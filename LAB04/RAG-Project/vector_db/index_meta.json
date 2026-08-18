@@ -1,0 +1,13 @@
+{
+  "file": {
+    "size": 60880,
+    "mtime": 1787067612
+  },
+  "settings": {
+    "CHUNK_SIZE": 400,
+    "CHUNK_OVERLAP": 50,
+    "EMBEDDING_MODEL_NAME": "paraphrase-multilingual-MiniLM-L12-v2"
+  },
+  "n_chunks": 200,
+  "source_file": "cat_qa_dataset.txt"
+}

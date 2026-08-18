@@ -1,0 +1,702 @@
+[
+  {
+    "id": 0,
+    "category": "Cat Health and Disease Prevention",
+    "question": "What are the essential vaccines for cats?",
+    "answer": "The core vaccines that every cat should receive are the combination vaccine (FVRCP) to prevent feline panleukopenia, feline herpesvirus, and calicivirus, as well as the rabies vaccine, which is required by Thai law to be administered annually. Cats that go outdoors or come into contact with other cats should also be considered for the feline leukemia virus (FeLV) vaccine. Kittens should receive their first dose between 6-8 weeks of age, followed by boosters every 3-4 weeks until they reach 16 weeks of age.",
+    "line_no": 9
+  },
+  {
+    "id": 1,
+    "category": "Cat Health and Disease Prevention",
+    "question": "Why do cats frequently get viral respiratory infections?",
+    "answer": "Cats that have been infected with the Herpesvirus often do not fully recover. The virus lies dormant in the nerve ganglia and will cause symptoms to reappear when the immune system is weak or stressed, such as during a move, the introduction of a new cat, or sudden environmental changes. Symptoms include sneezing, a runny nose, watery eyes, and loss of appetite. Therefore, multi-cat households or cats from shelters have a higher risk of reinfection compared to solitary cats.",
+    "line_no": 13
+  },
+  {
+    "id": 2,
+    "category": "Cat Health and Disease Prevention",
+    "question": "How often should I take my cat for an annual health check-up?",
+    "answer": "Normal adult cats should have a general health check-up once a year. Senior cats, aged 7-8 years and older, should be checked every 6 months, including blood and urine tests, because chronic kidney disease and hyperthyroidism are common in older cats but often do not show clear symptoms until the disease has progressed. You should seek immediate further testing if your cat drinks more water, loses weight for no apparent reason, or is unusually lethargic.",
+    "line_no": 17
+  },
+  {
+    "id": 3,
+    "category": "Cat Health and Disease Prevention",
+    "question": "What symptoms indicate that I should take my cat to the vet immediately without waiting?",
+    "answer": "Emergency signals include not urinating for over 24 hours, especially in male cats, which could be a rapidly fatal urinary tract obstruction. Other signs include open-mouth breathing or difficulty breathing; extreme lethargy, not getting up, or not eating for over 24 hours; severe vomiting or diarrhea combined with lethargy; sudden weakness in the legs or inability to walk; pale or blue gums; and having wounds from falling from a height or being hit by a car.",
+    "line_no": 21
+  },
+  {
+    "id": 4,
+    "category": "Cat Health and Disease Prevention",
+    "question": "How often should deworming medication and flea/tick preventatives be given?",
+    "answer": "Internal deworming should be done every 3 months for adult cats, and monthly for kittens until they are 6 months old. Topical spot-on flea and tick preventatives or oral medications should be given according to the product's specified cycle, usually every 4 weeks. For cats that go outside or live in damp areas with a risk of mosquito-borne heartworm, you should consult a veterinarian regarding additional preventatives, as heartworm in cats is much more difficult to treat than in dogs.",
+    "line_no": 25
+  },
+  {
+    "id": 5,
+    "category": "Cat Health and Disease Prevention",
+    "question": "Why shouldn't cats eat dog food?",
+    "answer": "Dog food contains lower levels of protein and taurine than cats require. Cats cannot synthesize enough taurine on their own and must obtain it directly from their diet. Continuous taurine deficiency will lead to heart muscle weakness and permanent retinal degeneration. Additionally, cats require preformed arachidonic acid and vitamin A, which plants and standard dog food do not provide in sufficient amounts. Feeding dog food occasionally is not dangerous, but it should not be used as a long-term substitute for cat food.",
+    "line_no": 29
+  },
+  {
+    "id": 6,
+    "category": "Cat Health and Disease Prevention",
+    "question": "What foods or items are toxic to cats?",
+    "answer": "Clearly dangerous items include onions and garlic in all forms, which destroy red blood cells; grapes and raisins; chocolate; caffeine; alcohol; gum or candies containing xylitol; all parts of lilies, which are highly toxic to cat kidneys even in small amounts; and cow's milk, as most adult cats cannot digest lactose, leading to diarrhea. If you suspect your cat has ingested any of these, you should take them to the vet immediately without waiting for symptoms to appear.",
+    "line_no": 33
+  },
+  {
+    "id": 7,
+    "category": "Cat Health and Disease Prevention",
+    "question": "What diseases are obese cats at risk for, and how should they lose weight?",
+    "answer": "Obese cats have an increased risk of type 2 diabetes, osteoarthritis, fatty liver disease, and urinary tract diseases. Weight loss must be gradual. Never abruptly withhold food because obese cats that stop eating for more than 2-3 days risk acute liver failure, known as hepatic lipidosis. You should consult a vet to plan a gradual calorie reduction along with encouraging exercise using toys.",
+    "line_no": 37
+  },
+  {
+    "id": 8,
+    "category": "Behavior and Relationship with Owners",
+    "question": "Why do cats scratch furniture even when provided with a scratching post?",
+    "answer": "Scratching is a natural behavior that helps shed old nail sheaths, stretch muscles, and mark territory via scent glands in their paws. If a cat avoids an existing scratching post, it might be due to the material, height, or placement not being to their liking. Try changing the surface, such as using sisal rope instead of carpet, place it in the spot they already scratch, and use catnip or treats to entice them to associate that spot with positive feelings. Punishing them by hitting or scolding loudly usually makes the cat fear the owner rather than stopping the behavior.",
+    "line_no": 41
+  },
+  {
+    "id": 9,
+    "category": "Behavior and Relationship with Owners",
+    "question": "What causes cats to pee outside the litter box?",
+    "answer": "Causes fall into two main categories: health problems (like cystitis, bladder stones, or kidney disease), which must always be ruled out first; and behavioral issues. Behavioral causes include a dirty litter box, a disliked type of litter, a lack of privacy or being placed near loud noises, another cat monopolizing the same box, or stress from household changes. The general rule is that the number of litter boxes should equal the number of cats plus one, and they should be distributed to avoid competition.",
+    "line_no": 45
+  },
+  {
+    "id": 10,
+    "category": "Behavior and Relationship with Owners",
+    "question": "Why do cats suddenly bite gently when being petted?",
+    "answer": "This behavior is called petting-induced aggression. It occurs from continuous tactile stimulation exceeding the cat's tolerance threshold. Even if it starts with enjoyment, warning signs before a bite usually include aggressive tail twitching, flattened ears, or skin twitching. You should observe these signals and stop petting before the cat reaches that point. It is not a behavioral defect, but rather a limitation in sensory sensitivity that varies from cat to cat.",
+    "line_no": 49
+  },
+  {
+    "id": 11,
+    "category": "Behavior and Relationship with Owners",
+    "question": "Why do cats knead on hands or blankets?",
+    "answer": "This behavior stems from kittenhood, when they kneaded their mother's teats to stimulate milk flow. As they grow, some retain this behavior as an expression of feeling safe and relaxed. Cats that were weaned too early tend to knead more frequently. It is not an abnormal behavior and doesn't need to be corrected unless their claws cause pain, which can be managed by placing a thick cloth over your hand or trimming their nails short.",
+    "line_no": 53
+  },
+  {
+    "id": 12,
+    "category": "Behavior and Relationship with Owners",
+    "question": "Why do cats like to bring prey or toys and drop them in front of their owners?",
+    "answer": "This behavior is inherited from wild cat instincts, where mother cats bring prey to teach their kittens how to hunt. Bringing it to the owner shows that the cat views the owner as a group member who needs care or with whom resources should be shared. It is a sign of bonding, not a problem. The appropriate response is to gently praise them and calmly take the item; there is no need to be alarmed or to scold them.",
+    "line_no": 57
+  },
+  {
+    "id": 13,
+    "category": "Behavior and Relationship with Owners",
+    "question": "How should a new cat and an existing cat in the house be introduced?",
+    "answer": "They should be separated in different areas for at least 1 week to get used to each other's scent under the door or through a scented cloth from the other cat. Then, let them see each other for short periods through a barrier or cage, while feeding them simultaneously on opposite sides of the door to create positive associations. Gradually increase the time and distance when they no longer hiss or puff up their tails. The whole process may take weeks to months depending on the cats' personalities. Rushing it often worsens their relationship in the long run.",
+    "line_no": 61
+  },
+  {
+    "id": 14,
+    "category": "Cat Anatomy and Responses",
+    "question": "What is the function of cat whiskers besides aesthetics?",
+    "answer": "Whiskers, or vibrissae, are highly sensitive tactile organs. Their roots are deeply embedded in the skin and densely connected to nerve endings. They help cats sense the width of openings without needing to see, detect air movement and nearby objects in the dark, and communicate emotions based on their direction. You should never cut a cat's whiskers, as it will cause temporary loss of spatial awareness and induce stress.",
+    "line_no": 65
+  },
+  {
+    "id": 15,
+    "category": "Cat Anatomy and Responses",
+    "question": "Why do cats purr, and does it always mean the same thing?",
+    "answer": "Purring is caused by the vibration of laryngeal muscles during inhalation and exhalation. It is mostly seen when a cat feels relaxed or content, but it does not always mean they are happy. Some cats purr when they are in pain, frightened, or near death, as the vibration frequency can theoretically help relieve pain and stimulate bone repair. Therefore, you should consider the context and other body language, and not use purring as the sole indicator of their mood.",
+    "line_no": 69
+  },
+  {
+    "id": 16,
+    "category": "Cat Anatomy and Responses",
+    "question": "Can cats see colors, and can they really see in the dark?",
+    "answer": "Cats can see color, but it's more limited than humans because they only have 2 types of color receptor cells compared to humans' 3 types, making it hard for them to distinguish red and green tones. As for seeing in the dark, they cannot see in pitch blackness; rather, they use low light highly efficiently. This is because they have a reflective layer behind the retina (tapetum lucidum) that bounces light back through the photoreceptor cells a second time, which makes cat eyes glow in the dark when exposed to light.",
+    "line_no": 73
+  },
+  {
+    "id": 17,
+    "category": "Cat Anatomy and Responses",
+    "question": "Why is a cat's tongue rough when it licks?",
+    "answer": "The surface of a cat's tongue is covered with hook-like papillae made of keratin, the same material as their nails. Their function is to comb through fur to untangle knots, scrape meat from bones when hunting, and help draw up liquid while drinking. This structure also causes loose fur to stick to the tongue and be swallowed, accumulating as hairballs. This is one reason why long-haired cats should be brushed regularly to reduce the amount of ingested fur.",
+    "line_no": 77
+  },
+  {
+    "id": 18,
+    "category": "Cat Anatomy and Responses",
+    "question": "How can cats jump so high and balance so well?",
+    "answer": "A cat's spine has much more flexible joints than a human's, and they lack a fully fused collarbone, allowing their front legs free rotation and their bodies to twist in mid-air. Their balancing system relies on the inner ear combined with vision and tail positioning, which acts as a counterbalance. The righting reflex allows cats to usually land feet first, but this does not mean falling from heights is always safe, as they still risk bone fractures or internal organ injuries.",
+    "line_no": 81
+  },
+  {
+    "id": 19,
+    "category": "Thai Law and Social Context regarding Cats",
+    "question": "What are the legal requirements for keeping a cat in a condo?",
+    "answer": "The Prevention of Animal Cruelty and Provision of Animal Welfare Act, B.E. 2557 (2014) requires owners to care for pets properly and prohibits cruelty. Some areas, particularly Bangkok, have local ordinances requiring pet registration and microchipping for identification. Additionally, condominium juristic persons have the right to set their own supplementary rules, such as limiting the number or size of pets. Therefore, owners should check the juristic person's regulations alongside central laws.",
+    "line_no": 85
+  },
+  {
+    "id": 20,
+    "category": "Thai Law and Social Context regarding Cats",
+    "question": "If my cat attacks or bites someone else, is the owner liable?",
+    "answer": "According to Section 433 of the Civil and Commercial Code, the owner or keeper of an animal is responsible for the damages caused by the animal, unless they can prove they exercised reasonable care or that the damage would have occurred despite such care. In practice, owners should have third-party liability insurance or negotiate direct medical compensation with the injured party to minimize conflict.",
+    "line_no": 89
+  },
+  {
+    "id": 21,
+    "category": "Thai Law and Social Context regarding Cats",
+    "question": "Is it a crime to harm or abuse a street cat?",
+    "answer": "Yes. The Prevention of Animal Cruelty and Provision of Animal Welfare Act, B.E. 2557 covers all animals regardless of whether they have an owner. Anyone who abuses an animal without justifiable reason faces imprisonment for up to 2 years, a fine of up to 40,000 baht, or both. Witnesses can take photos or videos as evidence and report the incident to the local police station or an animal welfare agency.",
+    "line_no": 93
+  },
+  {
+    "id": 22,
+    "category": "Thai Law and Social Context regarding Cats",
+    "question": "Can neighbors chase me away if I feed stray cats in the village?",
+    "answer": "Feeding stray animals is not inherently illegal. However, if it is in the common areas of a village or condo, the juristic person has the right to issue regulations prohibiting it or designating specific feeding spots for the cleanliness and safety of the community. The best approach is to discuss and agree with the juristic person or neighbors on feeding spots and times, always clean up afterward, and consider a stray cat spay/neuter program simultaneously to reduce long-term conflicts.",
+    "line_no": 97
+  },
+  {
+    "id": 23,
+    "category": "Breeds and Diversity",
+    "question": "What are the authentic Thai cat breeds?",
+    "answer": "Traditional Thai cat breeds recognized internationally include several varieties: the Siamese (Wichien Maat), with short cream fur and dark points on the face, ears, legs, tail, and clear blue eyes; the Khao Manee, with pure white fur and odd-colored eyes, considered auspicious; and the Korat (Si Sawat), with silver-grey fur all over and bright green eyes, which is legendary as a lucky cat for wealth. Each breed has distinct personality traits and care needs.",
+    "line_no": 101
+  },
+  {
+    "id": 24,
+    "category": "Breeds and Diversity",
+    "question": "How does caring for a long-haired cat differ from a short-haired cat?",
+    "answer": "Long-haired cats like Persians or Ragdolls require almost daily brushing to prevent fur from matting, which can pull the skin and cause inflammation, and they have a higher risk of hairball blockages in the stomach. Short-haired cats only need brushing 1-2 times a week. However, some short-haired breeds like the Devon Rex or hairless Sphynx require special skin care because they lack the fur to naturally absorb excess oils.",
+    "line_no": 105
+  },
+  {
+    "id": 25,
+    "category": "Reproduction and Family Care",
+    "question": "At what age should a cat be spayed/neutered?",
+    "answer": "Most veterinarians recommend spaying/neutering at around 4-6 months of age, before the cat reaches its first reproductive maturity. Early spaying significantly reduces the risk of mammary cancer in female cats if done before their first heat cycle, and it reduces territorial urine spraying and roaming behaviors in male cats. Today, many clinics can perform the procedure on cats weighing 1 kilogram or more without having to wait until they are older, contrary to past beliefs.",
+    "line_no": 109
+  },
+  {
+    "id": 26,
+    "category": "Reproduction and Family Care",
+    "question": "What are the symptoms of a cat in heat, and how often does it happen?",
+    "answer": "Unspayed female cats enter a heat cycle every 2-3 weeks during periods of long daylight. Noticeable symptoms include unusually loud vocalization, especially at night, rubbing against the floor or objects, raising their hindquarters when petted on the back, and attempting to escape outside. Cats only ovulate when stimulated by mating, meaning if they don't mate, the cycle will continually repeat until they are spayed or the breeding season ends.",
+    "line_no": 113
+  },
+  {
+    "id": 27,
+    "category": "Reproduction and Family Care",
+    "question": "How long are cats pregnant before giving birth, and what are the signs of impending labor?",
+    "answer": "Cat pregnancy lasts approximately 63-67 days. Nearing birth, cats typically seek a quiet spot to nest, their body temperature drops slightly, they lose their appetite, and they start showing signs of straining or rapid breathing. You should prepare a clean, warm, and secluded birthing box in advance. If she pushes for over 1 hour without producing a kitten, or if dark green fluid leaks before the first kitten, take her to a vet immediately as she may be experiencing dystocia.",
+    "line_no": 117
+  },
+  {
+    "id": 28,
+    "category": "Reproduction and Family Care",
+    "question": "Why shouldn't stray cats be left to breed in the neighborhood?",
+    "answer": "A single female cat can have multiple litters a year, and each litter can reach reproductive age in less than a year. This causes the stray population to multiply exponentially, rapidly exceeding available resources and space, leading to malnutrition, infectious diseases among cats, and community conflicts. The most sustainable solution is a Trap-Neuter-Return (TNR) program, which controls the population without relying on euthanasia.",
+    "line_no": 121
+  },
+  {
+    "id": 29,
+    "category": "Nutrition and Feeding",
+    "question": "Should cats eat wet food or dry kibble?",
+    "answer": "Wet food has a high moisture content of about 70-80%, similar to natural prey, helping cats get more water, which is good for the kidneys and urinary tract. Dry food is convenient to store and can somewhat help scrape off plaque through chewing. In practice, you can feed a mix of both, prioritizing wet food for cats that drink little water or have a history of stones. More importantly, choose formulas with animal protein as the primary ingredient that are appropriate for the cat's life stage.",
+    "line_no": 125
+  },
+  {
+    "id": 30,
+    "category": "Nutrition and Feeding",
+    "question": "How many meals a day should a cat be fed?",
+    "answer": "Kittens under 6 months old should be fed 3-4 meals a day because their stomachs are small and they need high energy. Normal adult cats do well with 2 meals, morning and evening, or divided into multiple smaller meals if the cat is prone to obesity. Leaving food out all day (free feeding) risks the cat overeating, especially in neutered/spayed cats whose metabolism has slowed down.",
+    "line_no": 129
+  },
+  {
+    "id": 31,
+    "category": "Nutrition and Feeding",
+    "question": "When should weaning kittens start eating solid food?",
+    "answer": "You can start introducing solid food at around 3-4 weeks of age. Begin with mashed wet food mixed with kitten milk replacer to a porridge-like consistency, and gradually reduce the liquid as the kitten gets used to it. The weaning process is typically completed around 8 weeks of age. Kittens should not be separated from their mother before 8 weeks, as they still need nutrients from her milk and social behavioral learning from their mother and siblings.",
+    "line_no": 133
+  },
+  {
+    "id": 32,
+    "category": "Nutrition and Feeding",
+    "question": "Why do cats eat grass, and is it dangerous?",
+    "answer": "Eating grass is a normal and common behavior. It is theorized to induce vomiting to expel hairballs or indigestible material, or to provide certain beneficial dietary fibers. Commercially available cat grass, such as young wheat or oat grass, is safe. However, you must be careful not to let cats access certain toxic indoor ornamental plants, like lilies, dieffenbachia, or pothos, which could be mistaken for cat grass.",
+    "line_no": 137
+  },
+  {
+    "id": 33,
+    "category": "Nutrition and Feeding",
+    "question": "Is a raw diet really safe for cats?",
+    "answer": "A raw diet provides nutrients close to nature but carries the risk of bacterial contamination, like Salmonella and Listeria, for both the cat and household members. If you choose this diet, you must use human-grade meat that has been frozen to kill parasites, store and prepare it with strict hygiene, and ensure a complete balance of calcium-phosphorus and essential nutrients. Homemade raw diets without nutritional knowledge often lack critical nutrients. You should consult a veterinary nutritionist before switching long-term.",
+    "line_no": 141
+  },
+  {
+    "id": 34,
+    "category": "Nutrition and Feeding",
+    "question": "What are the risks if my cat doesn't drink enough water, and how can I fix it?",
+    "answer": "Cats have an instinct to drink very little water because their ancestors were desert animals that derived moisture primarily from prey. Low water intake increases the risk of urinary stones and inflammation. Ways to encourage more drinking include using a cat fountain (as cats prefer running water to still water), placing multiple water bowls around the house away from food bowls and litter boxes, changing the water daily to keep it fresh, and increasing the proportion of wet food in their diet.",
+    "line_no": 145
+  },
+  {
+    "id": 35,
+    "category": "Nutrition and Feeding",
+    "question": "Do senior cats need a different food formula?",
+    "answer": "You should consider switching when they are around 7-10 years old. Formulas for senior cats usually adjust the protein to be easily digestible while maintaining adequate amounts to preserve muscle mass, reduce phosphorus to protect the kidneys, and add antioxidants and omega-3 fatty acids. If the cat has underlying diseases like chronic kidney disease or diabetes, you should use prescription medical diets ordered by a vet instead of standard formulas.",
+    "line_no": 149
+  },
+  {
+    "id": 36,
+    "category": "Nutrition and Feeding",
+    "question": "How often can I give my cat treats or snacks?",
+    "answer": "Treat volume should not exceed 10% of their total daily calorie intake. This ensures that their nutritionally balanced main diet is not diluted to the point of nutrient deficiency. Choose treats with clear calorie counts and subtract them proportionally from the main meals. Human foods like processed meats, sausages, or sweets are unsuitable because they are too high in salt, fat, or artificial additives.",
+    "line_no": 153
+  },
+  {
+    "id": 37,
+    "category": "Nutrition and Feeding",
+    "question": "Do I need to transition slowly when changing cat food brands?",
+    "answer": "You should change it gradually over 7-10 days, starting by mixing 25% of the new food with 75% of the old food, and incrementally increasing the new food's proportion every 2-3 days until it reaches 100%. Sudden changes risk causing diarrhea or the cat refusing the food because their digestive system and familiarity haven't adapted. Picky eaters may require even longer than that.",
+    "line_no": 157
+  },
+  {
+    "id": 38,
+    "category": "Grooming and Oral Health",
+    "question": "Can cats get gingivitis and tooth decay?",
+    "answer": "Yes, and it is very common. Most cats over 3 years old have some degree of tartar or gingivitis. A specific problem found in cats is tooth resorption, where the tooth structure is destroyed from the inside for unknown reasons, causing severe dental pain even if the exterior looks normal. Noticeable symptoms include drooling, eating more slowly, or tilting the head while chewing. You should take them for oral check-ups and scaling by a vet at least once a year.",
+    "line_no": 161
+  },
+  {
+    "id": 39,
+    "category": "Grooming and Oral Health",
+    "question": "How do I brush my cat's teeth without getting bitten?",
+    "answer": "It is easiest to start training while the cat is still young. First, get them accustomed to their mouth being touched by your finger. For the first week, use a cat-formulated toothpaste in a flavor they like, such as chicken, and smear it on your finger for them to lick. Then, gradually switch to a soft-bristled toothbrush or a finger brush. Brush gently in circles on the outside of the molars, which is the most important part. Short, consistent daily sessions are better than long, infrequent ones. If the cat resists heavily, use a no-brush dental gel instead.",
+    "line_no": 165
+  },
+  {
+    "id": 40,
+    "category": "Grooming and Oral Health",
+    "question": "How dangerous are hairball blockages?",
+    "answer": "Regurgitating hairballs occasionally is normal. However, if a cat frequently tries to vomit but nothing comes out, loses appetite, has a hard abdomen, or is lethargic, it could be a hairball intestinal blockage, which is a surgical emergency. Prevention includes regular brushing to reduce ingested fur, feeding hairball control formulas, or using malt paste as recommended by a vet.",
+    "line_no": 169
+  },
+  {
+    "id": 41,
+    "category": "Grooming and Oral Health",
+    "question": "How often should I trim my cat's nails, and how do I do it safely?",
+    "answer": "Trim every 2-3 weeks for indoor cats that rarely scratch natural objects. Use specialized cat nail clippers. Gently squeeze the paw pad to extend the nail. Clip only the sharp white tip, maintaining a distance from the pink section called the quick, which contains blood vessels and nerves. Cutting it will cause bleeding and pain. You should have styptic powder on hand and gently accustom your cat to paw handling from a young age.",
+    "line_no": 173
+  },
+  {
+    "id": 42,
+    "category": "Grooming and Oral Health",
+    "question": "Is it abnormal for my cat to have a lot of earwax?",
+    "answer": "A small amount of light brown earwax is normal. But if there is a large amount, a foul odor, it is black like coffee grounds, or if the cat frequently scratches its ears and constantly shakes its head, it could be a sign of ear mites or a fungal/bacterial ear infection. You should not stick a cotton swab deep into the ear canal, as it risks pushing dirt deeper or damaging the eardrum. A vet should examine and clean the ears or prescribe appropriate medication.",
+    "line_no": 177
+  },
+  {
+    "id": 43,
+    "category": "Kitten Care",
+    "question": "I found a newborn kitten with no mother. What should I do?",
+    "answer": "First, observe from a distance for at least 1-2 hours, as the mother might have just gone to find food and will return. If you are certain it is abandoned, wrap it in a cloth to provide warmth because newborns cannot regulate their own body temperature. Never give it cow's milk, as it cannot digest it and will get diarrhea. You must use specific kitten milk replacer fed through a small bottle every 2-3 hours, and stimulate elimination by gently wiping the anus with a warm, damp cloth, simulating the mother's licking. You should take it to a vet for evaluation as soon as possible.",
+    "line_no": 181
+  },
+  {
+    "id": 44,
+    "category": "Kitten Care",
+    "question": "When should kittens be trained to use the litter box?",
+    "answer": "Kittens naturally start using a litter box around 3-4 weeks of age with almost no training required. Simply place a low-sided litter box in an easily accessible spot near where they stay. After they eat, try gently placing them in the box to get them familiar with it. Use fine, unscented litter, as kittens have sensitive noses and may dislike synthetic scents. If a kitten still isn't using the box past 8 weeks, consult a vet to check for other issues.",
+    "line_no": 185
+  },
+  {
+    "id": 45,
+    "category": "Kitten Care",
+    "question": "My kitten bites hard when playing. How do I train them out of this habit?",
+    "answer": "Never use your bare hands or fingers to play with a kitten, as it teaches them that hands are toys and they will bite harder as they grow. You should always use a teaser wand or toys that keep distance from your hands. When a kitten bites too hard, immediately stop playing and walk away for a moment to teach them that biting hard stops the fun. You should not hit or flick their nose, as this will make the kitten fear human hands instead of learning bite inhibition.",
+    "line_no": 189
+  },
+  {
+    "id": 46,
+    "category": "Senior Cat Care",
+    "question": "Is it abnormal for senior cats to sleep a lot more?",
+    "answer": "Older cats naturally sleep more due to decreased metabolism and activity levels. However, if they sleep noticeably more combined with eating less, losing interest in play, or having difficulty with stairs, it could be a sign of osteoarthritis, which affects over half of cats over 10 years old but is often overlooked because cats don't show obvious pain like dogs do. They should be examined to rule out other conditions like kidney disease or hyperthyroidism, which can also cause lethargy.",
+    "line_no": 193
+  },
+  {
+    "id": 47,
+    "category": "Senior Cat Care",
+    "question": "How do I know if my cat is in pain from joint disease, since cats rarely vocalize it?",
+    "answer": "Signs to look for instead of crying include hesitation or inability to jump as high as before; stiff walking or rigid steps after waking up; avoiding high-sided litter boxes, leading to urinating outside the box; decreased grooming causing a dull coat, especially around the hard-to-reach hips; and increased irritability when handled or picked up. Modifying the environment to make things more accessible, such as using ramps to beds and low-sided litter boxes, along with vet-prescribed painkillers, can greatly improve their quality of life.",
+    "line_no": 197
+  },
+  {
+    "id": 48,
+    "category": "Senior Cat Care",
+    "question": "My old cat is losing a lot of weight despite eating the same amount. What could cause this?",
+    "answer": "This is a classic sign of hyperthyroidism, which is common in cats over 10 years old. The thyroid gland overproduces hormones, elevating metabolism so much that weight drops even if their appetite increases or remains the same. Other concurrent symptoms include restlessness, rapid heart rate, frequent vomiting, and a coarse coat. It is diagnosed via a blood test measuring T4 hormone levels and can be treated with medication, radioactive iodine, or surgery depending on the individual cat's suitability.",
+    "line_no": 201
+  },
+  {
+    "id": 49,
+    "category": "First Aid and Emergencies",
+    "question": "My cat was hit by a car but is still breathing. What should I do before seeing a vet?",
+    "answer": "Do not pick them up by embracing them, as they might have broken bones or spinal injuries. Instead, carefully slide their entire body onto a firm surface like a board or flat cardboard box to restrict movement. Cover them with a blanket to provide warmth, as cats in shock lose body heat rapidly. Do not give food or water by mouth, as they may need emergency anesthesia for surgery. Rush them to the nearest animal hospital immediately, even if they look fine externally, because internal bleeding symptoms often don't show right away.",
+    "line_no": 205
+  },
+  {
+    "id": 50,
+    "category": "First Aid and Emergencies",
+    "question": "If my cat ingested poison or overdosed on medication, should I make them vomit?",
+    "answer": "You should not induce vomiting yourself without consulting a vet or animal poison control center first. Certain substances, such as corrosives or petroleum products, are more dangerous if vomited due to the risk of aspiration into the lungs. You should memorize or take a photo of the product label, note the estimated time and amount ingested, and call a vet immediately for correct, substance-specific advice.",
+    "line_no": 209
+  },
+  {
+    "id": 51,
+    "category": "First Aid and Emergencies",
+    "question": "What are the symptoms of heat stroke in cats, and what should be done?",
+    "answer": "Symptoms include open-mouth panting, excessive drooling, bright red or dark purple gums, lethargy, staggering, and possibly seizures in severe cases. You should move the cat to a shaded, well-ventilated area immediately. Use a cloth soaked in room-temperature water to wipe their body, especially the groin and armpits. Never use ice-cold water or ice because it constricts blood vessels and worsens heat dissipation. Then rush them to a vet immediately, as this condition damages internal organs very quickly.",
+    "line_no": 213
+  },
+  {
+    "id": 52,
+    "category": "First Aid and Emergencies",
+    "question": "What should I do if my cat is having a seizure?",
+    "answer": "Do not put your hands in the cat's mouth, as cats don't swallow their tongues (a common misconception), and you might get bitten unknowingly due to muscle spasms. Clear the area around them of objects that could cause injury. Dim the lights and keep the area quiet. Time the seizure, as this information is crucial for diagnosis. If the seizure lasts longer than 5 minutes or occurs multiple times in a row, it is an emergency and they must go to the hospital immediately. Cats having their first seizure should be examined for the underlying cause even if they stop seizing on their own.",
+    "line_no": 217
+  },
+  {
+    "id": 53,
+    "category": "First Aid and Emergencies",
+    "question": "My male cat cannot pee at all. How dangerous is this?",
+    "answer": "Extremely dangerous, and it is considered one of the top emergencies in cats. A male cat's urethra is much narrower than a female's, so it clogs easily from crystals or inflammatory mucus. When completely blocked, waste products accumulate in the blood to toxic levels, and the bladder could rupture. It can be fatal within 24-48 hours if untreated. Signs include frequently visiting the litter box but producing no urine, straining and crying, and frequently licking the lower abdomen. You must take them to the hospital immediately without waiting to see.",
+    "line_no": 221
+  },
+  {
+    "id": 54,
+    "category": "Common Cat Myths",
+    "question": "Can a cat really heal its own wounds by licking them?",
+    "answer": "No, not in the sense of always being safe. Cat saliva contains some enzymes that may mildly help kill bacteria and clean dirt from a wound. However, excessive licking keeps the wound constantly moist, hindering healing, and a cat's mouth houses bacteria that can cause secondary infections. Deep or large wounds should be treated by a vet, and an Elizabethan collar should be worn to prevent the cat from licking its own wound.",
+    "line_no": 225
+  },
+  {
+    "id": 55,
+    "category": "Common Cat Myths",
+    "question": "Do cats really have 9 lives?",
+    "answer": "This is merely a folklore belief stemming from their balancing ability and higher survival rates from high falls compared to other animals, thanks to their righting reflex and flexible spine. Cats do not actually have extra lives and can die from accidents just like any other animal. This myth can make owners careless, thinking cats are always safe when falling from heights. In reality, a condition called high-rise syndrome still causes cats to suffer severe injuries or death.",
+    "line_no": 229
+  },
+  {
+    "id": 56,
+    "category": "Common Cat Myths",
+    "question": "Does a dry nose always mean a cat is sick?",
+    "answer": "No. A cat's nose being wet or dry depends on many factors, such as having just woken up, dry air, or room humidity, making it an inaccurate health indicator. More reliable signs are overall behaviors, like appetite, activity level, elimination, and actual body temperature measured with a pet thermometer, which for a normal cat is around 38-39.2 degrees Celsius.",
+    "line_no": 233
+  },
+  {
+    "id": 57,
+    "category": "Common Cat Myths",
+    "question": "Is it true that cats don't need exercise because they are naturally lazy?",
+    "answer": "Not true. In nature, cats spend a lot of time moving to hunt prey and explore their territory. The perception that indoor cats sleep all day often stems from a lack of stimulating play rather than true laziness. Lack of activity increases the risk of obesity, stress, and destructive behavior. You should play with your cat using a teaser wand at least twice a day, for 10-15 minutes at a time, to simulate the hunt-catch-eat-groom-sleep cycle they naturally require.",
+    "line_no": 237
+  },
+  {
+    "id": 58,
+    "category": "Common Cat Myths",
+    "question": "Are cats allergic to milk, even though cartoons often depict them drinking it from a saucer?",
+    "answer": "Most adult cats cannot digest lactose well because lactase enzyme levels decrease after weaning. Giving cow's milk usually causes diarrhea or bloating. It is not appropriate food, despite being a common trope in mainstream media. If you want your cat to enjoy something similar to milk, you should choose specialized, lactose-free cat milk products available at pet stores.",
+    "line_no": 241
+  },
+  {
+    "id": 59,
+    "category": "Communication and Body Language",
+    "question": "What does it mean when a cat thrashes its tail back and forth?",
+    "answer": "A fast and hard thrashing tail usually communicates building frustration or irritation. This is different from a slow swish with just the tip twitching, which usually signifies focused interest while watching something. A tail held straight up in the air with a slight curve at the tip means the cat feels confident and friendly. If the tail is unusually puffed out alongside an arched back, it means they are terrified or feel threatened. You should always read tail signals in conjunction with ears and body posture for accuracy.",
+    "line_no": 245
+  },
+  {
+    "id": 60,
+    "category": "Communication and Body Language",
+    "question": "What does it mean when a cat slowly blinks at us?",
+    "answer": "A slow blink is informally called a \"cat kiss\". It is a sign of trust and a feeling of safety, as keeping their eyes closed for an extended time—in an animal instinctively on alert—means they don't feel the need to guard against you. Owners can respond by slow blinking back to communicate good feelings in the same way. Behavioral research has found that this method helps reduce stress in cats and makes them more likely to approach the owner.",
+    "line_no": 249
+  },
+  {
+    "id": 61,
+    "category": "Communication and Body Language",
+    "question": "Why does a cat expose its belly, but scratch when I pet it?",
+    "answer": "Rolling over to expose the belly is a display of trust in that environment, but unlike with dogs, it is not always an invitation for a belly rub. The belly is a sensitive area housing vital organs under thin skin, so defensive instincts trigger immediately when touched there. You should let the cat choose where to be petted by observing their reactions first, rather than immediately touching their belly when they roll over.",
+    "line_no": 253
+  },
+  {
+    "id": 62,
+    "category": "Communication and Body Language",
+    "question": "What does it mean when a cat's ears are pinned flat against its head?",
+    "answer": "Flattened ears usually convey fear, aggression, or pain. It is a defensive posture to minimize the exposed area of a sensitive organ from an attack. This is different from ears turned slightly to the side, which might just mean they are listening to surrounding sounds. If you see flattened ears combined with hissing or a puffed-up tail, back away and give the cat space to calm down on its own. You should not approach to pick them up or force contact during this time, as you risk being scratched or bitten.",
+    "line_no": 257
+  },
+  {
+    "id": 63,
+    "category": "Communication and Body Language",
+    "question": "Who are a cat's meows directed at?",
+    "answer": "Interestingly, adult cats rarely meow at each other in the wild; they developed the meow primarily to communicate with humans. This is because they learned humans respond to this sound. Each cat usually has unique vocal patterns that the owner gradually learns the meaning of, such as a short, high-pitched squeak for greeting, a drawn-out yowl when demanding food, or a low growl for displeasure. Unusually frequent vocalization in older cats could be a sign of cognitive confusion or pain that should be checked.",
+    "line_no": 261
+  },
+  {
+    "id": 64,
+    "category": "Environment and Enrichment",
+    "question": "What kind of home is ideal for a cat based on environmental enrichment principles?",
+    "answer": "The basic principle is to provide vertical space for cats to climb, such as cat trees or wall shelves, because cats feel secure when elevated. They need private hiding spots like boxes or enclosed beds. There should be multiple scratching posts in both vertical and horizontal orientations. Provide toys that stimulate hunting instincts, like those with feathers or sounds. Also, separate food, water, and litter boxes from each other, as cats dislike eating near their elimination area. Rotating toys weekly also helps reduce boredom effectively.",
+    "line_no": 265
+  },
+  {
+    "id": 65,
+    "category": "Environment and Enrichment",
+    "question": "What requires special caution when keeping multiple cats in a house?",
+    "answer": "Every vital resource should always outnumber the amount of cats by at least one. This includes food bowls, water, litter boxes, and beds, to reduce resource guarding and hidden stress that might not be obvious but can lead to inappropriate urination or fighting. Locations should be distributed so a cat doesn't have to cross another's territory to access them. Watch for negative tension signals, such as prolonged staring or blocking access to key areas, which can lead to chronic conflicts if unresolved.",
+    "line_no": 269
+  },
+  {
+    "id": 66,
+    "category": "Environment and Enrichment",
+    "question": "Can cats be trained to walk on a leash outside?",
+    "answer": "Yes, but training must start very gradually inside the house first. Use an H-harness that distributes pulling force without choking. Let the cat wear it and walk around indoors until comfortable for several days before venturing outside. Begin outdoors in quiet areas before gradually moving to more stimulating environments. Do not force or drag the cat if they cower in fear and refuse to walk. Some cats adapt well, especially if trained from kittenhood, but some may never like it, which is completely normal.",
+    "line_no": 273
+  },
+  {
+    "id": 67,
+    "category": "Environment and Enrichment",
+    "question": "What are the different types of cat litter, and how do they differ?",
+    "answer": "Clumping bentonite clay litter absorbs moisture and forms hard clumps that are easy to scoop, making it the most popular. Silica gel litter controls odors well and requires changing less frequently, but does not clump. Natural litters, such as corn, tofu, or recycled paper, are suitable for cats with dust allergies or kittens who might ingest litter, as they are safer to digest. The choice should primarily depend on the cat's preference, as some cats will immediately reject a litter box if the texture feels unfamiliar.",
+    "line_no": 277
+  },
+  {
+    "id": 68,
+    "category": "Parasites and Zoonotic Diseases",
+    "question": "Is Toxoplasma in cats really dangerous to pregnant women?",
+    "answer": "Partially true. The Toxoplasma gondii parasite can spread from cat feces to humans and poses a risk to the fetus if a pregnant woman gets infected for the first time during pregnancy. However, the actual risk is much lower than commonly believed. The parasite is shed only for a brief period after the cat's initial infection, and one must come into contact with feces that have been sitting for over 24 hours to become infected. The recommendation is to have someone else clean the litter box, or to wear gloves and wash hands thoroughly if doing it yourself. There is no need to get rid of the cat due to pregnancy.",
+    "line_no": 281
+  },
+  {
+    "id": 69,
+    "category": "Parasites and Zoonotic Diseases",
+    "question": "Can cats transmit ringworm to humans?",
+    "answer": "Yes, they can. Ringworm is not a worm, but a skin fungus. It spreads through direct contact with infected fur or skin flakes containing spores, or via objects like combs and bedding. In humans, it typically manifests as a red, itchy ring with a distinct border. Kittens and cats with weakened immune systems have a higher risk of infection and transmission. Treatment involves topical or oral medication prescribed by a vet, alongside strict environmental cleaning, as spores can survive for a long time in the environment.",
+    "line_no": 285
+  },
+  {
+    "id": 70,
+    "category": "Parasites and Zoonotic Diseases",
+    "question": "What disease causes swollen lymph nodes after a cat scratch?",
+    "answer": "It could be Cat Scratch Disease. It is caused by the Bartonella henselae bacteria found in cat saliva, especially in cats with fleas. The scratch or bite wound becomes red and swollen, followed by swelling of nearby lymph nodes, and sometimes a low-grade fever. It generally resolves on its own in people with normal immune systems, but it can be more severe in young children or immunocompromised individuals. Prevention involves consistent flea control on the cat and washing scratch wounds immediately with soap.",
+    "line_no": 289
+  },
+  {
+    "id": 71,
+    "category": "Parasites and Zoonotic Diseases",
+    "question": "Can cat fleas bite humans, and how dangerous are they?",
+    "answer": "They can bite, even though humans are not their primary host. They usually cause red, itchy bumps around the ankles or legs. Fleas are also carriers of a certain type of tapeworm that cats can contract from swallowing a flea while grooming, and transmission to humans is possible, though rare, particularly in children. Controlling fleas at the source involves giving the cat regular preventatives and frequently vacuuming carpets and cat beds, because the majority of flea eggs and larvae reside in the environment rather than on the cat itself.",
+    "line_no": 293
+  },
+  {
+    "id": 72,
+    "category": "Common Chronic Diseases in Cats",
+    "question": "Can chronic kidney disease in cats be cured?",
+    "answer": "Chronic kidney disease cannot be completely cured because damaged kidney tissue does not regenerate. However, the deterioration can be slowed and symptoms controlled through low-protein/low-phosphorus diets, blood pressure medication, appetite stimulants, and at-home subcutaneous fluids in necessary cases. Early detection through annual blood tests helps implement a care plan promptly and can extend their life span with good quality of life by several years.",
+    "line_no": 297
+  },
+  {
+    "id": 73,
+    "category": "Common Chronic Diseases in Cats",
+    "question": "How do you notice diabetes in cats, and how is it treated?",
+    "answer": "Symptoms include abnormal increases in drinking and urinating, weight loss despite a hearty appetite, and in long-standing cases, walking abnormally on their hocks (heels) due to nerve degeneration. Diagnosis requires repeated blood and urine glucose testing, as cats can easily have temporarily elevated sugar from stress. The primary treatment is scheduled subcutaneous insulin injections combined with a low-carbohydrate, high-protein diet. Some cats that are well-controlled early on can even reach diabetic remission and stop relying on insulin.",
+    "line_no": 301
+  },
+  {
+    "id": 74,
+    "category": "Common Chronic Diseases in Cats",
+    "question": "What is the difference between FIV and FeLV, and do infected cats need to be euthanized?",
+    "answer": "FIV (Feline Immunodeficiency Virus) is primarily transmitted through severe bite wounds from fighting. FeLV (Feline Leukemia Virus) transmits more easily through saliva and mutual care, like grooming or sharing bowls. Neither has a cure, but many FIV-positive cats can live normal lives for years with good care and separation from uninfected cats. FeLV usually results in a shorter lifespan and a higher risk of leukemia. Euthanasia is not immediately necessary upon diagnosis; you should consult a vet to plan individualized care for their quality of life.",
+    "line_no": 305
+  },
+  {
+    "id": 75,
+    "category": "Common Chronic Diseases in Cats",
+    "question": "Is feline asthma real, and how is it treated?",
+    "answer": "Yes, it is real. It results from airways being hypersensitive to triggers like dust, litter, cigarette smoke, or air fresheners. Symptoms include frequent dry coughing, wheezing, or episodic panting that looks like trying to hack up a hairball with nothing coming out. Diagnosis requires ruling out heart disease and lung parasites first. The primary treatment is bronchodilators and inhaled steroids via a specialized cat mask, combined with reducing household triggers, such as switching to low-dust litter.",
+    "line_no": 309
+  },
+  {
+    "id": 76,
+    "category": "Cat Stress and Mental Health",
+    "question": "How do cats show symptoms of stress?",
+    "answer": "Stress signals in cats are often more subtle than in dogs. Examples include overgrooming to the point of thinning fur or sores, hiding for unusually long periods, suddenly eating less or more, peeing outside the box despite no health issues, or increasing aggression toward people or other cats they used to get along with. Common causes are environmental changes like moving, a new family member, or rearranging furniture. Giving them time to adjust and maintaining normal routines as much as possible helps reduce stress.",
+    "line_no": 313
+  },
+  {
+    "id": 77,
+    "category": "Cat Stress and Mental Health",
+    "question": "Do synthetic pheromones like Feliway really help stressed cats?",
+    "answer": "There is some level of evidence that they help reduce certain stress behaviors, such as territorial urine spraying and destructive scratching, because they mimic the pheromones cats secrete from facial glands to indicate a safe space. They are effective as a supplementary tool alongside environmental and routine adjustments. They should not be used as the sole method to fix severe or chronic behavioral problems without consulting a veterinary behaviorist.",
+    "line_no": 317
+  },
+  {
+    "id": 78,
+    "category": "Cat Stress and Mental Health",
+    "question": "Can cats get depressed, especially after losing another cat in the house?",
+    "answer": "Cats genuinely show reactions to the loss of a feline companion or owner, even if it's not equivalent to clinical depression in humans. Symptoms include eating less, lethargy, increased vocalization, or sleeping in spots the deceased cat used to occupy. Symptoms usually improve on their own within a few weeks as they adjust. You should provide extra attention and activities during this time. However, if they are lethargic and refuse to eat for over 2-3 days, they should be examined, as concurrent health problems might exist beyond just grief.",
+    "line_no": 321
+  },
+  {
+    "id": 79,
+    "category": "Travel and Cat Carriers",
+    "question": "How do I train my cat to willingly enter a carrier without resisting?",
+    "answer": "The carrier should be left out in the house as a regular item, not just brought out for vet visits, to prevent the cat from associating it with bad experiences. Line the inside with cloth or clothing carrying the owner's scent, and use treats to lure the cat inside voluntarily. Choose a carrier with a top-loading door so the vet can examine them without having to drag the cat out of a narrow opening, which creates a lot of stress. Consistent training for weeks before actual travel greatly reduces resistance.",
+    "line_no": 325
+  },
+  {
+    "id": 80,
+    "category": "Travel and Cat Carriers",
+    "question": "What needs to be prepared for long-distance car travel with a cat?",
+    "answer": "The cat should always be kept in a carrier or crate secured tightly to the seat for safety. Do not let them roam freely in the car, as they risk interfering with driving or hiding stubbornly under seats. Withhold large meals for 2-3 hours before travel to prevent motion sickness, but keep water available during long trips. Stop every 3-4 hours to allow the cat to use the litter box on long journeys, and bring vaccination records if crossing provincial or national borders.",
+    "line_no": 329
+  },
+  {
+    "id": 81,
+    "category": "Adoption and Stray Cats",
+    "question": "How should I prepare when adopting a stray cat into my home?",
+    "answer": "You should take them for a health check and test for major infectious diseases like FIV/FeLV before letting them interact with other cats in the house. Deworm and apply flea/tick treatment immediately upon bringing them inside. Isolate them in a quarantine area for at least 1-2 weeks to observe for hidden illnesses and allow them time to adapt to the new environment. Stray cats used to living outdoors often take longer to trust humans; you should be patient and give them space without forcing contact too quickly.",
+    "line_no": 333
+  },
+  {
+    "id": 82,
+    "category": "Adoption and Stray Cats",
+    "question": "How does a TNR (Trap-Neuter-Return) program work?",
+    "answer": "TNR involves humanely trapping stray cats with cage traps, having a vet spay/neuter them and administer basic vaccines. The tip of one ear is clipped slightly as a universal sign that they are sterilized to avoid trapping them again, and then they are returned to where they were captured. This method sustainably controls stray populations without euthanasia because the sterilized cats maintain their territory without reproducing. In Thailand, many organizations offer these programs for free or at low cost in certain areas, and interested people can coordinate to perform TNR in their own communities.",
+    "line_no": 337
+  },
+  {
+    "id": 83,
+    "category": "Cat Ownership Costs",
+    "question": "What is the approximate annual cost of owning one cat?",
+    "answer": "Basic expenses include food, litter, annual vaccines, parasite preventatives, and general supplies, which vary greatly depending on the quality of chosen products and the size of the cat. An often overlooked expense is emergency medical care, which in a single incident can cost more than all the annual expenses combined. Setting aside an emergency fund or buying pet health insurance significantly mitigates financial risks during sudden illnesses.",
+    "line_no": 341
+  },
+  {
+    "id": 84,
+    "category": "Toys and Playtime",
+    "question": "What type of toys best stimulate a cat's hunting instincts?",
+    "answer": "Toys that mimic real prey movements, such as a teaser wand with feathers or fabric at the end jerked in an irregular rhythm, stimulate instincts better than toys with uniform, mechanical movements. Puzzle feeders, where the cat must paw or push to get food to drop out, are great for mental stimulation and slowing down fast eaters. Play sessions should end by allowing the cat to successfully \"catch\" the prey, followed by a small treat, completely mimicking the hunt-eat cycle. Do not leave the cat feeling perpetually unsuccessful in their hunt.",
+    "line_no": 345
+  },
+  {
+    "id": 85,
+    "category": "Toys and Playtime",
+    "question": "Are laser pointers dangerous or stressful for cats to play with?",
+    "answer": "Playing exclusively with a laser without a physical target to catch can build up long-term frustration because the cat chases the light but never actually \"catches\" anything, leaving the hunting cycle incomplete. It is recommended to alternate the laser with tangible toys, or end the session by pointing the laser onto a real toy for the cat to bite and grab as a reward. Also, never shine the light directly into a cat's eyes, as it can damage their retinas just like human eyes.",
+    "line_no": 349
+  },
+  {
+    "id": 86,
+    "category": "Household Hazards",
+    "question": "Which household items are the most dangerous if swallowed by a cat?",
+    "answer": "Long, stringy objects like string, ribbons, sewing thread still attached to needles, or hair ties are the most dangerous because, when swallowed, they can anchor in the intestines, causing them to bunch up accordion-style (linear foreign body), which is a severe surgical emergency. Never try to pull out a string protruding from a cat's mouth or anus, as this can tear the intestines. Always keep these items out of the cat's sight and take them to a vet immediately if ingestion is suspected.",
+    "line_no": 353
+  },
+  {
+    "id": 87,
+    "category": "Household Hazards",
+    "question": "Are rubber bands dangerous for cats to play with?",
+    "answer": "They are much more dangerous than people think, as many cats like to chew and swallow rubber bands because the elastic texture feels similar to meat. When swallowed, they can cause intestinal blockages just like strings. Always keep rubber bands, paper clips, and small office supplies out of your cat's reach. If you find your cat particularly loves playing with these types of items, provide safe, alternative chew toys designed specifically for cats.",
+    "line_no": 357
+  },
+  {
+    "id": 88,
+    "category": "Spraying and Territorial Marking",
+    "question": "How does spraying differ from normally peeing outside the litter box?",
+    "answer": "Spraying usually occurs in a standing posture, directing urine backward onto vertical surfaces like walls or table legs; the volume is smaller than normal urination, and the purpose is scent communication rather than elimination. It is most common in intact male cats or in situations causing insecurity, like a neighborhood cat lingering near a window. Normal peeing outside the box is usually done in a squatting position on a flat surface with a large volume of urine, which often correlates with litter box issues or health problems.",
+    "line_no": 361
+  },
+  {
+    "id": 89,
+    "category": "Spraying and Territorial Marking",
+    "question": "If a neutered cat is still spraying, what should be done?",
+    "answer": "Have a health check first to rule out urinary tract problems that can present with similar symptoms. If healthy, consider environmental stressors like stray cats visible through windows, conflict with another house cat, or sudden changes. Using synthetic pheromones, blocking the view of stray cats with window film, and thoroughly cleaning previous spray spots with enzymatic cleaners to prevent the scent from inviting re-spraying resolves this behavior in many cases.",
+    "line_no": 365
+  },
+  {
+    "id": 90,
+    "category": "Breeds and Diversity",
+    "question": "What are the defining characteristics of a Maine Coon?",
+    "answer": "The Maine Coon is one of the largest domestic cat breeds; adult males can weigh up to 8-10 kilograms. They have a thick double coat to withstand cold, originating from the cold climate of Maine. They feature lynx-like ear tufts, long bushy tails, and a friendly, outgoing personality that earned them the nickname \"the dog of the cat world\". They require regular brushing to prevent matting, and due to their large size, owners should monitor for hypertrophic cardiomyopathy (heart disease), which is common in this breed.",
+    "line_no": 369
+  },
+  {
+    "id": 91,
+    "category": "Breeds and Diversity",
+    "question": "Are Scottish Folds cute but prone to health problems?",
+    "answer": "Yes. The gene causing the folded ears is a dominant gene affecting cartilage throughout the entire body, not just the ears. This puts the breed at high risk for osteochondrodysplasia (degenerative cartilage and bone disease), causing chronic joint pain from a young age. Cats inheriting two copies of the fold gene (from two folded-ear parents) suffer severe symptoms, leading to widespread ethical debates regarding breeding. Owners of this breed should monitor for stiff walking or a short, stiff tail, which are signs of the disease.",
+    "line_no": 373
+  },
+  {
+    "id": 92,
+    "category": "Senior Cat Care",
+    "question": "What causes an old cat to become confused, pace around, or vocalize at night without reason?",
+    "answer": "This could be Feline Cognitive Dysfunction (FCD), similar to dementia in humans. Symptoms include spatial confusion even in familiar homes, loud aimless vocalization, particularly at night, sleeping at abnormal times, and forgetting litter box locations. Diagnosis requires ruling out treatable causes like hyperthyroidism or high blood pressure. Care involves keeping routines consistent, adding nightlights, and consulting a vet about supplements or medications that slow symptom progression.",
+    "line_no": 377
+  },
+  {
+    "id": 93,
+    "category": "Breeding and Genetics",
+    "question": "Is it true that tricolor (calico) cats are almost exclusively female? Why?",
+    "answer": "Yes, almost entirely. The gene controlling orange/black fur colors is located on the X chromosome. Females have two X chromosomes, allowing them to express both orange and black mixed with white to form a tricolor (calico) pattern. Normal males have only one X chromosome and can therefore display only one color. The exceedingly rare male calico is usually a result of an XXY chromosomal abnormality, making them sterile by nature. This rarity is why male calicos are considered lucky in many cultures.",
+    "line_no": 381
+  },
+  {
+    "id": 94,
+    "category": "Breeding and Genetics",
+    "question": "Is there a real link between blue eyes and deafness in cats?",
+    "answer": "They are linked specifically in solid white cats. The gene controlling pure white fur (epistatic white) is associated with the abnormal development of inner ear nerve cells from birth. Solid white cats with two blue eyes have a significantly higher chance of being deaf compared to those with other eye colors. The chance is even higher if both eyes are blue compared to just one. However, not every white, blue-eyed cat is deaf. You should test their hearing from kittenhood to plan appropriate care if deafness is found.",
+    "line_no": 385
+  },
+  {
+    "id": 95,
+    "category": "Seasonal Care",
+    "question": "How should cats be specially cared for during the summer?",
+    "answer": "You should provide clean drinking water in multiple locations and change it more frequently, as it evaporates quickly. Provide shaded, well-ventilated spots for the cat to escape the heat. Never leave a cat in a car parked in the sun for even a few minutes, because temperatures can rapidly spike to dangerous levels. Long-haired cats should be brushed regularly to reduce matted fur that traps heat, and white cats or those with thin fur on their ears must be protected from sunburn, which increases the long-term risk of skin cancer if frequently exposed to strong sun.",
+    "line_no": 389
+  },
+  {
+    "id": 96,
+    "category": "Surgery and Recovery",
+    "question": "How should a spay/neuter incision be cared for post-surgery?",
+    "answer": "You should have them wear an Elizabethan collar or a post-surgical recovery suit continuously during the 7-10 day recovery period to prevent licking or chewing the wound, which can cause infection or torn stitches. Confine them to a quiet room, and prevent them from jumping up high or playing aggressively during this time. Check the incision daily for redness, swelling, discharge, or separation. If any abnormalities are found, return to the vet immediately. Females undergoing abdominal surgery require more careful monitoring than males, whose incisions are smaller and heal faster.",
+    "line_no": 393
+  },
+  {
+    "id": 97,
+    "category": "Surgery and Recovery",
+    "question": "How dangerous is anesthesia, especially for senior cats?",
+    "answer": "Modern anesthesia is much safer than in the past thanks to advanced drugs and vital sign monitoring equipment, but risks always exist, particularly in cats with underlying heart, kidney, or liver disease. Therefore, vets often recommend pre-anesthetic bloodwork, and sometimes an EKG, for senior or high-risk cats to assess and adjust the anesthetic plan safely. Fasting them before anesthesia for the specified time is also crucial to reduce the risk of aspiration while unconscious.",
+    "line_no": 397
+  },
+  {
+    "id": 98,
+    "category": "Choosing a Vet and Long-Term Care",
+    "question": "How do I choose a suitable veterinarian or clinic for my cat?",
+    "answer": "Look for a clinic with separate waiting areas for dogs and cats, or at least elevated cages specifically for cats, because the smell and sound of dogs greatly increase a cat's stress. Vets familiar with \"low-stress handling\" techniques will help reduce their fear for future visits. Choose a conveniently located clinic to minimize stressful travel time, and bring your cat for regular check-ups while healthy to familiarize them, not just when they are sick.",
+    "line_no": 401
+  },
+  {
+    "id": 99,
+    "category": "Choosing a Vet and Long-Term Care",
+    "question": "Is pet health insurance for cats worth it?",
+    "answer": "Pet health insurance helps mitigate sudden, large expenses from accidents or severe illnesses requiring surgery or ongoing care. The value depends on the policy terms, coverage limits, and disease exclusions. You should carefully read details regarding pre-existing conditions and waiting periods. Breeds at high risk for genetic diseases or cats living in accident-prone areas may benefit more from insurance compared to relying solely on a personal savings fund.",
+    "line_no": 405
+  }
+]
