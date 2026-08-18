@@ -1,0 +1,154 @@
+[
+  {
+    "query": "What are the essential vaccines for cats?",
+    "results": [
+      {
+        "chunk_id": 0,
+        "qa_id": 0,
+        "category": "Unspecified Category",
+        "question": "What are the essential vaccines for cats?",
+        "answer": "The core vaccines that every cat should receive are the combination vaccine (FVRCP) to prevent feline panleukopenia, feline herpesvirus, and calicivirus, as well as the rabies vaccine, which is required by Thai law to be administered annually. Cats that go outdoors or come into contact with other cats should also be considered for the feline leukemia virus (FeLV) vaccine. Kittens should receive their first dose between 6-8 weeks of age, followed by boosters every 3-4 weeks until they reach 16 weeks of age.",
+        "text": "Question: What are the essential vaccines for cats? Answer: The core vaccines that every cat should receive are the combination vaccine (FVRCP) to prevent feline panleukopenia, feline herpesvirus, and calicivirus, as well as the rabies vaccine, which is required by Thai law to be administered annually. Cats that go outdoors or come into contact with other cats should also be considered for the fel",
+        "part_idx": 0,
+        "line_no": 9,
+        "score": 0.8626648187637329
+      },
+      {
+        "chunk_id": 1,
+        "qa_id": 0,
+        "category": "Unspecified Category",
+        "question": "What are the essential vaccines for cats?",
+        "answer": "The core vaccines that every cat should receive are the combination vaccine (FVRCP) to prevent feline panleukopenia, feline herpesvirus, and calicivirus, as well as the rabies vaccine, which is required by Thai law to be administered annually. Cats that go outdoors or come into contact with other cats should also be considered for the feline leukemia virus (FeLV) vaccine. Kittens should receive their first dose between 6-8 weeks of age, followed by boosters every 3-4 weeks until they reach 16 weeks of age.",
+        "text": "h other cats should also be considered for the feline leukemia virus (FeLV) vaccine. Kittens should receive their first dose between 6-8 weeks of age, followed by boosters every 3-4 weeks until they reach 16 weeks of age.",
+        "part_idx": 1,
+        "line_no": 9,
+        "score": 0.6275340914726257
+      },
+      {
+        "chunk_id": 109,
+        "qa_id": 54,
+        "category": "Unspecified Category",
+        "question": "Can a cat really heal its own wounds by licking them?",
+        "answer": "No, not in the sense of always being safe. Cat saliva contains some enzymes that may mildly help kill bacteria and clean dirt from a wound. However, excessive licking keeps the wound constantly moist, hindering healing, and a cat's mouth houses bacteria that can cause secondary infections. Deep or large wounds should be treated by a vet, and an Elizabethan collar should be worn to prevent the cat from licking its own wound.",
+        "text": " infections. Deep or large wounds should be treated by a vet, and an Elizabethan collar should be worn to prevent the cat from licking its own wound.",
+        "part_idx": 1,
+        "line_no": 225,
+        "score": 0.5974565744400024
+      }
+    ]
+  },
+  {
+    "query": "What foods or items are toxic to cats?",
+    "results": [
+      {
+        "chunk_id": 12,
+        "qa_id": 6,
+        "category": "Unspecified Category",
+        "question": "What foods or items are toxic to cats?",
+        "answer": "Clearly dangerous items include onions and garlic in all forms, which destroy red blood cells; grapes and raisins; chocolate; caffeine; alcohol; gum or candies containing xylitol; all parts of lilies, which are highly toxic to cat kidneys even in small amounts; and cow's milk, as most adult cats cannot digest lactose, leading to diarrhea. If you suspect your cat has ingested any of these, you should take them to the vet immediately without waiting for symptoms to appear.",
+        "text": "Question: What foods or items are toxic to cats? Answer: Clearly dangerous items include onions and garlic in all forms, which destroy red blood cells; grapes and raisins; chocolate; caffeine; alcohol; gum or candies containing xylitol; all parts of lilies, which are highly toxic to cat kidneys even in small amounts; and cow's milk, as most adult cats cannot digest lactose, leading to diarrhea. If",
+        "part_idx": 0,
+        "line_no": 33,
+        "score": 0.9145432114601135
+      },
+      {
+        "chunk_id": 66,
+        "qa_id": 33,
+        "category": "Unspecified Category",
+        "question": "Is a raw diet really safe for cats?",
+        "answer": "A raw diet provides nutrients close to nature but carries the risk of bacterial contamination, like Salmonella and Listeria, for both the cat and household members. If you choose this diet, you must use human-grade meat that has been frozen to kill parasites, store and prepare it with strict hygiene, and ensure a complete balance of calcium-phosphorus and essential nutrients. Homemade raw diets without nutritional knowledge often lack critical nutrients. You should consult a veterinary nutritionist before switching long-term.",
+        "text": "Question: Is a raw diet really safe for cats? Answer: A raw diet provides nutrients close to nature but carries the risk of bacterial contamination, like Salmonella and Listeria, for both the cat and household members. If you choose this diet, you must use human-grade meat that has been frozen to kill parasites, store and prepare it with strict hygiene, and ensure a complete balance of calcium-pho",
+        "part_idx": 0,
+        "line_no": 141,
+        "score": 0.7077286243438721
+      },
+      {
+        "chunk_id": 61,
+        "qa_id": 30,
+        "category": "Unspecified Category",
+        "question": "How many meals a day should a cat be fed?",
+        "answer": "Kittens under 6 months old should be fed 3-4 meals a day because their stomachs are small and they need high energy. Normal adult cats do well with 2 meals, morning and evening, or divided into multiple smaller meals if the cat is prone to obesity. Leaving food out all day (free feeding) risks the cat overeating, especially in neutered/spayed cats whose metabolism has slowed down.",
+        "text": "isks the cat overeating, especially in neutered/spayed cats whose metabolism has slowed down.",
+        "part_idx": 1,
+        "line_no": 129,
+        "score": 0.67323899269104
+      }
+    ]
+  },
+  {
+    "query": "What causes cats to pee outside the litter box?",
+    "results": [
+      {
+        "chunk_id": 18,
+        "qa_id": 9,
+        "category": "Unspecified Category",
+        "question": "What causes cats to pee outside the litter box?",
+        "answer": "Causes fall into two main categories: health problems (like cystitis, bladder stones, or kidney disease), which must always be ruled out first; and behavioral issues. Behavioral causes include a dirty litter box, a disliked type of litter, a lack of privacy or being placed near loud noises, another cat monopolizing the same box, or stress from household changes. The general rule is that the number of litter boxes should equal the number of cats plus one, and they should be distributed to avoid competition.",
+        "text": "Question: What causes cats to pee outside the litter box? Answer: Causes fall into two main categories: health problems (like cystitis, bladder stones, or kidney disease), which must always be ruled out first; and behavioral issues. Behavioral causes include a dirty litter box, a disliked type of litter, a lack of privacy or being placed near loud noises, another cat monopolizing the same box, or ",
+        "part_idx": 0,
+        "line_no": 45,
+        "score": 0.8554957509040833
+      },
+      {
+        "chunk_id": 177,
+        "qa_id": 88,
+        "category": "Unspecified Category",
+        "question": "How does spraying differ from normally peeing outside the litter box?",
+        "answer": "Spraying usually occurs in a standing posture, directing urine backward onto vertical surfaces like walls or table legs; the volume is smaller than normal urination, and the purpose is scent communication rather than elimination. It is most common in intact male cats or in situations causing insecurity, like a neighborhood cat lingering near a window. Normal peeing outside the box is usually done in a squatting position on a flat surface with a large volume of urine, which often correlates with litter box issues or health problems.",
+        "text": " cats or in situations causing insecurity, like a neighborhood cat lingering near a window. Normal peeing outside the box is usually done in a squatting position on a flat surface with a large volume of urine, which often correlates with litter box issues or health problems.",
+        "part_idx": 1,
+        "line_no": 361,
+        "score": 0.8422504663467407
+      },
+      {
+        "chunk_id": 89,
+        "qa_id": 44,
+        "category": "Unspecified Category",
+        "question": "When should kittens be trained to use the litter box?",
+        "answer": "Kittens naturally start using a litter box around 3-4 weeks of age with almost no training required. Simply place a low-sided litter box in an easily accessible spot near where they stay. After they eat, try gently placing them in the box to get them familiar with it. Use fine, unscented litter, as kittens have sensitive noses and may dislike synthetic scents. If a kitten still isn't using the box past 8 weeks, consult a vet to check for other issues.",
+        "text": " unscented litter, as kittens have sensitive noses and may dislike synthetic scents. If a kitten still isn't using the box past 8 weeks, consult a vet to check for other issues.",
+        "part_idx": 1,
+        "line_no": 185,
+        "score": 0.7077576518058777
+      }
+    ]
+  },
+  {
+    "query": "Why do cats scratch furniture?",
+    "results": [
+      {
+        "chunk_id": 16,
+        "qa_id": 8,
+        "category": "Unspecified Category",
+        "question": "Why do cats scratch furniture even when provided with a scratching post?",
+        "answer": "Scratching is a natural behavior that helps shed old nail sheaths, stretch muscles, and mark territory via scent glands in their paws. If a cat avoids an existing scratching post, it might be due to the material, height, or placement not being to their liking. Try changing the surface, such as using sisal rope instead of carpet, place it in the spot they already scratch, and use catnip or treats to entice them to associate that spot with positive feelings. Punishing them by hitting or scolding loudly usually makes the cat fear the owner rather than stopping the behavior.",
+        "text": "Question: Why do cats scratch furniture even when provided with a scratching post? Answer: Scratching is a natural behavior that helps shed old nail sheaths, stretch muscles, and mark territory via scent glands in their paws. If a cat avoids an existing scratching post, it might be due to the material, height, or placement not being to their liking. Try changing the surface, such as using sisal ro",
+        "part_idx": 0,
+        "line_no": 41,
+        "score": 0.8397027254104614
+      },
+      {
+        "chunk_id": 22,
+        "qa_id": 11,
+        "category": "Unspecified Category",
+        "question": "Why do cats knead on hands or blankets?",
+        "answer": "This behavior stems from kittenhood, when they kneaded their mother's teats to stimulate milk flow. As they grow, some retain this behavior as an expression of feeling safe and relaxed. Cats that were weaned too early tend to knead more frequently. It is not an abnormal behavior and doesn't need to be corrected unless their claws cause pain, which can be managed by placing a thick cloth over your hand or trimming their nails short.",
+        "text": "Question: Why do cats knead on hands or blankets? Answer: This behavior stems from kittenhood, when they kneaded their mother's teats to stimulate milk flow. As they grow, some retain this behavior as an expression of feeling safe and relaxed. Cats that were weaned too early tend to knead more frequently. It is not an abnormal behavior and doesn't need to be corrected unless their claws cause pain",
+        "part_idx": 0,
+        "line_no": 53,
+        "score": 0.6883528232574463
+      },
+      {
+        "chunk_id": 18,
+        "qa_id": 9,
+        "category": "Unspecified Category",
+        "question": "What causes cats to pee outside the litter box?",
+        "answer": "Causes fall into two main categories: health problems (like cystitis, bladder stones, or kidney disease), which must always be ruled out first; and behavioral issues. Behavioral causes include a dirty litter box, a disliked type of litter, a lack of privacy or being placed near loud noises, another cat monopolizing the same box, or stress from household changes. The general rule is that the number of litter boxes should equal the number of cats plus one, and they should be distributed to avoid competition.",
+        "text": "Question: What causes cats to pee outside the litter box? Answer: Causes fall into two main categories: health problems (like cystitis, bladder stones, or kidney disease), which must always be ruled out first; and behavioral issues. Behavioral causes include a dirty litter box, a disliked type of litter, a lack of privacy or being placed near loud noises, another cat monopolizing the same box, or ",
+        "part_idx": 0,
+        "line_no": 45,
+        "score": 0.6273269057273865
+      }
+    ]
+  }
+]
