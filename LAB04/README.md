@@ -1,4 +1,4 @@
-# RAG-Project (Retrieval-Augmented Generation)
+# DL-04-RAG System Development I
 
 ## Overview
 This project implements a complete, customizable Retrieval-Augmented Generation (RAG) system. It combines document retrieval with Large Language Models (LLMs) to answer questions based on a provided dataset (`cat_qa_dataset.txt`).
@@ -101,3 +101,17 @@ RAG-Project/
 *   **Sparse Retrieval**: BM25
 *   **LLM Providers**: Local via Ollama, or Cloud APIs (OpenAI, Gemini)
 *   **Reranking Model**: `BAAI/bge-reranker-v2-m3`
+
+## Context Summary
+
+This RAG (Retrieval-Augmented Generation) project is designed to act as an intelligent, conversational Q&A assistant that answers user queries based on a specific knowledge base (`cat_qa_dataset.txt`). It solves the problem of standard LLMs hallucinating or lacking domain-specific knowledge by grounding the model's responses in factual, retrieved data.
+
+The system processes information through a precise workflow:
+
+*   **User Input**: The user asks a question in the terminal (`main.py`). The system's memory module (`src/memory.py`) contextualizes the question using previous conversation turns, and the query transformer (`src/query_transform.py`) can optionally refine it to improve searchability.
+*   **Retrieval**: The system converts the query into a dense vector via `sentence-transformers` (`src/embedding_model.py`) to perform semantic similarity search in a FAISS database (`src/vector_store.py`). If hybrid search is enabled, a BM25 sparse index (`src/hybrid_retriever.py`) simultaneously performs exact keyword matching. An optional cross-encoder (`src/rerankers.py`) then rescores the best candidates to ensure maximum relevance.
+*   **Context**: The top-ranked retrieved text chunks are extracted and assembled into a structured prompt using predefined templates (`src/prompt_templates.py`).
+*   **LLM**: The formulated prompt, containing both the retrieved context and the user's original question, is sent to the configured language model (Ollama, OpenAI, or Gemini via `src/generator.py`).
+*   **Output**: The LLM analyzes the context and generates a final, accurate response, which is returned and displayed to the user in the terminal.
+
+By orchestrating these components (`src/rag_pipeline.py`), the project ensures that the generated answers are highly relevant, traceable, and specifically derived from the provided dataset.
