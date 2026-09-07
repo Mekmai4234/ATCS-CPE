@@ -1,11 +1,9 @@
-# 🐾 DL-05 / LAB05: Advanced RAG System Engineering II
+# 🐾 DL-05 / LAB05: RAG System Development II
 > **Empirical Failure Mode Analysis & Production Mitigations on a Feline Veterinary Knowledge Base**  
 > *Department of Computer Engineering, Faculty of Engineering, Rajamangala University of Technology Thanyaburi (RMUTT)*  
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Architecture](https://img.shields.io/badge/Architecture-Two--Stage%20Hybrid%20RAG-blueviolet?style=flat-square)](file:///d:/RMUTT/Advanced%20Ai/ATCS-CPE-main/LAB05/main.py)
-[![Verification](https://img.shields.io/badge/Verification-10%2F10%20PASS%20(100%25)-success?style=flat-square)](file:///d:/RMUTT/Advanced%20Ai/ATCS-CPE-main/LAB05/main.py)
-[![Hit@10](https://img.shields.io/badge/Benchmark%20Hit%4010-100.0%25-brightgreen?style=flat-square)](file:///d:/RMUTT/Advanced%20Ai/ATCS-CPE-main/LAB05/problem09_evaluation.py)
 
 ---
 
