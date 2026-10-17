@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -28,7 +29,9 @@ MODULE_ROOT = PROJECT_ROOT / "02_api_backend"
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=PROJECT_ROOT / ".env", extra="ignore", env_file_encoding="utf-8"
+        env_file=(PROJECT_ROOT / ".env", MODULE_ROOT / "integration" / ".env"),
+        extra="ignore",
+        env_file_encoding="utf-8",
     )
 
     app_env: str = "development"
@@ -39,6 +42,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./runtime/app.db"
     adapter_mode: str = "unavailable"
     adapter_factory: str | None = None
+    backend_integration_profile: Literal["live", "offline"] = "live"
     enable_streaming: bool = False
     job_max_attempts: int = Field(default=3, ge=1, le=10)
     job_lease_seconds: float = Field(default=30, ge=0.3, le=600)
@@ -55,6 +59,18 @@ class Settings(BaseSettings):
     max_context_tokens: int = Field(default=24000, gt=0)
     answer_max_output_tokens: int = Field(default=1200, gt=0)
     agent_max_output_tokens: int = Field(default=2400, gt=0)
+    agent_finalize_reserve_seconds: float = Field(default=10, gt=0, le=120)
+    agent_read_page_size: int = Field(default=30, ge=1, le=200)
+    embedding_provider: str = "gemini"
+    embedding_model: str = "gemini-embedding-2"
+    embedding_dimensions: int = Field(default=1536, ge=8, le=3072)
+    embedding_tokenizer: str = "utf8-byte-budget-v1"
+    chroma_persist_dir: str = "./runtime/chroma"
+    chunk_target_tokens: int = Field(default=600, ge=8, le=7000)
+    chunk_overlap_tokens: int = Field(default=100, ge=0)
+    retrieval_top_k: int = Field(default=8, ge=1, le=100)
+    embedding_batch_size: int = Field(default=16, ge=1, le=64)
+    rag_operation_timeout_seconds: float = Field(default=60, gt=0, le=600)
 
     @model_validator(mode="after")
     def supported_configuration(self):
@@ -64,6 +80,11 @@ class Settings(BaseSettings):
             raise ValueError("Custom mode requires ADAPTER_FACTORY=package.module:factory")
         if self.adapter_mode == "fixture" and self.app_env not in {"development", "test"}:
             raise ValueError("Fixture mode is restricted to development/test")
+        if self.backend_integration_profile == "offline" and self.app_env not in {
+            "development",
+            "test",
+        }:
+            raise ValueError("Offline integration is restricted to development/test")
         if self.enable_streaming:
             raise ValueError("Streaming is not implemented; use ENABLE_STREAMING=false")
         url = make_url(self.database_url)
