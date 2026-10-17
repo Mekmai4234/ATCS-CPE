@@ -1,14 +1,31 @@
-Implementation steps
-1. Define research-run states and schemas for plans, quizzes, and flashcards.
-2. Define allowlisted tool inputs and outputs with explicit video scope.
-3. Build an agent loop that can choose tools based on intermediate results.
-4. Provide search, transcript-reading, and evidence-analysis tools.
-5. Add a coverage check so missing evidence can trigger another scoped search.
-6. Enforce step and time budgets; stop with an honest partial result when exceeded.
-7. Generate study plans with ordered topics and cited videos.
-8. Generate quizzes with supported answers/explanations and flashcards with source links.
-9. Persist meaningful progress events and final artifacts through 02.
-10. Test branching decisions, missing evidence, budget exhaustion, and instruction-like transcript text.
+### 06_research_learning_agent - Workflow Steps
 
-Acceptance criteria
-A research task demonstrates a genuine tool-selection loop driven by intermediate results. Every tool stays in scope, learning outputs reference supporting content, and the run terminates within configured limits.
+A) Multi-step Research
+----------------------
+1. Receive { goal, scope, level, days } and a persisted run_id from 02_api_backend.
+2. Validate the selected sources, allowed task, and available run budget.
+3. Give Gemini the goal, evidence policy, remaining budget, and allowed tool schemas.
+4. Let the agent choose a relevant tool, such as search_evidence or read_video_chunks.
+5. Validate the requested tool/arguments and execute it within the original scope.
+6. Store a concise progress event and return the observation to the agent.
+7. Assess coverage and missing prerequisites; select another search/read/analysis action
+   when intermediate results show it is needed.
+8. Repeat only while step and total-time budgets remain.
+9. Compose a grounded research result or request a learning artifact.
+10. Validate citations/coverage and persist a completed or partial result through 02.
+
+B) Learning Artifact Tools
+--------------------------
+1. Receive an artifact request directly from 02 or as an allowed agent tool call.
+2. Gather evidence for the requested topic and explicit video scope.
+3. For a study plan, order supported topics and attach cited video intervals.
+4. For a quiz, generate questions, supported answers, explanations, and citations.
+5. For flashcards, create short question/answer pairs linked to source passages.
+6. Validate the output schema and sources, then return the artifact for storage.
+
+C) Budget and Failure Handling
+------------------------------
+1. Before every call, check remaining time and steps; tool/model calls must respect both.
+2. On insufficient evidence, return the known findings and describe the gap.
+3. On exhausted budget, persist partial findings rather than claiming the task is complete.
+4. On fatal errors, persist failed with a classified reason; handle cancellation when supported.

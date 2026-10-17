@@ -8,7 +8,9 @@ Frontend: TypeScript + React/Next.js
 Backend/AI: Python + FastAPI
 Application data: SQLite สำหรับต้นแบบ
 Knowledge data: ChromaDB
-LLM และ Embeddings: ผ่าน provider adapter โดยเก็บ credentials ฝั่ง server
+LLM: Gemini ผ่าน Google GenAI SDK (`google-genai`) สำหรับ 05 และ 06
+Embeddings: คงข้อเสนอ OpenAI `text-embedding-3-small` ของ 04 แยกจากโมเดลสร้างคำตอบ
+เก็บ credentials ทั้งหมดฝั่ง server และเลือกโมเดลผ่าน configuration
 Background jobs: เริ่มจาก worker ที่อ่านงานจาก persistent job store ของ API; เลือก durable queue เพิ่มเมื่อการ deploy ต้องใช้
 
 ล็อกเวอร์ชันใน manifest/lockfile หลังทดสอบความเข้ากันได้ ไม่ติดตั้งทุกหมวดเป็นบริการแยกโดยไม่จำเป็น
@@ -91,3 +93,15 @@ Frontend รับเฉพาะ NEXT_PUBLIC_API_BASE_URL ส่วนกุญ
 หากใช้ Next.js ให้เลือกวิธีโหลดค่า public ใน environment ของ frontend แล้วบันทึกวิธีจริงใน 01/step.txt
 แยก data, application logs และ index ไว้ใน runtime/ ที่ถูก ignore
 บทถอดเสียงและชื่อคลิปเป็นข้อมูลที่ไม่เชื่อถือ ห้ามนำไปใช้เป็นคำสั่งระบบหรือสิทธิ์เรียกเครื่องมือ
+
+## การตั้งค่า Gemini และข้อตกลงเอกสาร
+
+- `GEMINI_API_KEY` ใช้กับการสร้างคำตอบและ Agent; `OPENAI_API_KEY` ใช้เฉพาะเมื่อเลือก embedding adapter เดิม
+- `LLM_MODEL=gemini-3.5-flash` สะท้อนชื่อรุ่นที่ผู้ใช้ระบุ เอกสาร Google ระบุว่าชื่อรุ่นนี้ deprecated และคำขอถูกส่งต่อไป `gemini-3.6-flash` ต้องตรวจสอบสิทธิ์และรุ่นที่ตอบกลับตอนเชื่อมต่อจริง
+- แหล่งอ้างอิง: https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash และ https://ai.google.dev/gemini-api/docs/libraries
+- `MAX_CONTEXT_TOKENS` เป็นงบ input ของแอป ไม่ใช่จำนวน token สูงสุดของโมเดล; ต้องเผื่องบ output และข้อจำกัด provider
+- `ENABLE_STREAMING=false` ใช้คำตอบ JSON ที่ตรวจแล้ว หากเพิ่ม streaming ต้องแยก provisional events กับ final answer ที่ผ่านการตรวจ
+- chat/analysis response ใช้ `status`, `answer`, `citations[]`, `coverage` และ `provider_metadata`; chat เพิ่ม `conversation_id`
+- `provider_metadata` เก็บชื่อรุ่นที่ร้องขอ และชื่อ/เวอร์ชันที่ provider ส่งกลับเมื่อมี พร้อม usage และ latency ที่วัดได้
+- การวางงานนานต้องใช้ persistent job/run records; การเก็บประวัติสนทนาต้อง durable ส่วน telemetry ส่งแบบ asynchronous ได้
+- เอกสาร `step.txt` อธิบาย runtime workflow ส่วนคำสั่งติดตั้ง/เริ่มแอปจริงจะเพิ่มเมื่อมี source และ manifests
