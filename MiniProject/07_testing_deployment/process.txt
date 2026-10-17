@@ -1,0 +1,16 @@
+Input
+Feature branches, acceptance criteria, representative video fixtures, and deployment configuration.
+
+Flow
+Static checks -> component checks -> integration scenarios -> AI evaluation -> review -> merge into develop.
+Release candidate -> demonstration and deployment checks -> pull request into main -> release.
+Record failures with enough information to reproduce them without logging credentials or unnecessary personal data.
+
+Output
+Test results, an evaluation report, measured latency/usage, deployment instructions, and a rollback procedure.
+
+Monitoring plan
+Track job failures, provider errors, request latency, agent tool counts, token usage, and citation-validation failures. Redact sensitive data from logs.
+
+Recovery
+Use database/vector backups and retain compatible schema/index versions. A code rollback may require a data restore or migration; document that dependency explicitly.

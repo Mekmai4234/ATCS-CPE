@@ -1,0 +1,14 @@
+Implementation steps
+1. Define answer, citation, summary, and comparison output schemas.
+2. Resolve follow-up questions using relevant conversation history without inventing evidence.
+3. Retrieve supporting chunks from 04 within the explicit scope.
+4. Build prompts that separate application instructions from untrusted transcript content.
+5. Generate answers with citation IDs tied to retrieved chunks.
+6. Validate that cited chunks exist and that timestamps match source metadata.
+7. Return an insufficient_evidence outcome when support is missing.
+8. For complete summaries, process all selected-video chunks in bounded batches and combine results with coverage tracking.
+9. For comparisons, gather evidence from every selected video and state missing coverage.
+10. Evaluate factual support, citation correctness, and helpful abstention with 07.
+
+Acceptance criteria
+Supported claims have traceable evidence, citations point to real source intervals, and unsupported questions do not receive invented answers. A partial retrieval result must not be described as a complete summary.

@@ -1,0 +1,14 @@
+Implementation steps
+1. Define a versioned chunk schema containing text, segment IDs, video ID, and time bounds.
+2. Split captions on sensible boundaries while preserving links to original segments.
+3. Validate non-empty text and configurable overlap limits.
+4. Embed chunks and persist vectors with stable IDs and required metadata.
+5. Mark a video ready only after indexing succeeds.
+6. Implement scoped retrieval using video/channel/date filters and ownership when applicable.
+7. Return ranked evidence with traceable chunk IDs and source URLs.
+8. Implement full per-video chunk enumeration for complete summaries and comparisons.
+9. Reindex changed transcripts and remove stale chunks on replacement or deletion.
+10. Evaluate retrieval using questions with known supporting segments.
+
+Acceptance criteria
+Relevant evidence can be recovered with correct video IDs and timestamps. Filters exclude unrelated videos. Repeated indexing does not duplicate chunks, and embedding-model changes trigger an explicit index migration.

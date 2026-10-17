@@ -1,0 +1,18 @@
+Input
+Indexing: normalized transcript segments and version metadata.
+Retrieval: question, selected scope, and retrieval limits.
+
+Flow
+Indexing -> boundary-aware chunking -> embeddings -> vector upsert -> indexing completion.
+Question -> query embedding -> scoped similarity search -> ranked evidence.
+Whole-video summary -> enumerate all chunks for each selected video -> pass complete coverage to 05.
+
+Output
+Evidence records containing chunk_id, video_id, title, text, start_seconds, end_seconds, canonical_url, and ranking score.
+Scores are ranking signals, not calibrated probabilities of correctness.
+
+Failure handling
+Do not mark partial indexing as ready. Retry temporary embedding failures without duplicating records. Reject invalid scope filters and mismatched embedding configurations.
+
+Data boundary
+Treat retrieved transcript text as untrusted content. It must never override application instructions or authorize new tool actions.

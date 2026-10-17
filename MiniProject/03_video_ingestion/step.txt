@@ -1,0 +1,14 @@
+Implementation steps
+1. Support explicit YouTube watch and short-link formats; reject unrelated URLs.
+2. Normalize each URL into a video ID and check for existing imports.
+3. Implement metadata retrieval without assuming every field is available.
+4. Retrieve accessible captions using the configured language preference.
+5. Normalize segments while preserving start time, duration, language, and text.
+6. Store transcript provenance and a content hash for reindexing decisions.
+7. Send usable transcript records to 04_rag_knowledge.
+8. Classify missing captions, inaccessible videos, timeouts, and provider restrictions separately.
+9. Add playlist/channel discovery with pagination and import limits after single-video import works.
+10. Add explicit refresh to discover newly published videos; scheduled refresh is a later integration.
+
+Acceptance criteria
+A supported captioned video produces ordered timestamped segments. Duplicate input is idempotent, and a video without accessible captions receives no_transcript rather than a fabricated transcript.

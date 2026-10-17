@@ -1,0 +1,14 @@
+Implementation steps
+1. Finalize the proposed HTTP contract in docs/architecture.md.
+2. Define video, transcript, import job, conversation, message, citation, and learning artifact models.
+3. Add database migrations, request validation, structured errors, and health endpoints.
+4. Implement URL import, video listing, scoped selection, and job-status endpoints.
+5. Persist jobs before returning acceptance; implement retries and restart recovery.
+6. Connect ingestion/indexing workers and publish real per-video statuses.
+7. Expose chat, summaries, comparisons, research runs, and learning artifact endpoints.
+8. Add deletion that removes associated application data and vector records.
+9. Add conversation history and artifact persistence.
+10. If multiple users are supported, add authentication and enforce ownership in every data and search operation.
+
+Acceptance criteria
+Accepted jobs survive a restart, repeated imports do not create duplicate video records within the same ownership scope, and no_transcript is distinct from a temporary fetch failure. API responses conform to the shared contract.

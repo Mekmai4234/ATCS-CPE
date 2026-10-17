@@ -1,0 +1,17 @@
+Input
+User-entered URLs, selected video IDs, date/channel filters, questions, and learning goals.
+
+Flow
+User action -> input validation -> backend request -> loading/status view -> result rendering.
+Import status is polled from the backend until ready, no_transcript, or failed.
+Ready videos can be selected for chat; processing or unavailable videos cannot.
+Citation clicks seek the embedded player or open the original video at the cited time.
+
+Output
+Video cards, embedded playback, grounded chat answers, citations, and learning artifacts.
+
+Interfaces
+02_api_backend owns authentication if added, persistent data, job status, and HTTP errors. The frontend never queries ChromaDB or a model provider directly.
+
+Failure handling
+Show actionable errors for invalid links, network failures, unavailable embedding, and missing evidence. Keep transcripts and video titles as display data; never interpret them as application instructions.

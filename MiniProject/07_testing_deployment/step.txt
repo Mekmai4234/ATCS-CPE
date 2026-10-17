@@ -1,0 +1,14 @@
+Implementation steps
+1. Record exact dependency versions and real startup commands as components are added.
+2. Prepare captioned, missing-caption, duplicate, unavailable, Thai, and English video fixtures.
+3. Verify import -> transcript -> index -> chat -> cited timestamp end to end.
+4. Evaluate retrieval coverage, unsupported-claim rate, citation accuracy, and abstention.
+5. Verify complete-summary coverage and comparison evidence from every selected video.
+6. Test agent tool selection, scope boundaries, budget limits, and artifact grounding.
+7. Test worker restart recovery, deletion, retry behavior, and concurrent requests.
+8. Measure import latency, answer latency, and provider usage on a documented dataset.
+9. Add repeatable CI checks, then configure hosting, secrets, CORS, persistent volumes, and health checks.
+10. Document backup, restore, rollback, and a demonstration script before release.
+
+Acceptance criteria
+The integrated demo passes the documented scenarios, measured limitations are reported, secrets are excluded from Git, and persistent data survives a service restart. Do not claim performance numbers before measuring them.
