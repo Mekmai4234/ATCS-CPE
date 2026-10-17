@@ -21,6 +21,8 @@ VIDEO_A, VIDEO_B = "dQw4w9WgXcQ", "jNQXAC9IVRw"
 
 
 class DockerCheck:
+    expected_mode = "fixture"
+
     def __init__(self):
         self.project = f"yk02-check-{uuid4().hex[:10]}"
         with socket.socket() as sock:
@@ -94,7 +96,7 @@ class DockerCheck:
             payload = json.loads(response.read())
             valid = expected if isinstance(expected, tuple) else (expected,)
             assert status in valid, (path, status, payload)
-            assert response.headers["X-Adapter-Mode"] == "fixture"
+            assert response.headers["X-Adapter-Mode"] == self.expected_mode
             assert response.headers["X-Request-ID"]
             return payload, status
 
