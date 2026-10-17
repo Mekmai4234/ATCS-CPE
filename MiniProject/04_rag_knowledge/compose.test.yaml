@@ -1,0 +1,26 @@
+services:
+  tests:
+    build:
+      context: ..
+      dockerfile: 04_rag_knowledge/Dockerfile
+    network_mode: none
+    environment:
+      APP_ENV: test
+      GEMINI_API_KEY: ""
+      RUN_LIVE_EMBEDDING_TESTS: "0"
+    init: true
+  persistence:
+    build:
+      context: ..
+      dockerfile: 04_rag_knowledge/Dockerfile
+    network_mode: none
+    environment:
+      APP_ENV: test
+      GEMINI_API_KEY: ""
+      RUN_LIVE_EMBEDDING_TESTS: "0"
+    volumes:
+      - reference-data:/data
+    init: true
+    command: ["yk-rag", "evaluate", "--state", "/data", "--phase", "verify"]
+volumes:
+  reference-data:
