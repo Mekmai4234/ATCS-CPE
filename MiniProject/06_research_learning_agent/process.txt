@@ -1,50 +1,48 @@
-### 06_research_learning_agent - Process & Techniques (README)
+### 06_research_learning_agent - Process & Techniques
 
 Overview
---------
-The agent helps users achieve research/learning goals across imported videos. It can
-choose another action based on evidence returned by previous tools. Direct generation
-of a quiz or flashcard set can use the same tools without a full agent loop.
-All behaviors described here are planned for implementation.
+Research orchestration and learning-artifact generation over imported transcript evidence.
+Implemented as the Python package youtube_agent, called by 02's existing worker.
+Live Gemini transport is implemented; executed validation uses offline fixtures/HTTP mocks.
 
 Architecture
-------------
-- RunController loads scope, goal, progress, and remaining budgets.
-- GeminiDecisionLoop requests the next allowed action.
-- ToolRegistry validates calls to search_evidence, read_video_chunks, compare_videos,
-  and create_learning_artifact.
-- Evidence tools reuse 04; synthesis/comparison tools reuse 05.
-- ArtifactBuilder creates study plans, quizzes, and flashcards from supported evidence.
-- ResultValidator checks schema, citations, and declared coverage.
-- 02 owns run persistence and exposes progress to 01.
+- AgentSettings: bounded configurable run/model/context settings, module-local env override.
+- AgentService: per-run state, observation-driven decisions, coverage, artifact validation.
+- GeminiModel: official SDK native function calls and schema-constrained artifact output.
+- RagKnowledge: bridge to 04 using BackendExecution authorization/version checks.
+- AgentAdapters: optional 06-owned composition for 02; 03/05 remain explicitly unavailable.
+- Existing 02 schemas and execution context define persistence and integration boundaries.
 
-Techniques Used
----------------
-- Tool/function calling provides machine-validated actions instead of parsing free text.
-- An observation-driven loop permits follow-up retrieval when information is missing.
-- Scope propagation prevents a tool from silently searching unrelated videos.
-- Step and wall-clock budgets keep research bounded.
-- Progress events describe actions/results without storing hidden chain-of-thought.
-- Grounded artifact generation links learning material to source video intervals.
+Tools and Data
+- search_evidence(query, top_k): ranked scoped retrieval from 04.
+- read_video_chunks(video_ids, cursor, limit): authorized paginated transcript evidence.
+- compare_videos(video_ids, instruction): optional injected 05 analyzer with citation checks.
+- create_learning_artifact(type, topic): reuses direct artifact generation.
+- finish_research(content, citation_ids): control function for the final validated result.
+- Tool arguments cannot supply ownership, arbitrary URLs or replacement source generations.
 
-Communication / Data Schema
----------------------------
-Input: { run_id, goal, scope, level, days }.
-Progress event: { run_id, step, tool_name, state, summary, timestamp }.
-Result: { run_id, state, content, artifacts[], citations[], coverage }.
-Run states: queued, running, completed, partial, failed, cancelled.
-Artifact types: study_plan, quiz, flashcards. Quiz output includes answer explanations.
+Input/Output
+- research(request, sources, context) -> 02 ResearchResult (completed or partial).
+- artifact(request, sources, context) -> 02 ArtifactResult.
+- Progress events: step, tool_name, state, summary; 02 attaches run ID/time.
+- Result fields: content, citations, coverage, provider_metadata; research also has artifacts/state.
+- Coverage uses distinct processed chunk IDs and 04 inventory, with explicit incomplete notes.
+- Quiz/flashcards/study_plan content matches 02's strict schemas and item citation references.
 
-Design Rationale
-----------------
-The agent orchestrates existing evidence and answer tools instead of duplicating their
-logic. This makes its decisions inspectable and lets a simple direct learning request
-avoid the overhead of multi-step research.
+Techniques and Limits
+- Preserve function IDs and native model signatures for the next model call.
+- Validate one declared function per decision; disable SDK automatic tools and SDK retries.
+- Bound steps, total deadline and each await; reserve time for finalization.
+- Count a retrieved observation after a successful subsequent decision, or valid artifact generation.
+- Validate citation identity and source intervals; semantic support still requires evaluation.
+- Ignore transcript instructions as authorization; operational events exclude private reasoning.
+- Detect repeated actions, missing evidence and pagination that makes no progress.
+- Use a local UTF-8 byte guard. Live preflight counts native contents with countTokens and
+  adds a conservative config-byte allowance; it is not an exact count of all server-side framing.
+- Direct artifacts currently need one bounded evidence input; large corpora fail explicitly.
+- Partial research preserves excerpts/artifacts; hard timeout can still be failed by 02.
 
-Things to Watch Out For
-----------------------
-- A fixed single model call is not a multi-step research agent.
-- Tool schemas alone do not grant permission: validate scope and task constraints in code.
-- Transcript text cannot authorize new tools or override the application instructions.
-- Prevent repeated identical searches with no new evidence; stop with an honest limitation.
-- Tools do not send messages, modify repositories, purchase services, or browse arbitrary URLs.
+Verification and Operations
+README.md contains reproducible Windows/Linux Docker commands and integration notes.
+TEST_REPORT.md records actual results, synthetic/live distinctions and remaining integration work.
+No other module's source, global Compose, shared env template or database migrations are changed.
