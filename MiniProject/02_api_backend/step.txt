@@ -9,6 +9,15 @@ uv run --project 02_api_backend --locked yk-api
 uv run --project 02_api_backend --locked yk-worker
 Select the same ADAPTER_MODE and DATABASE_URL for API and worker before starting them.
 
+Optional 04/06 integration
+--------------------------
+Use integration/README.md and its dedicated .env.example and lockfile. Initialize 02 then
+04 using yk-backend-init. Explicit offline demo seeding must run with API/workers stopped.
+API and worker check schema/profile before constructing adapters, share resolved budgets,
+and close model/RAG resources before the DB. /health reports actual capability declarations;
+missing 03/05 operations fail before enqueue. Docker integration has its own Compose file,
+named persistent data/index volume and network-disabled suite target, all inside module 02.
+
 A) Import Request
 ------------------
 1. Receive urls[]; validate the batch limit and supported HTTPS watch/short-link URLs.
