@@ -1,0 +1,41 @@
+{
+  "description": "Synthetic Thai/English reference transcripts; no actual YouTube contents. Offline token-hash results are mechanism checks only.",
+  "videos": [
+    {
+      "video_id": "dQw4w9WgXcQ",
+      "title": "[FIXTURE] English retrieval lesson",
+      "channel_id": "fixture-en",
+      "published_at": "2026-01-01",
+      "language": "en",
+      "source": "fixture",
+      "segments": [
+        {"segment_id": "rag", "text": "Retrieval augmented generation uses retrieved evidence to support answers.", "start_seconds": 0, "duration_seconds": 12},
+        {"segment_id": "vectors", "text": "Embeddings vectors encode text meaning for semantic similarity search.", "start_seconds": 12, "duration_seconds": 15},
+        {"segment_id": "citations", "text": "Citations connect answers to source passages and video timestamps.", "start_seconds": 27, "duration_seconds": 13}
+      ]
+    },
+    {
+      "video_id": "jNQXAC9IVRw",
+      "title": "[FIXTURE] บทเรียนหลักฐานภาษาไทย",
+      "channel_id": "fixture-th",
+      "published_at": "2026-02-01",
+      "language": "th",
+      "source": "fixture",
+      "segments": [
+        {"segment_id": "evidence", "text": "หลักฐาน ต้องมาจากข้อความในคลิปที่เลือก ก่อนนำไปสร้างคำตอบ", "start_seconds": 3, "duration_seconds": 12},
+        {"segment_id": "timestamps", "text": "เวลาอ้างอิง ช่วยให้เปิดย้อนกลับไปตรวจคำพูดในวิดีโอได้", "start_seconds": 15, "duration_seconds": 15},
+        {"segment_id": "coverage", "text": "สรุปทั้งคลิป ต้องอ่านข้อมูลให้ครบทุกส่วนและแจ้งส่วนที่ขาด", "start_seconds": 30, "duration_seconds": 13}
+      ]
+    }
+  ],
+  "questions": [
+    {"question": "retrieved evidence answers", "video_id": "dQw4w9WgXcQ", "segment_id": "rag"},
+    {"question": "Embeddings vectors semantic similarity", "video_id": "dQw4w9WgXcQ", "segment_id": "vectors"},
+    {"question": "Citations source timestamps", "video_id": "dQw4w9WgXcQ", "segment_id": "citations"},
+    {"question": "หลักฐาน", "video_id": "jNQXAC9IVRw", "segment_id": "evidence"},
+    {"question": "เวลาอ้างอิง", "video_id": "jNQXAC9IVRw", "segment_id": "timestamps"},
+    {"question": "สรุปทั้งคลิป", "video_id": "jNQXAC9IVRw", "segment_id": "coverage"},
+    {"question": "What lets me verify an answer against the exact point in a recording?", "video_id": "dQw4w9WgXcQ", "segment_id": "citations"},
+    {"question": "ถ้าอยากตรวจสอบว่าผู้พูดพูดไว้จริง ต้องกดกลับไปตรงไหน", "video_id": "jNQXAC9IVRw", "segment_id": "timestamps"}
+  ]
+}

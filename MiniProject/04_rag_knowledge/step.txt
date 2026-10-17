@@ -1,29 +1,37 @@
-### 04_rag_knowledge - Workflow Steps
+04_rag_knowledge - Gemini Workflow Steps
 
-A) Indexing Pipeline
---------------------
-1. Receive normalized transcript segments and video/version metadata from 03.
-2. Validate non-empty text, ordered intervals, stable IDs, and usable source metadata.
-3. Group neighboring segments into chunks with configurable overlap.
-4. Retain original segment references and calculate each chunk's time bounds.
-5. Create an embedding for each chunk using EMBEDDING_MODEL.
-6. Upsert vectors and metadata with stable IDs into the selected Chroma collection.
-7. Publish the new indexed version only when all required chunks succeed.
-8. Remove superseded version records after a successful replacement.
-9. Report completion or a retryable/permanent failure to the backend job coordinator.
+Setup
+-----
+See README.md for locked install/test/Docker commands and module-local key configuration.
+Initialize 02's existing schema, then run yk-rag init for additive rag04 tables.
 
-B) Question Retrieval Pipeline
-------------------------------
-1. Receive a question and validated source scope from 05 or an authorized tool in 06.
-2. Embed the question using the same configuration as the target index.
-3. Apply scope constraints, then retrieve ranked relevant chunks.
-4. Select up to RETRIEVAL_TOP_K evidence records while limiting avoidable duplication.
-5. Return chunk text and traceable video/timestamp metadata to the caller.
-6. If no suitable evidence is available, return an empty/limited evidence result.
+A) Indexing
+-----------
+1. Receive Source, normalized TranscriptResult and ExecutionContext from the 02 worker.
+2. Validate transcript hash, authorized source, current generation and execution.
+3. Group caption pieces using conservative UTF-8 byte budgets and bounded overlap.
+4. Preserve Unicode, segment IDs, titles and original time bounds; chunk schema is version 2.
+5. Prepare title/text retrieval strings without changing original evidence text.
+6. Count each final input with Gemini countTokens; reject oversized/invalid counts.
+7. Embed one Content object per chunk with gemini-embedding-2 and explicit dimensions.
+8. Validate one finite nonzero vector per chunk, then upsert into an invisible Chroma run.
+9. Verify persisted IDs; atomically fence lease/cancellation/source and publish the manifest.
+10. Clean superseded runs and return IndexReceipt; 02 verifies inventory and commits ready.
 
-C) Complete-video Coverage Pipeline
------------------------------------
-1. Receive the explicit video scope for a full summary or comparison.
-2. Enumerate all eligible chunks for each selected video, using pagination/batches.
-3. Return chunk batches and coverage metadata to 05/06.
-4. Report missing or partially indexed videos; do not label partial evidence as complete.
+B) Retrieval
+------------
+1. Receive question and a nonempty subset of the current job's frozen sources.
+2. Reject widened scopes, invalid limits and old/incompatible index configurations.
+3. Prepare the query retrieval prefix, count it and embed with the same Gemini config.
+4. Filter Chroma by exact published run IDs before cosine ranking.
+5. Limit duplicates and return ranked evidence with original text and real timestamps.
+6. Recheck source/run identities after asynchronous operations. 05 decides sufficiency.
+
+C) Coverage, Replacement and Deletion
+------------------------------------
+1. Enumerate all chunks using snapshot-bound pages; report missing sources/unknown totals.
+2. Supply exact scoped evidence lookup and actual published vector inventory to 02.
+3. Keep old indexes until replacement succeeds; never combine incompatible vector spaces.
+4. Hide authorized generations before deleting vectors; retain retryable failed cleanup.
+5. Stop API/workers for explicit per-video reindex and abandoned-staging GC.
+6. Back up compatible application DB and Chroma data together.
