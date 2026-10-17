@@ -52,6 +52,26 @@ class Repository:
                 "Use a separate DATABASE_URL when switching between fixture and other adapters",
                 409,
             )
+        if self.settings.adapter_mode == "custom":
+            identities = (
+                connection.execute(
+                    sa.select(db.jobs.c.payload["adapter_identity"].as_string())
+                    .where(db.jobs.c.payload["adapter_mode"].as_string() == "custom")
+                    .distinct()
+                )
+                .scalars()
+                .all()
+            )
+            if any(identity != self.adapter_identity for identity in identities):
+                raise AppError(
+                    "adapter_mode_mismatch",
+                    "Use a separate DATABASE_URL for this adapter profile",
+                    409,
+                )
+
+    @property
+    def adapter_identity(self):
+        return f"{self.settings.adapter_factory}:{self.settings.backend_integration_profile}"
 
     def check_mode(self):
         with self.db.read() as connection:
@@ -59,7 +79,13 @@ class Repository:
 
     def _new_job(self, connection, kind, payload, **extra):
         self._check_mode(connection)
-        payload = dict(payload, adapter_mode=self.settings.adapter_mode)
+        payload = dict(
+            payload,
+            adapter_mode=self.settings.adapter_mode,
+            adapter_identity=self.adapter_identity
+            if self.settings.adapter_mode == "custom"
+            else None,
+        )
         now = time.time()
         data = dict(
             job_id=uid(),
@@ -561,12 +587,13 @@ class Repository:
             video_id=transcript.video_id, generation=job["generation"], transcript_version=version
         )
 
-    def fail(self, job_id, token, error):
+    def fail(self, job_id, token, error, *, deadline_exhausted=False):
         with self.db.write() as connection:
             job = self._owned(connection, job_id, token, allow_cancel=True)
             cancelled = job["cancel_requested"] or error.code == "cancelled"
             retry = (
                 not cancelled
+                and not deadline_exhausted
                 and error.retryable
                 and job["attempt_count"] < job["max_attempts"]
                 and time.time() < job["deadline_at"]

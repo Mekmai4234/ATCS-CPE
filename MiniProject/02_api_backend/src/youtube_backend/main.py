@@ -14,8 +14,8 @@ from starlette.exceptions import HTTPException
 from .config import Settings
 from .database import Database
 from .errors import AppError
-from .integrations import load_adapters
 from .repository import Repository
+from .runtime import ManagedAdapters
 from .schemas import (
     Accepted,
     AnalysisRequest,
@@ -46,15 +46,19 @@ def create_app(settings=None, database=None, adapters=None):
     settings = settings or Settings()
     database = database or Database(settings.database_url)
     repository = Repository(database, settings)
-    adapters = adapters or load_adapters(settings, repository)
-    worker = Worker(repository, adapters, settings)
+    runtime = ManagedAdapters(settings, repository, adapters)
+    worker = Worker(repository, runtime, settings)
 
     @asynccontextmanager
     async def lifespan(app):
-        database.check_schema()
-        repository.check_mode()
-        yield
-        database.close()
+        try:
+            await runtime.start()
+            yield
+        finally:
+            try:
+                await runtime.close()
+            finally:
+                database.close()
 
     app = FastAPI(
         title="YouTube Knowledge API (02)",
@@ -67,7 +71,7 @@ def create_app(settings=None, database=None, adapters=None):
         },
     )
     app.state.settings, app.state.repository = settings, repository
-    app.state.worker, app.state.adapters = worker, adapters
+    app.state.worker, app.state.adapters = worker, runtime
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.web_origin],
@@ -141,10 +145,17 @@ def create_app(settings=None, database=None, adapters=None):
             adapters_configured=settings.adapter_mode != "unavailable",
             live_provider_verified=False,
             single_user=True,
+            capabilities=runtime.capabilities,
+            integration_profile=settings.backend_integration_profile
+            if settings.adapter_mode == "custom"
+            else None,
+            synthetic_data=settings.adapter_mode == "fixture"
+            or settings.backend_integration_profile == "offline",
         )
 
     @app.post("/api/videos/import", response_model=ImportResponse, status_code=202)
-    def import_videos(body: ImportRequest):
+    async def import_videos(body: ImportRequest):
+        await runtime.require("ingest", "index", "inventory")
         return dict(jobs=repository.import_urls(body.urls), mode=settings.adapter_mode)
 
     @app.get("/api/jobs/{job_id}", response_model=JobResponse)
@@ -187,11 +198,13 @@ def create_app(settings=None, database=None, adapters=None):
         return repository.transcript(video_id, limit, offset)
 
     @app.delete("/api/videos/{video_id}", response_model=Accepted, status_code=202)
-    def delete_video(video_id: str):
+    async def delete_video(video_id: str):
+        await runtime.require("delete")
         return accepted(repository.delete_video(video_id))
 
     @app.post("/api/chat", response_model=ChatResponse, responses={202: {"model": Accepted}})
     async def chat(body: ChatRequest, request: Request, idempotency_key: IdempotencyKey = None):
+        await runtime.require("answer", "evidence", "inventory")
         job = repository.enqueue("chat", body.model_dump(mode="json"), idempotency_key)
         if job["state"] == "queued":
             await worker.run_once(job["job_id"])
@@ -218,13 +231,15 @@ def create_app(settings=None, database=None, adapters=None):
         )
 
     @app.post("/api/analysis", response_model=Accepted, status_code=202)
-    def analysis(body: AnalysisRequest, idempotency_key: IdempotencyKey = None):
+    async def analysis(body: AnalysisRequest, idempotency_key: IdempotencyKey = None):
+        await runtime.require("analyze", "evidence", "inventory")
         return accepted(
             repository.enqueue("analysis", body.model_dump(mode="json"), idempotency_key)
         )
 
     @app.post("/api/research", response_model=Accepted, status_code=202)
-    def research(body: ResearchRequest, idempotency_key: IdempotencyKey = None):
+    async def research(body: ResearchRequest, idempotency_key: IdempotencyKey = None):
+        await runtime.require("research", "evidence", "inventory")
         return accepted(
             repository.enqueue("research", body.model_dump(mode="json"), idempotency_key), True
         )
@@ -247,7 +262,8 @@ def create_app(settings=None, database=None, adapters=None):
         return repository.public_job(repository.cancel(run_id))
 
     @app.post("/api/learning-artifacts", response_model=Accepted, status_code=202)
-    def create_artifact(body: ArtifactRequest, idempotency_key: IdempotencyKey = None):
+    async def create_artifact(body: ArtifactRequest, idempotency_key: IdempotencyKey = None):
+        await runtime.require("artifact", "evidence", "inventory")
         return accepted(
             repository.enqueue("artifact", body.model_dump(mode="json"), idempotency_key)
         )

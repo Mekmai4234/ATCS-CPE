@@ -20,6 +20,21 @@ from .schemas import (
 
 
 class FixtureAdapters:
+    capabilities = dict.fromkeys(
+        (
+            "ingest",
+            "index",
+            "delete",
+            "evidence",
+            "inventory",
+            "answer",
+            "analyze",
+            "research",
+            "artifact",
+        ),
+        True,
+    )
+
     def __init__(self, repository, settings):
         self.repo = repository
         self.settings = settings

@@ -4,8 +4,10 @@ Runnable single-user backend for YouTube Knowledge. It implements HTTP contracts
 SQLite persistence/migrations, import coordination, a separate durable worker,
 chat history, analysis/research jobs, learning artifacts, cancellation and deletion.
 
-Modules 03-06 are not implemented in this checkout. The default `unavailable` mode
-reports that explicitly. `fixture` mode is a deterministic integration sandbox:
+Modules 04/06 are connected through the optional **02-owned integration environment**
+described in [integration/README.md](integration/README.md). Modules 03/05 remain
+unavailable. The lightweight default `unavailable` mode reports missing adapters
+explicitly. `fixture` mode is a deterministic integration sandbox:
 it does not fetch YouTube, create embeddings, use ChromaDB, call Gemini, or run an
 autonomous agent. Every fixture answer/title is labelled and HTTP responses carry
 `X-Adapter-Mode`. Passing fixture tests does not validate AI quality.
@@ -91,19 +93,27 @@ An unrelated question returns `insufficient_evidence` in this deterministic demo
 
 ## Configuration and Gemini
 
-Settings load `MiniProject/.env` explicitly; environment variables take precedence.
+Settings load `MiniProject/.env` and the optional `02_api_backend/integration/.env`
+explicitly; the integration file overrides the shared file, and process environment
+variables take precedence over both.
 Copy `.env.example` only if no local `.env` already exists. API keys are never
 required for offline tests. Streaming is not implemented and enabling it fails
 configuration validation.
 
-Keep `LLM_MODEL=gemini-3.5-flash` configurable as requested. Module 05 owns the
-Google GenAI SDK adapter; 06 should reuse its provider integration. This backend
+Keep `LLM_MODEL=gemini-3.5-flash` configurable as requested. Module 06 supplies the
+Agent Gemini gateway; module 05's answer generation is not implemented yet. This backend
 stores requested/returned model metadata, usage and latency supplied by adapters.
 The compatibility/routing note remains in `05_ai_answers_analysis/env.txt`.
 No Gemini SDK call or account/model-access test has been performed by this module.
-OpenAI embeddings remain a separate module 04 choice.
+Module 04 now uses Gemini embeddings; the 02 integration template reflects that change.
+The older shared root template may still contain the superseded OpenAI proposal.
 
 ## Connect modules 03-06
+
+For the supplied 04/06 implementation, use `youtube_backend.team:create_adapters`
+and the dedicated integration environment. It shares the RAG service between evidence
+and Agent tools, centralizes configuration, and closes Gemini/Chroma at shutdown.
+See [integration/README.md](integration/README.md) for offline/live profiles and capabilities.
 
 1. Implement the async `Adapters` protocol in `src/youtube_backend/integrations.py`
    in a trusted, installable team package. Return the Pydantic models in `schemas.py`.

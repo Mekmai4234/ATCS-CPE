@@ -28,6 +28,8 @@ dev = [
 yk-api = "youtube_backend.cli:api"
 yk-worker = "youtube_backend.cli:worker"
 yk-db = "youtube_backend.cli:migrate"
+yk-backend-init = "youtube_backend.cli:integration_init"
+yk-backend-demo-seed = "youtube_backend.cli:demo_seed"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/youtube_backend"]
