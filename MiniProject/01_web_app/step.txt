@@ -1,13 +1,30 @@
-Implementation steps
-1. Agree on API schemas with 02_api_backend and implement labeled mock fixtures.
-2. Build navigation and pages for importing videos, the video library, chat, and learning outputs.
-3. Accept multiple URLs, show validation errors, and submit an import request.
-4. Display thumbnails, titles, channels, and per-video processing stages.
-5. Embed supported YouTube videos; provide an external link if embedding is unavailable.
-6. Build video/channel/date filters and preserve the selected scope in chat requests.
-7. Render answers with source cards and timestamp links.
-8. Add research progress, learning plans, quizzes, and flashcards.
-9. Integrate real endpoints, loading states, retry actions, and accessible keyboard navigation.
+### 01_web_app - Workflow Steps
 
-Acceptance criteria
-A user can import a supported video, observe its real status, select ready videos, ask a question, and open a cited timestamp. Missing transcripts and failed jobs must be visible. No fabricated percentage or unlabeled mock answer may appear in real mode.
+A) Video Import and Library
+---------------------------
+1. The user opens the video library and pastes one or more YouTube links.
+2. The frontend checks for empty input and obvious URL-format errors.
+3. Send { urls[] } to POST /api/videos/import; the backend performs authoritative validation.
+4. Receive jobs[] and create a card for each accepted video/job.
+5. Poll GET /api/jobs/{job_id} and refresh metadata from GET /api/videos.
+6. Display the real stage: queued, fetching_transcript, indexing, ready,
+   no_transcript, or failed. Display a percentage only if measured progress is provided.
+7. Show the thumbnail, title, channel, and an embedded-player or external-video action.
+8. Enable AI source selection when a video is ready; explain unavailable transcripts or errors.
+
+B) Questions and Follow-up
+--------------------------
+1. The user selects ready videos and optionally narrows channel/date/playlist filters.
+2. Send { question, conversation_id, scope } to POST /api/chat.
+3. Show the submitted message immediately and a loading state for the answer.
+4. Receive { status, answer, citations[], coverage, conversation_id }.
+5. Render the answer and source cards, or an insufficient-evidence explanation.
+6. A citation click opens the original video at start_seconds or seeks the embedded player.
+7. A follow-up question carries the conversation ID and current explicit source scope.
+
+C) Research and Learning
+-------------------------
+1. The user enters a research goal or selects a summary, comparison, quiz, or flashcard task.
+2. Submit the matching request to the API and display progress for long-running research.
+3. Render the returned artifact with its citations and any partial-coverage notice.
+4. Preserve the current task/input on recoverable errors so the user can retry.
