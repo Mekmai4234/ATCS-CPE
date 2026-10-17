@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "youtube-knowledge-agent"
+version = "0.1.0"
+description = "Bounded, evidence-grounded research and learning (module 06)"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "youtube-knowledge-backend",
+  "youtube-knowledge-rag",
+  "google-genai>=1.60,<3",
+  "pydantic-settings>=2.7,<3",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.11,<1", "httpx>=0.28,<1"]
+
+[tool.uv.sources]
+youtube-knowledge-backend = { path = "../02_api_backend", editable = true }
+youtube-knowledge-rag = { path = "../04_rag_knowledge", editable = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/youtube_agent"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
