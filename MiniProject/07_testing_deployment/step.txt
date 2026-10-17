@@ -1,14 +1,32 @@
-Implementation steps
-1. Record exact dependency versions and real startup commands as components are added.
-2. Prepare captioned, missing-caption, duplicate, unavailable, Thai, and English video fixtures.
-3. Verify import -> transcript -> index -> chat -> cited timestamp end to end.
-4. Evaluate retrieval coverage, unsupported-claim rate, citation accuracy, and abstention.
-5. Verify complete-summary coverage and comparison evidence from every selected video.
-6. Test agent tool selection, scope boundaries, budget limits, and artifact grounding.
-7. Test worker restart recovery, deletion, retry behavior, and concurrent requests.
-8. Measure import latency, answer latency, and provider usage on a documented dataset.
-9. Add repeatable CI checks, then configure hosting, secrets, CORS, persistent volumes, and health checks.
-10. Document backup, restore, rollback, and a demonstration script before release.
+### 07_testing_deployment - Workflow Steps
 
-Acceptance criteria
-The integrated demo passes the documented scenarios, measured limitations are reported, secrets are excluded from Git, and persistent data survives a service restart. Do not claim performance numbers before measuring them.
+A) Verification and AI Evaluation
+---------------------------------
+1. Prepare fixtures for captioned, missing-caption, duplicate, unavailable, Thai,
+   and English video cases, plus known supporting transcript intervals.
+2. Run component checks for URL parsing, timestamp preservation, indexing, and API schemas.
+3. Run the integrated flow: paste URL -> import -> index -> question -> cited timestamp.
+4. Check unsupported questions produce an honest insufficient-evidence result.
+5. Evaluate retrieval against known supporting chunks and inspect claim/source support.
+6. Verify whole-video summary/comparison coverage and disclose missing inputs.
+7. Verify agent tool selection, scope constraints, step/time budgets, and learning artifacts.
+8. Test worker restart recovery, retry classification, deletion during processing, and
+   multi-user isolation when that feature is implemented.
+9. Record observed import/answer latency and model usage with dataset/configuration details.
+
+B) Deployment
+--------------
+1. Add manifests, lockfiles, entrypoints, and tested startup instructions for actual components.
+2. Build/package the web, API, and worker; combine AI packages where appropriate.
+3. Provide environment values and persistent storage without committing credentials.
+4. Run migration/index checks and health checks in an isolated test environment.
+5. Configure allowed origins and HTTPS for the deployed web/API.
+6. Verify the release candidate, then use a PR from develop to main for the agreed release.
+7. Document deployment, backup/restore, and rollback commands once verified.
+
+C) Monitoring and Improvement
+-----------------------------
+1. Collect job failures, provider errors, latency, model usage, and citation-validation errors.
+2. Correlate events using request/job/run IDs and redact sensitive values.
+3. Review retrieval misses and unsupported claims to improve data, prompts, or chunking.
+4. Re-run relevant evaluations when data, prompt, embedding configuration, or model changes.
