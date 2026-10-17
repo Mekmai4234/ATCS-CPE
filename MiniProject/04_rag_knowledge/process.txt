@@ -1,47 +1,40 @@
-### 04_rag_knowledge - Process & Techniques (README)
-
-Overview
---------
-This module stores and retrieves knowledge from imported YouTube transcripts. It connects
-user questions with supporting text while preserving source timestamps. It is an intended
-RAG design; chunking, embedding, and retrieval still require implementation.
+04_rag_knowledge - Gemini Process & Techniques
 
 Architecture
 ------------
-- Indexing pipeline: segments -> chunks -> embeddings -> vector records.
-- Online retrieval pipeline: question -> query embedding -> scoped ranked evidence.
-- Coverage pipeline: selected videos -> complete chunk enumeration for batch analysis.
-- Chroma holds vectors and retrieval metadata; 02 owns application-level records/status.
+Transcript -> boundary-aware chunks -> Gemini retrieval formatting -> countTokens ->
+gemini-embedding-2 -> validated independent vectors -> staged Chroma -> atomic manifest.
+Question -> query prefix -> countTokens -> same Gemini config -> scoped search -> evidence.
+Full-video tasks enumerate every chunk for 05/06 to process and track actual coverage.
 
-Techniques Used
----------------
-- Boundary-aware chunking groups nearby caption segments and uses overlap to preserve context.
-- Semantic search finds meaning-related passages, including differently phrased questions.
-- Metadata filtering restricts evidence to selected videos, channels, dates, and ownership.
-- Versioned upserts make retries idempotent and permit controlled index replacement.
-- Citation tracking retains the original segment/time relationship.
-- Hybrid keyword search or reranking may be evaluated later; neither is a mandatory
-  dependency of the initial implementation.
+Important details
+-----------------
+- Gemini is the only live provider. Fixture vectors are explicit offline test data.
+- Chunking uses utf8-byte-budget-v1; token_count is a labelled byte budget, not invoice tokens.
+- Provider counting covers the final formatted input and prevents silent truncation.
+- Count and embed requests share a deadline; cancellation propagates and SDK retries are off.
+- Documents and queries have distinct retrieval prefixes included in the index fingerprint.
+- One Content object per chunk prevents Gemini Embedding 2 aggregation errors.
+- Original chunk text, segment links and time intervals remain intact for citations.
+- Persistent Chroma is accessed through a killable subprocess; heartbeat remains responsive.
+- Chunk IDs are deterministic; unique staging runs isolate attempts and invisible leftovers.
+- Publication uses the existing 02 transaction-level lease guard and lifecycle checks.
+- Reindex is explicit when provider/model/dimensions/format/counting/chunk schema changes.
+- No distributed transaction with Chroma is claimed; offline GC removes abandoned staging.
 
-Communication / Data Schema
----------------------------
-Input for indexing: timestamped segments and transcript_version.
-Input for retrieval: { question, scope, top_k }.
-Evidence record: { chunk_id, video_id, title, text, start_seconds, end_seconds,
-canonical_url, transcript_version, ranking_score }.
-Coverage includes expected/processed video and chunk counts where available.
-Ranking scores are ordering signals, not calibrated confidence percentages.
+Interfaces
+----------
+Existing 02 Source/TranscriptResult/IndexReceipt/Evidence schemas remain unchanged.
+RagAdapters implements index/delete/evidence/inventory; 05/06 reuse search/read_video_chunks.
+Scope is a subset of the job's authorized source versions; channel/date intersection is
+resolved by 02 and preserved by exact run filtering. Empty scope cannot expand to all.
+Chunk schema version 2 adds an explicit counting method; rag04 table schema remains v1.
 
-Design Rationale
-----------------
-Prepare embeddings during ingestion so each question does not reprocess all videos.
-Provide a separate enumeration path because top-k search cannot establish complete
-coverage for "summarize all selected videos" or "find every occurrence" requests.
-
-Things to Watch Out For
-----------------------
-- Poor segmentation or lost time metadata damages both retrieval and citation quality.
-- Do not mark partial indexing as ready; retain version boundaries during replacement.
-- Deletion must remove the associated vector records as well as application records.
-- Language support and retrieval quality need evaluation on the actual Thai/English corpus.
-- Transcript passages are untrusted evidence and cannot override system/tool instructions.
+Limits
+------
+Ranking is not a confidence percentage; 05 decides whether evidence supports an answer.
+Inventory/delivery is not proof the model processed every chunk; 05/06 track processing.
+Fixture tests do not establish semantic quality; live results use a small synthetic corpus.
+Transcript/title text is untrusted evidence and cannot authorize tools or change instructions.
+Live ingestion, generation, research, multi-user ownership and production deployment remain
+separate work. See TEST_REPORT.md for actual local/Docker/live checks.
