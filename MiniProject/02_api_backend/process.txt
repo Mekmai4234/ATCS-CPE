@@ -1,0 +1,20 @@
+Input
+Validated HTTP requests from 01_web_app and worker status updates.
+
+Flow
+Import request -> validate allowed YouTube URLs -> normalize video IDs -> deduplicate -> persist jobs -> return job IDs.
+Worker claims a job -> calls 03 -> calls 04 -> records ready or a classified terminal state.
+Chat request -> validate scope -> call 05 -> store answer and citations -> return result.
+Research request -> create run -> invoke 06 -> persist progress and final artifact.
+
+Output
+Structured JSON, durable job states, conversation history, and learning artifacts.
+
+Shared statuses
+queued -> fetching_transcript -> indexing -> ready.
+no_transcript indicates no usable captions were found.
+failed indicates an error with a code and retryable flag.
+Progress percentages are optional and must come from measured work.
+
+Failure handling
+Use bounded retries for transient failures. Restrict remote fetches to validated provider URLs. In multi-user mode, authorize before retrieving data. Never return server secrets in responses.
