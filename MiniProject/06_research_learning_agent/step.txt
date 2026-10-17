@@ -1,0 +1,14 @@
+Implementation steps
+1. Define research-run states and schemas for plans, quizzes, and flashcards.
+2. Define allowlisted tool inputs and outputs with explicit video scope.
+3. Build an agent loop that can choose tools based on intermediate results.
+4. Provide search, transcript-reading, and evidence-analysis tools.
+5. Add a coverage check so missing evidence can trigger another scoped search.
+6. Enforce step and time budgets; stop with an honest partial result when exceeded.
+7. Generate study plans with ordered topics and cited videos.
+8. Generate quizzes with supported answers/explanations and flashcards with source links.
+9. Persist meaningful progress events and final artifacts through 02.
+10. Test branching decisions, missing evidence, budget exhaustion, and instruction-like transcript text.
+
+Acceptance criteria
+A research task demonstrates a genuine tool-selection loop driven by intermediate results. Every tool stays in scope, learning outputs reference supporting content, and the run terminates within configured limits.

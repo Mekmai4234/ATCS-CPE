@@ -1,0 +1,17 @@
+Input
+Question or analysis task, selected video scope, relevant history, and retrieved evidence.
+
+Flow
+Classify requested output -> gather scoped evidence -> check coverage -> generate structured response -> validate citations -> return result.
+If evidence is absent or inadequate, return a clear limitation and suggested next action.
+Summaries and comparisons use coverage-aware aggregation rather than top-k retrieval alone.
+
+Output
+status (answered or insufficient_evidence), answer text, citations, coverage notes, and optional per-video findings.
+Each citation references a known chunk and includes video_id, title, start_seconds, and a timestamp URL.
+
+Failure handling
+Bound retries for invalid model output and provider failures. Never manufacture citations. Report partial coverage and contradictory sources clearly.
+
+Limitations
+The answer describes imported transcript evidence, not independently verified real-world truth. Time-sensitive game advice must retain source date/version context when available.

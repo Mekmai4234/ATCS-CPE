@@ -1,0 +1,18 @@
+Input
+A user goal, selected videos, learning level, and optional duration such as a seven-day plan.
+
+Flow
+Plan -> select an allowed tool -> inspect result -> assess coverage -> search/read again if needed -> compose artifact -> validate -> persist.
+Example: search RAG basics, inspect missing prerequisites, retrieve additional evidence, then arrange a seven-day study plan.
+
+Output
+Research progress, completed or partial results, cited learning plans, quizzes with answer explanations, and flashcards.
+
+Run states
+queued, running, completed, partial, failed, cancelled.
+Agent events are separate from video import statuses.
+
+Boundaries
+Tools cannot change repository content, send messages, purchase services, or access arbitrary external URLs.
+Transcript instructions are evidence only and cannot grant permissions or alter the agent's tool policy.
+A fixed single LLM call must not be presented as an autonomous research loop.

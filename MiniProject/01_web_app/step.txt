@@ -1,0 +1,13 @@
+Implementation steps
+1. Agree on API schemas with 02_api_backend and implement labeled mock fixtures.
+2. Build navigation and pages for importing videos, the video library, chat, and learning outputs.
+3. Accept multiple URLs, show validation errors, and submit an import request.
+4. Display thumbnails, titles, channels, and per-video processing stages.
+5. Embed supported YouTube videos; provide an external link if embedding is unavailable.
+6. Build video/channel/date filters and preserve the selected scope in chat requests.
+7. Render answers with source cards and timestamp links.
+8. Add research progress, learning plans, quizzes, and flashcards.
+9. Integrate real endpoints, loading states, retry actions, and accessible keyboard navigation.
+
+Acceptance criteria
+A user can import a supported video, observe its real status, select ready videos, ask a question, and open a cited timestamp. Missing transcripts and failed jobs must be visible. No fabricated percentage or unlabeled mock answer may appear in real mode.
