@@ -1,17 +1,51 @@
-Input
-Question or analysis task, selected video scope, relevant history, and retrieved evidence.
+### 05_ai_answers_analysis - Process & Techniques (README)
 
-Flow
-Classify requested output -> gather scoped evidence -> check coverage -> generate structured response -> validate citations -> return result.
-If evidence is absent or inadequate, return a clear limitation and suggested next action.
-Summaries and comparisons use coverage-aware aggregation rather than top-k retrieval alone.
+Overview
+--------
+This module turns transcript evidence into understandable answers, summaries, and
+comparisons using Gemini. It relies on 04 for evidence and returns results to 02 for
+storage/delivery. This is a planned generation design, not an implemented service.
 
-Output
-status (answered or insufficient_evidence), answer text, citations, coverage notes, and optional per-video findings.
-Each citation references a known chunk and includes video_id, title, start_seconds, and a timestamp URL.
+Architecture
+------------
+- TaskHandler selects question-answering, summary, or comparison behavior.
+- EvidenceCollector calls scoped retrieval or complete chunk enumeration.
+- PromptBuilder separates trusted instructions, history, questions, and untrusted excerpts.
+- GeminiAdapter calls the configurable model through google-genai.
+- OutputValidator checks schemas and maps citations to supplied source records.
+- CoverageTracker records which videos/chunks were actually processed.
 
-Failure handling
-Bound retries for invalid model output and provider failures. Never manufacture citations. Report partial coverage and contradictory sources clearly.
+Techniques Used
+---------------
+- Retrieval-augmented prompting gives Gemini evidence with stable reference labels.
+- Grounding instructions require an honest insufficient-evidence result when support is absent.
+- Context budgeting bounds input size without pretending omitted evidence was analyzed.
+- Hierarchical batch summarization supports whole-video analysis beyond one model request.
+- Citation mapping creates URLs from trusted video IDs and validated timestamps.
+- Structured outputs support predictable frontend/API handling.
+- Reference validation checks source identity; semantic support still needs evaluation and
+  cannot be guaranteed merely because a citation ID exists.
 
-Limitations
-The answer describes imported transcript evidence, not independently verified real-world truth. Time-sensitive game advice must retain source date/version context when available.
+Communication / Data Schema
+---------------------------
+Input: question/task, authorized scope, conversation ID, relevant history.
+Output: { status, answer, citations[], coverage, conversation_id, provider_metadata }.
+Status: answered or insufficient_evidence for successful task outcomes; operational errors
+use the backend's structured error contract.
+Citation: { citation_id, chunk_id, video_id, title, start_seconds, end_seconds, url }.
+Provider metadata may include the requested/returned model version, usage, and latency.
+
+Design Rationale
+----------------
+Keep answer generation separate from storage and retrieval so the Gemini model can be
+configured without rebuilding the knowledge index. Preserve evidence identifiers through
+batch analysis so users can inspect the original video.
+
+Things to Watch Out For
+----------------------
+- Never use transcript instructions as authorization to run tools or change system rules.
+- Cite the passage actually supporting a claim, not merely a related video title.
+- A ranked score is not a percentage of answer correctness.
+- Full comparisons need evidence from every selected video or a clear coverage limitation.
+- Game-version advice and other changing content should retain source dates/context.
+- Gemini model availability and alias routing must be verified at integration time.

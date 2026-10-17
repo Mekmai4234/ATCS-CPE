@@ -1,18 +1,50 @@
-Input
-A user goal, selected videos, learning level, and optional duration such as a seven-day plan.
+### 06_research_learning_agent - Process & Techniques (README)
 
-Flow
-Plan -> select an allowed tool -> inspect result -> assess coverage -> search/read again if needed -> compose artifact -> validate -> persist.
-Example: search RAG basics, inspect missing prerequisites, retrieve additional evidence, then arrange a seven-day study plan.
+Overview
+--------
+The agent helps users achieve research/learning goals across imported videos. It can
+choose another action based on evidence returned by previous tools. Direct generation
+of a quiz or flashcard set can use the same tools without a full agent loop.
+All behaviors described here are planned for implementation.
 
-Output
-Research progress, completed or partial results, cited learning plans, quizzes with answer explanations, and flashcards.
+Architecture
+------------
+- RunController loads scope, goal, progress, and remaining budgets.
+- GeminiDecisionLoop requests the next allowed action.
+- ToolRegistry validates calls to search_evidence, read_video_chunks, compare_videos,
+  and create_learning_artifact.
+- Evidence tools reuse 04; synthesis/comparison tools reuse 05.
+- ArtifactBuilder creates study plans, quizzes, and flashcards from supported evidence.
+- ResultValidator checks schema, citations, and declared coverage.
+- 02 owns run persistence and exposes progress to 01.
 
-Run states
-queued, running, completed, partial, failed, cancelled.
-Agent events are separate from video import statuses.
+Techniques Used
+---------------
+- Tool/function calling provides machine-validated actions instead of parsing free text.
+- An observation-driven loop permits follow-up retrieval when information is missing.
+- Scope propagation prevents a tool from silently searching unrelated videos.
+- Step and wall-clock budgets keep research bounded.
+- Progress events describe actions/results without storing hidden chain-of-thought.
+- Grounded artifact generation links learning material to source video intervals.
 
-Boundaries
-Tools cannot change repository content, send messages, purchase services, or access arbitrary external URLs.
-Transcript instructions are evidence only and cannot grant permissions or alter the agent's tool policy.
-A fixed single LLM call must not be presented as an autonomous research loop.
+Communication / Data Schema
+---------------------------
+Input: { run_id, goal, scope, level, days }.
+Progress event: { run_id, step, tool_name, state, summary, timestamp }.
+Result: { run_id, state, content, artifacts[], citations[], coverage }.
+Run states: queued, running, completed, partial, failed, cancelled.
+Artifact types: study_plan, quiz, flashcards. Quiz output includes answer explanations.
+
+Design Rationale
+----------------
+The agent orchestrates existing evidence and answer tools instead of duplicating their
+logic. This makes its decisions inspectable and lets a simple direct learning request
+avoid the overhead of multi-step research.
+
+Things to Watch Out For
+----------------------
+- A fixed single model call is not a multi-step research agent.
+- Tool schemas alone do not grant permission: validate scope and task constraints in code.
+- Transcript text cannot authorize new tools or override the application instructions.
+- Prevent repeated identical searches with no new evidence; stop with an honest limitation.
+- Tools do not send messages, modify repositories, purchase services, or browse arbitrary URLs.
