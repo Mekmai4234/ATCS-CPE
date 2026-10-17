@@ -1,6 +1,7 @@
 # สถาปัตยกรรมและข้อตกลงการเชื่อมต่อ
 
-> เอกสารออกแบบเริ่มต้น: API, schema และ stack ด้านล่างยังไม่ได้ implement ต้องตกลงร่วมกันก่อนลงมือและปรับเอกสารให้ตรงกับโค้ด
+> หมวด 02 มี implementation แล้ว ดู [ข้อตกลง API ที่ใช้งานจริง](backend_api_contract.md) และ [คู่มือรัน Backend](../02_api_backend/README.md)
+> หมวด 01 และ 03–06 ยังเป็นข้อกำหนดออกแบบ การทดสอบ 02 ใช้ fixture แทนโมดูลเหล่านั้น
 
 ## เทคโนโลยีที่เสนอ
 
@@ -46,13 +47,19 @@ Worker -> 04: แบ่งข้อความ ทำ embeddings และบ�
 | GET /api/videos/{video_id}/transcript | คืน segments พร้อมเวลาและภาษา |
 | DELETE /api/videos/{video_id} | ลบข้อมูลที่ได้รับอนุญาตและ index ที่เกี่ยวข้อง |
 | POST /api/chat | รับ question, conversation_id, scope; คืน answer, citations, status |
-| POST /api/analysis | รับ summary/compare และ scope; คืนผลพร้อม coverage |
+| POST /api/analysis | รับ summary/compare และ scope; คืน job_id (202) ติดตามผลพร้อม coverage ผ่าน GET /api/jobs/{job_id} |
 | POST /api/research | รับ goal, scope, level, days; คืน run_id |
 | GET /api/research/{run_id} | คืน progress events, state และผลเมื่อเสร็จ |
-| POST /api/learning-artifacts | รับ quiz/flashcards/study_plan และ scope; คืน artifact |
+| POST /api/learning-artifacts | รับ quiz/flashcards/study_plan และ scope; คืน job_id (202) แล้วอ่าน artifact_ids จากผลของ job |
 | GET /api/conversations/{id} | คืนประวัติที่มีสิทธิ์อ่าน |
 | GET /api/learning-artifacts/{id} | คืนผลการเรียนรู้ที่บันทึกไว้ |
 | GET /health | สถานะบริการสำหรับตรวจการ deploy |
+
+หมวด 02 เพิ่ม POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry และ POST /api/research/{run_id}/cancel
+แชตคืนคำตอบ JSON เมื่อเสร็จ หรือ 202 พร้อม job_id เมื่อมีงานกำลังทำ/retry; หน้าเว็บต้องรองรับทั้งสองกรณี
+ขอบเขตรุ่นแรกต้องมี video_ids ที่เลือกชัดเจน รองรับ channel/date แบบ intersection และปฏิเสธ playlist filter ที่ยังไม่ implement
+02 เป็นผู้ประสานงานเรียก 03 แล้ว 04 เพียงเส้นทางเดียว ไม่ให้ 03 เรียก indexing ซ้ำเอง
+ตัวเชื่อม 04 ต้องรองรับ generation/version และป้องกัน stale worker ก่อน publish vectors ตามสัญญาในคู่มือ Backend
 
 scope ประกอบด้วย video_ids[], channel_ids[], playlist_ids[] และ date_from/date_to ตามที่รองรับ
 ห้ามลดข้อจำกัด scope โดยเงียบ ๆ หากกรองไม่ได้ให้แจ้ง validation error

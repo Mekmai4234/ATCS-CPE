@@ -34,8 +34,8 @@ Copy-Item MiniProject/.env.example MiniProject/.env
 ```
 
 ทำครั้งแรกเมื่อยังไม่มี .env เท่านั้น เติมค่าจริงบนเครื่องตนเอง
-ไฟล์นี้เป็นแบบตั้งค่าที่วางแผนไว้ ยังไม่มีโปรแกรมอ่านค่าหรือคำสั่งรันแอป
-เมื่อเพิ่ม source ให้ระบุ manifest, lockfile, working directory และคำสั่งรันจริงไว้ใน step.txt
+หมวด 02 อ่านค่าตั้งค่านี้ได้แล้ว ดูคำสั่งรันจริงใน MiniProject/02_api_backend/README.md
+เมื่อเพิ่ม source ให้ระบุ manifest, lockfile, working directory และคำสั่งรันจริงใน README ของหมวด พร้อมลิงก์จาก step.txt ซึ่งอธิบาย runtime workflow
 
 ## 3. ตั้งชื่อและจัดโค้ด
 
