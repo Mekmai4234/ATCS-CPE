@@ -1,14 +1,35 @@
-Implementation steps
-1. Finalize the proposed HTTP contract in docs/architecture.md.
-2. Define video, transcript, import job, conversation, message, citation, and learning artifact models.
-3. Add database migrations, request validation, structured errors, and health endpoints.
-4. Implement URL import, video listing, scoped selection, and job-status endpoints.
-5. Persist jobs before returning acceptance; implement retries and restart recovery.
-6. Connect ingestion/indexing workers and publish real per-video statuses.
-7. Expose chat, summaries, comparisons, research runs, and learning artifact endpoints.
-8. Add deletion that removes associated application data and vector records.
-9. Add conversation history and artifact persistence.
-10. If multiple users are supported, add authentication and enforce ownership in every data and search operation.
+### 02_api_backend - Workflow Steps
 
-Acceptance criteria
-Accepted jobs survive a restart, repeated imports do not create duplicate video records within the same ownership scope, and no_transcript is distinct from a temporary fetch failure. API responses conform to the shared contract.
+A) Import Request
+------------------
+1. Receive { urls[] } through POST /api/videos/import.
+2. Validate accepted YouTube URL formats, normalize video IDs, and check import limits.
+3. Check existing video records and jobs within the authorized data scope.
+4. Persist new video/job records or return existing records for duplicate input.
+5. Return jobs[] without waiting for transcript retrieval or indexing.
+6. A worker claims a persisted job and calls 03_video_ingestion.
+7. If a usable transcript is returned, call 04_rag_knowledge to build the index.
+8. Persist each stage and mark ready only when indexing completes.
+9. Expose status through GET /api/jobs/{job_id}; record no_transcript or a classified failure.
+
+B) Chat and Analysis Request
+----------------------------
+1. Receive a question or summary/comparison request with an explicit source scope.
+2. Validate ready videos and load relevant conversation history when requested.
+3. Call 05_ai_answers_analysis with the task, authorized scope, and history.
+4. Receive the answer, citations, coverage, and provider metadata.
+5. Save the conversation turn/result, then send the validated response to the frontend.
+6. Return structured errors for invalid input, unavailable dependencies, and timeouts.
+
+C) Research and Learning Request
+--------------------------------
+1. Receive a research goal, or a direct learning-artifact request.
+2. Create a persisted run for long tasks and dispatch 06_research_learning_agent.
+3. Save progress events and final completed, partial, or failed results.
+4. Return run status/artifacts only to callers authorized to access them.
+
+D) Deletion and Recovery
+------------------------
+1. On an authorized deletion, coordinate job cancellation and remove related vector/data records.
+2. On restart, recover unfinished persisted jobs according to the claim/retry policy.
+3. Use bounded retries and record attempt_count; do not retry permanent errors indefinitely.

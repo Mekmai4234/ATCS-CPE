@@ -1,14 +1,29 @@
-Implementation steps
-1. Define a versioned chunk schema containing text, segment IDs, video ID, and time bounds.
-2. Split captions on sensible boundaries while preserving links to original segments.
-3. Validate non-empty text and configurable overlap limits.
-4. Embed chunks and persist vectors with stable IDs and required metadata.
-5. Mark a video ready only after indexing succeeds.
-6. Implement scoped retrieval using video/channel/date filters and ownership when applicable.
-7. Return ranked evidence with traceable chunk IDs and source URLs.
-8. Implement full per-video chunk enumeration for complete summaries and comparisons.
-9. Reindex changed transcripts and remove stale chunks on replacement or deletion.
-10. Evaluate retrieval using questions with known supporting segments.
+### 04_rag_knowledge - Workflow Steps
 
-Acceptance criteria
-Relevant evidence can be recovered with correct video IDs and timestamps. Filters exclude unrelated videos. Repeated indexing does not duplicate chunks, and embedding-model changes trigger an explicit index migration.
+A) Indexing Pipeline
+--------------------
+1. Receive normalized transcript segments and video/version metadata from 03.
+2. Validate non-empty text, ordered intervals, stable IDs, and usable source metadata.
+3. Group neighboring segments into chunks with configurable overlap.
+4. Retain original segment references and calculate each chunk's time bounds.
+5. Create an embedding for each chunk using EMBEDDING_MODEL.
+6. Upsert vectors and metadata with stable IDs into the selected Chroma collection.
+7. Publish the new indexed version only when all required chunks succeed.
+8. Remove superseded version records after a successful replacement.
+9. Report completion or a retryable/permanent failure to the backend job coordinator.
+
+B) Question Retrieval Pipeline
+------------------------------
+1. Receive a question and validated source scope from 05 or an authorized tool in 06.
+2. Embed the question using the same configuration as the target index.
+3. Apply scope constraints, then retrieve ranked relevant chunks.
+4. Select up to RETRIEVAL_TOP_K evidence records while limiting avoidable duplication.
+5. Return chunk text and traceable video/timestamp metadata to the caller.
+6. If no suitable evidence is available, return an empty/limited evidence result.
+
+C) Complete-video Coverage Pipeline
+-----------------------------------
+1. Receive the explicit video scope for a full summary or comparison.
+2. Enumerate all eligible chunks for each selected video, using pagination/batches.
+3. Return chunk batches and coverage metadata to 05/06.
+4. Report missing or partially indexed videos; do not label partial evidence as complete.

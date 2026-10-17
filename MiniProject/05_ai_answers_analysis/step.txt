@@ -1,14 +1,32 @@
-Implementation steps
-1. Define answer, citation, summary, and comparison output schemas.
-2. Resolve follow-up questions using relevant conversation history without inventing evidence.
-3. Retrieve supporting chunks from 04 within the explicit scope.
-4. Build prompts that separate application instructions from untrusted transcript content.
-5. Generate answers with citation IDs tied to retrieved chunks.
-6. Validate that cited chunks exist and that timestamps match source metadata.
-7. Return an insufficient_evidence outcome when support is missing.
-8. For complete summaries, process all selected-video chunks in bounded batches and combine results with coverage tracking.
-9. For comparisons, gather evidence from every selected video and state missing coverage.
-10. Evaluate factual support, citation correctness, and helpful abstention with 07.
+### 05_ai_answers_analysis - Workflow Steps
 
-Acceptance criteria
-Supported claims have traceable evidence, citations point to real source intervals, and unsupported questions do not receive invented answers. A partial retrieval result must not be described as a complete summary.
+A) Grounded Question Answering
+------------------------------
+1. Receive { question, conversation_id, scope, history } from 02_api_backend.
+2. Resolve follow-up references using relevant history while preserving explicit scope.
+3. Request supporting evidence from 04_rag_knowledge.
+4. If evidence is absent/inadequate, return status=insufficient_evidence with an explanation.
+5. Build the prompt with a YouTube research-assistant role, grounding rules, the question,
+   relevant history, and clearly labeled evidence references such as [1] and [2].
+6. Check the application context budget; retrieve fewer chunks or summarize appropriate
+   history if needed, and do not silently discard essential evidence.
+7. Call the configured Gemini model within the time/output limits.
+8. Validate the output schema and verify citation IDs against supplied evidence records.
+9. Map valid references to original video titles, IDs, time bounds, and timestamp URLs.
+10. Return { status, answer, citations[], coverage, conversation_id, provider_metadata } to 02.
+
+B) Summary and Comparison
+-------------------------
+1. Receive the task type and explicit video scope.
+2. Enumerate all eligible chunks from 04 for the requested whole-video coverage.
+3. Analyze bounded batches, preserving citations and a record of processed chunks.
+4. Combine batch findings into per-video summaries or a cross-video comparison.
+5. Validate sources and disclose missing videos/chunks or contradictory statements.
+6. Return the analysis with coverage metadata; label partial results explicitly.
+
+C) Failures and Delivery
+------------------------
+1. Retry only transient provider errors within the configured time/attempt budgets.
+2. If output/citations remain invalid, return a structured failure instead of invented sources.
+3. Default to validated JSON. If streaming is later enabled, define provisional vs final
+   events so unvalidated partial text cannot be mistaken for a checked final answer.

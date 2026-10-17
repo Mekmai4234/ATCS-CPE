@@ -1,21 +1,47 @@
-Input
-A normalized import job containing video_id, original_url, and the authorized data scope.
+### 03_video_ingestion - Process & Techniques (README)
 
-Flow
-Validate provider -> retrieve metadata -> select accessible captions -> normalize segments -> persist transcript -> hand off to 04.
-Skip unchanged transcript versions when already indexed.
-Record per-video outcomes independently so one failed video does not block a batch.
+Overview
+--------
+This module transforms supported YouTube links into timestamped transcript records for the
+knowledge pipeline. It reads accessible captions, not the visual content of a video.
+The following architecture is a design for implementation.
 
-Output
-Video metadata and transcript segments with:
-video_id, segment_id, text, start_seconds, duration_seconds, language, and transcript_version.
-Preserve the canonical URL and transcript source.
+Architecture
+------------
+- URLNormalizer extracts a stable video ID from accepted URL formats.
+- MetadataAdapter retrieves available title/channel/thumbnail/date information.
+- TranscriptAdapter selects and fetches accessible caption tracks.
+- TranscriptNormalizer preserves the connection between text and original time intervals.
+- Persistence is owned by 02; indexing is owned by 04.
 
-Failure handling
-No accessible captions -> no_transcript.
-Temporary network/provider error -> retry according to the job policy, then failed if exhausted.
-Unavailable or restricted video -> failed with a specific reason.
-Optional transcription must never start silently when the fallback is disabled.
+Techniques Used
+---------------
+- Stable video IDs make duplicate imports idempotent within a data scope.
+- Language preference chooses among accessible caption tracks without claiming every
+  video supports Thai or English.
+- Content hashing/versioning identifies unchanged transcripts and supports selective reindexing.
+- Per-video jobs isolate failures in multi-link imports.
+- Bounded retries handle transient failures without repeatedly retrying permanent restrictions.
 
-Limitations
-This module reads spoken/caption text. It does not infer silent cooking actions, gameplay movement, or code shown only on screen.
+Input / Output Contract
+-----------------------
+Input: { job_id, video_id, original_url, scope }.
+Output: video metadata plus segments containing segment_id, video_id, text,
+start_seconds, duration_seconds, language, and transcript_version.
+Keep the canonical URL and transcript provenance for traceable citations.
+Failure output includes a classified reason and retryable flag.
+
+Design Rationale
+----------------
+Captions are the primary source because they provide text and timestamps that can be
+searched and cited. Keeping the ingestion adapter separate lets later transcription
+support be added without rewriting retrieval or answer generation.
+
+Things to Watch Out For
+----------------------
+- A public video does not guarantee accessible captions.
+- Preserve timing through normalization; do not attach guessed timestamps to generated text.
+- A title/thumbnail fetch failure and transcript failure should retain distinct diagnostics.
+- Silent cooking actions, gameplay movement, and code shown only on screen are outside
+  transcript-only understanding.
+- Channel discovery must handle pagination, quotas, duplicates, and deleted videos.

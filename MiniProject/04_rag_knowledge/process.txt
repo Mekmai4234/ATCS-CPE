@@ -1,18 +1,47 @@
-Input
-Indexing: normalized transcript segments and version metadata.
-Retrieval: question, selected scope, and retrieval limits.
+### 04_rag_knowledge - Process & Techniques (README)
 
-Flow
-Indexing -> boundary-aware chunking -> embeddings -> vector upsert -> indexing completion.
-Question -> query embedding -> scoped similarity search -> ranked evidence.
-Whole-video summary -> enumerate all chunks for each selected video -> pass complete coverage to 05.
+Overview
+--------
+This module stores and retrieves knowledge from imported YouTube transcripts. It connects
+user questions with supporting text while preserving source timestamps. It is an intended
+RAG design; chunking, embedding, and retrieval still require implementation.
 
-Output
-Evidence records containing chunk_id, video_id, title, text, start_seconds, end_seconds, canonical_url, and ranking score.
-Scores are ranking signals, not calibrated probabilities of correctness.
+Architecture
+------------
+- Indexing pipeline: segments -> chunks -> embeddings -> vector records.
+- Online retrieval pipeline: question -> query embedding -> scoped ranked evidence.
+- Coverage pipeline: selected videos -> complete chunk enumeration for batch analysis.
+- Chroma holds vectors and retrieval metadata; 02 owns application-level records/status.
 
-Failure handling
-Do not mark partial indexing as ready. Retry temporary embedding failures without duplicating records. Reject invalid scope filters and mismatched embedding configurations.
+Techniques Used
+---------------
+- Boundary-aware chunking groups nearby caption segments and uses overlap to preserve context.
+- Semantic search finds meaning-related passages, including differently phrased questions.
+- Metadata filtering restricts evidence to selected videos, channels, dates, and ownership.
+- Versioned upserts make retries idempotent and permit controlled index replacement.
+- Citation tracking retains the original segment/time relationship.
+- Hybrid keyword search or reranking may be evaluated later; neither is a mandatory
+  dependency of the initial implementation.
 
-Data boundary
-Treat retrieved transcript text as untrusted content. It must never override application instructions or authorize new tool actions.
+Communication / Data Schema
+---------------------------
+Input for indexing: timestamped segments and transcript_version.
+Input for retrieval: { question, scope, top_k }.
+Evidence record: { chunk_id, video_id, title, text, start_seconds, end_seconds,
+canonical_url, transcript_version, ranking_score }.
+Coverage includes expected/processed video and chunk counts where available.
+Ranking scores are ordering signals, not calibrated confidence percentages.
+
+Design Rationale
+----------------
+Prepare embeddings during ingestion so each question does not reprocess all videos.
+Provide a separate enumeration path because top-k search cannot establish complete
+coverage for "summarize all selected videos" or "find every occurrence" requests.
+
+Things to Watch Out For
+----------------------
+- Poor segmentation or lost time metadata damages both retrieval and citation quality.
+- Do not mark partial indexing as ready; retain version boundaries during replacement.
+- Deletion must remove the associated vector records as well as application records.
+- Language support and retrieval quality need evaluation on the actual Thai/English corpus.
+- Transcript passages are untrusted evidence and cannot override system/tool instructions.
