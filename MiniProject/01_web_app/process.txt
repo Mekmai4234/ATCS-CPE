@@ -1,17 +1,47 @@
-Input
-User-entered URLs, selected video IDs, date/channel filters, questions, and learning goals.
+### 01_web_app - Process & Techniques (README)
 
-Flow
-User action -> input validation -> backend request -> loading/status view -> result rendering.
-Import status is polled from the backend until ready, no_transcript, or failed.
-Ready videos can be selected for chat; processing or unavailable videos cannot.
-Citation clicks seek the embedded player or open the original video at the cited time.
+Overview
+--------
+The frontend is the user's entry point to YouTube Knowledge. It turns pasted video links
+into a manageable library, presents evidence-based answers, and displays learning artifacts.
+The interface shows planned system behavior; implementation is still pending.
 
-Output
-Video cards, embedded playback, grounded chat answers, citations, and learning artifacts.
+Architecture
+------------
+- VideoImportForm collects URLs and displays per-item validation results.
+- VideoLibrary shows cards, processing stages, selection filters, and deletion actions.
+- VideoPlayer displays a supported YouTube embed and timestamp navigation.
+- ChatWindow displays questions, grounded answers, and evidence cards.
+- LearningWorkspace presents research progress, plans, quizzes, and flashcards.
+- The frontend communicates with 02_api_backend, not directly with ChromaDB or Gemini.
 
-Interfaces
-02_api_backend owns authentication if added, persistent data, job status, and HTTP errors. The frontend never queries ChromaDB or a model provider directly.
+Techniques Used
+---------------
+- Job polling keeps video import responsive while background processing continues.
+- Query caching avoids unnecessary repeated library/history requests.
+- Optimistic display applies to the user's message only; AI results must come from the backend.
+- State-specific UI distinguishes missing captions, processing failures, and insufficient evidence.
+- Citation mapping connects source records to actual video IDs and time bounds.
+- Optional streaming is added only when the API defines event and final-validation semantics.
 
-Failure handling
-Show actionable errors for invalid links, network failures, unavailable embedding, and missing evidence. Keep transcripts and video titles as display data; never interpret them as application instructions.
+Communication With the Backend
+------------------------------
+- POST /api/videos/import: { urls[] } -> { jobs[] }.
+- GET /api/jobs/{job_id}: import stage, errors, and measured progress if available.
+- GET /api/videos and GET /api/videos/{video_id}/transcript: library and timestamped text.
+- POST /api/chat: { question, conversation_id, scope } -> answer and citations.
+- POST /api/analysis, POST /api/research, and POST /api/learning-artifacts:
+  summaries, comparisons, research runs, and study outputs.
+
+Design Rationale
+----------------
+Separate the library, chat, and learning views so users can understand which videos support
+each result. Keep processing state visible so metadata availability is not confused with
+AI readiness.
+
+Things to Watch Out For
+----------------------
+- A video may allow normal playback but disallow embedding; offer its original link.
+- A missing transcript does not imply the video itself is unavailable.
+- Do not present mock answers as real results or invent processing percentages.
+- Chat history alone does not authorize searching outside the selected source scope.

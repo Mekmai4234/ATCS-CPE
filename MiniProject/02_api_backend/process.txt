@@ -1,20 +1,48 @@
-Input
-Validated HTTP requests from 01_web_app and worker status updates.
+### 02_api_backend - Process & Techniques (README)
 
-Flow
-Import request -> validate allowed YouTube URLs -> normalize video IDs -> deduplicate -> persist jobs -> return job IDs.
-Worker claims a job -> calls 03 -> calls 04 -> records ready or a classified terminal state.
-Chat request -> validate scope -> call 05 -> store answer and citations -> return result.
-Research request -> create run -> invoke 06 -> persist progress and final artifact.
+Overview
+--------
+The backend is the gateway between the web app and the ingestion/AI modules. It owns
+application persistence, request validation, import scheduling, conversation history, and
+delivery of results. This document specifies intended behavior, not a running service.
 
-Output
-Structured JSON, durable job states, conversation history, and learning artifacts.
+Architecture
+------------
+- Router layer defines HTTP endpoints and validates input/output schemas.
+- Service layer coordinates imports, questions, analysis, and research runs.
+- Repository layer reads/writes application data through parameterized database operations.
+- A persistent worker processes ingestion/indexing jobs outside the HTTP request lifetime.
+- Modules 03-06 may be Python packages in the same deployment; separate network services
+  are optional, not required by the numbered work folders.
 
-Shared statuses
-queued -> fetching_transcript -> indexing -> ready.
-no_transcript indicates no usable captions were found.
-failed indicates an error with a code and retryable flag.
-Progress percentages are optional and must come from measured work.
+Techniques Used
+---------------
+- Persistent jobs and idempotency prevent lost work and duplicate imports.
+- Short import requests return job IDs while workers perform slow processing.
+- Worker claims, bounded retries, and restart recovery protect processing consistency.
+- Request IDs connect API events with worker and model telemetry.
+- Durable history storage preserves answers and citations for follow-up questions.
+- Optional authentication must enforce ownership before retrieval, not only after generation.
 
-Failure handling
-Use bounded retries for transient failures. Restrict remote fetches to validated provider URLs. In multi-user mode, authorize before retrieving data. Never return server secrets in responses.
+Data Schema and Interfaces
+--------------------------
+- Video: video_id, canonical_url, title, channel_id, published_at, import status.
+- TranscriptSegment: segment_id, video_id, text, start_seconds, duration_seconds,
+  language, transcript_version.
+- Job: job_id, video_id, stage, attempt_count, error_code, retryable, timestamps.
+- Conversation/Message: IDs, role, content, citations, scope, timestamps.
+- LearningArtifact/ResearchRun: IDs, task/type, scope, state, content, citations, coverage.
+- See docs/architecture.md for proposed HTTP endpoints and shared field conventions.
+
+Design Rationale
+----------------
+The API owns persistent state while 03-06 own their processing responsibilities. This
+separation allows UI and AI development to proceed against agreed contracts.
+
+Things to Watch Out For
+----------------------
+- In-memory background tasks alone do not provide the required restart recovery.
+- ready means transcript indexing succeeded, not merely that a title/thumbnail was fetched.
+- no_transcript is different from a network failure or provider restriction.
+- Handle deletion during processing so a late worker cannot recreate deleted knowledge.
+- Do not log provider keys, full credentials, or unnecessary conversation content.
