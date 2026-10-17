@@ -1,12 +1,12 @@
 # ตารางแบ่งงานทีม
 
 ยังไม่กำหนดชื่อสมาชิกหรือระบุว่ามีงานเสร็จแล้ว ให้ทีมเติมชื่อ GitHub และลิงก์ Issue/PR เมื่อเริ่มทำจริง
-สถานะเริ่มต้นของทุกแถวคือ Planned
+หมวด 02 อยู่ระหว่างพัฒนาและทดสอบ Backend ด้วย fixture ส่วนหมวดอื่นยังเป็น Planned
 
 | หมวด | ผู้รับผิดชอบ | ผลงานที่ต้องส่ง | Dependency | สถานะ | Issue / PR |
 |---|---|---|---|---|---|
 | 01_web_app | ยังไม่ระบุ | หน้านำเข้า คลังคลิป แชต อ้างอิง และหน้าสื่อเรียนรู้ | API contract ของ 02; ใช้ mock ที่ติดป้ายได้ช่วงแรก | Planned | — |
-| 02_api_backend | ยังไม่ระบุ | schema, API, job store/worker, history, artifacts | ตกลง interface กับ 03–06 | Planned | — |
+| 02_api_backend | ยังไม่ระบุ GitHub | schema, API, job store/worker, history, artifacts | มี interface/fixture; รอเชื่อมโค้ดจริง 03–06 | In Progress | — |
 | 03_video_ingestion | ยังไม่ระบุ | URL parser, metadata/transcript adapter, timestamp records | job/schema ของ 02 | Planned | — |
 | 04_rag_knowledge | ยังไม่ระบุ | chunking, indexing, scoped retrieval, coverage enumeration | transcript schema ของ 03 | Planned | — |
 | 05_ai_answers_analysis | ยังไม่ระบุ | grounded answers, citations, summaries, comparisons | evidence contract ของ 04 | Planned | — |

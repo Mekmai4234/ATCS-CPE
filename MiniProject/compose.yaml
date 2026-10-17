@@ -1,0 +1,75 @@
+name: youtube-knowledge-backend
+
+x-backend: &backend
+  image: ${COMPOSE_PROJECT_NAME:-youtube-knowledge-backend}-runtime:local
+  build:
+    context: .
+    dockerfile: 02_api_backend/Dockerfile
+    target: runtime
+  init: true
+  environment: &backend-environment
+    APP_ENV: development
+    ADAPTER_MODE: ${ADAPTER_MODE:-unavailable}
+    ENABLE_STREAMING: "false"
+    MINIPROJECT_ROOT: /app
+    DATABASE_URL: sqlite:////app/runtime/app.db
+    API_HOST: 0.0.0.0
+    API_PORT: "8000"
+    WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+    LLM_MODEL: ${LLM_MODEL:-gemini-3.5-flash}
+  volumes:
+    - backend-data:/app/runtime
+
+services:
+  migrate:
+    <<: *backend
+    command: ["yk-db", "upgrade", "head"]
+    restart: "no"
+
+  api:
+    <<: *backend
+    command: ["yk-api"]
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  worker:
+    <<: *backend
+    command: ["yk-worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tests:
+    image: ${COMPOSE_PROJECT_NAME:-youtube-knowledge-backend}-tests:local
+    build:
+      context: .
+      dockerfile: 02_api_backend/Dockerfile
+      target: test
+    profiles: ["test"]
+    init: true
+    environment:
+      APP_ENV: test
+      ADAPTER_MODE: fixture
+      ENABLE_STREAMING: "false"
+      MINIPROJECT_ROOT: /app
+      DATABASE_URL: sqlite:////tmp/not-used-by-isolated-tests.db
+
+volumes:
+  backend-data:
