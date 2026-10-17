@@ -1,5 +1,8 @@
 # Backend verification report
 
+The following is the original 2026-10-17 baseline. For the current 04/06 integration
+delivery, see [INTEGRATION_TEST_REPORT.md](INTEGRATION_TEST_REPORT.md).
+
 Date: 2026-10-17 (Asia/Bangkok)
 
 Scope: module 02 implementation in the local working tree. Modules 03-06 are

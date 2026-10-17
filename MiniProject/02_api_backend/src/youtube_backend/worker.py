@@ -114,6 +114,7 @@ class Worker:
         )
         # The request deadline is durable across retries. Chat also observes its HTTP budget.
         remaining = context.remaining_seconds
+        hard_deadline = job["kind"] != "chat" or self.settings.llm_timeout_seconds >= remaining
         if job["kind"] == "chat":
             remaining = min(remaining, self.settings.llm_timeout_seconds)
         process = heartbeat = None
@@ -135,7 +136,9 @@ class Worker:
             raise
         except TimeoutError:
             self._fail_if_owned(
-                job, AppError("task_timeout", "Task exceeded its deadline", 504, True)
+                job,
+                AppError("task_timeout", "Task exceeded its deadline", 504, True),
+                deadline_exhausted=hard_deadline,
             )
         except ValidationError:
             self._fail_if_owned(
@@ -168,9 +171,11 @@ class Worker:
         )
         return True
 
-    def _fail_if_owned(self, job, error):
+    def _fail_if_owned(self, job, error, *, deadline_exhausted=False):
         with suppress(LeaseLost):
-            self.repo.fail(job["job_id"], job["lease_token"], error)
+            self.repo.fail(
+                job["job_id"], job["lease_token"], error, deadline_exhausted=deadline_exhausted
+            )
 
     async def run_forever(self):
         while True:

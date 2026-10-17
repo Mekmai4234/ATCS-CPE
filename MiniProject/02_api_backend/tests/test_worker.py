@@ -190,6 +190,36 @@ async def test_timeout_cancels_adapter_and_preserves_deadline(env, monkeypatch):
     assert result["attempt_count"] == 1
 
 
+def test_hard_timeout_is_terminal_even_before_wall_clock_deadline(env):
+    job_id = queue_import(env)
+    job = env.repo.claim(job_id)
+    assert job["deadline_at"] > time.time()
+    env.repo.fail(
+        job_id,
+        job["lease_token"],
+        AppError("task_timeout", "Deadline", 504, True),
+        deadline_exhausted=True,
+    )
+    result = env.repo.get_job(job_id)
+    assert result["state"] == "failed" and result["retryable"]
+    assert env.repo.retry(job_id)["job_id"] != job_id
+
+
+async def test_chat_attempt_timeout_can_retry_inside_total_budget(env, monkeypatch):
+    await import_ready(env, VIDEO_A)
+    env.settings.llm_timeout_seconds = 0.04
+
+    async def slow(*args):
+        await asyncio.sleep(1)
+
+    monkeypatch.setattr(env.adapters, "answer", slow)
+    response = env.client.post("/api/chat", json=chat_body())
+    assert response.status_code == 202
+    result = env.repo.get_job(response.json()["job_id"])
+    assert result["state"] == "queued" and result["error_code"] == "task_timeout"
+    assert result["deadline_at"] > time.time()
+
+
 async def test_delete_during_index_waits_and_does_not_resurrect(env, monkeypatch):
     entered, release = asyncio.Event(), asyncio.Event()
     original = env.adapters.index
