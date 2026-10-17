@@ -1,16 +1,48 @@
-Input
-Feature branches, acceptance criteria, representative video fixtures, and deployment configuration.
+### 07_testing_deployment - Process & Techniques (README)
 
-Flow
-Static checks -> component checks -> integration scenarios -> AI evaluation -> review -> merge into develop.
-Release candidate -> demonstration and deployment checks -> pull request into main -> release.
-Record failures with enough information to reproduce them without logging credentials or unnecessary personal data.
+Overview
+--------
+This module verifies that the application works end to end and that its AI outputs are
+supported by the imported videos. It also plans packaging, deployment, monitoring, and
+recovery. These processes require implementation before any release claim is made.
 
-Output
-Test results, an evaluation report, measured latency/usage, deployment instructions, and a rollback procedure.
+Architecture
+------------
+- Component checks validate each module's contracts and failure handling.
+- Integration scenarios exercise web/API/worker/index/model interactions.
+- AI evaluation compares retrieved evidence and generated claims with known references.
+- Packaging may run web, API, and worker as separate processes/containers; modules 03-06
+  can share Python packages instead of becoming independent services.
+- Structured telemetry tracks operational behavior while persistent stores hold user data.
 
-Monitoring plan
-Track job failures, provider errors, request latency, agent tool counts, token usage, and citation-validation failures. Redact sensitive data from logs.
+Techniques Used
+---------------
+- Reference-based retrieval checks measure whether expected supporting segments are found.
+- Citation/grounding review checks whether claims are actually supported, not merely linked.
+- Coverage checks validate full-video summaries and cross-video comparisons.
+- Fault scenarios exercise provider timeouts, missing captions, retries, and worker restarts.
+- Reproducible configurations record SDK/model/embedding versions and dataset details.
+- Regression evaluation catches changes after prompt, model, or index updates.
+- Database/vector backup and restore procedures protect persistent knowledge.
 
-Recovery
-Use database/vector backups and retain compatible schema/index versions. A code rollback may require a data restore or migration; document that dependency explicitly.
+Communication / Deliverables
+---------------------------
+Receive acceptance scenarios from 01-06 and report reproducible failures to the responsible
+module. Deliver a test report, AI evaluation report, measured latency/usage results,
+deployment instructions, and a rollback procedure.
+Required telemetry fields include event time, request/job/run ID, stage, outcome,
+latency, requested/returned model metadata where available, and provider usage if returned.
+
+Design Rationale
+----------------
+Operational success and AI answer quality are different checks. A successful HTTP request
+does not establish correct evidence, complete coverage, or a useful learning plan.
+Keep measured results separate from design targets.
+
+Things to Watch Out For
+----------------------
+- Do not require paid live-model calls for every small offline check; use fixtures where suitable.
+- Embedding changes may require a full reindex, and schema changes may require migrations.
+- A code rollback is incomplete if data/index versions are incompatible.
+- Keep local/test/deployed credentials and data separate.
+- State what was measured, which cases were inspected, and which limitations remain.

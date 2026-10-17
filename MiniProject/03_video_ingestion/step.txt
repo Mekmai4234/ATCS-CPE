@@ -1,14 +1,28 @@
-Implementation steps
-1. Support explicit YouTube watch and short-link formats; reject unrelated URLs.
-2. Normalize each URL into a video ID and check for existing imports.
-3. Implement metadata retrieval without assuming every field is available.
-4. Retrieve accessible captions using the configured language preference.
-5. Normalize segments while preserving start time, duration, language, and text.
-6. Store transcript provenance and a content hash for reindexing decisions.
-7. Send usable transcript records to 04_rag_knowledge.
-8. Classify missing captions, inaccessible videos, timeouts, and provider restrictions separately.
-9. Add playlist/channel discovery with pagination and import limits after single-video import works.
-10. Add explicit refresh to discover newly published videos; scheduled refresh is a later integration.
+### 03_video_ingestion - Workflow Steps
 
-Acceptance criteria
-A supported captioned video produces ordered timestamped segments. Duplicate input is idempotent, and a video without accessible captions receives no_transcript rather than a fabricated transcript.
+A) Single-video Ingestion
+-------------------------
+1. Receive an authorized job containing video_id, original_url, and import options.
+2. Validate/normalize the supported watch or short-link URL and confirm the job is current.
+3. Retrieve available video metadata: title, channel, thumbnail, and publication date.
+4. Look for accessible transcript tracks using TRANSCRIPT_LANGUAGES.
+5. Retrieve the selected track and normalize segment ordering and whitespace.
+6. Preserve start_seconds, duration_seconds, language, and segment IDs.
+7. Store provenance and a transcript content hash/version through 02_api_backend.
+8. If the transcript is unchanged and its index is current, reuse the existing result.
+9. Otherwise pass the normalized transcript/version to 04_rag_knowledge.
+10. Let the job coordinator mark ready only after successful indexing.
+
+B) Missing Captions and Errors
+------------------------------
+1. If no accessible usable captions exist, report no_transcript with a clear reason.
+2. If a fetch fails temporarily, report a retryable error under the shared attempt limit.
+3. If the video is unavailable/restricted, return a specific failure instead of invented text.
+4. Use fresh transcription only if the optional adapter is implemented and explicitly enabled.
+
+C) Channel / Playlist Refresh
+-----------------------------
+1. When discovery is implemented, enumerate video IDs with pagination and import limits.
+2. Compare the discovered IDs/versions with stored records.
+3. Enqueue only new or changed items and process them independently.
+4. Reuse the same workflow for manual refresh and a later configured scheduler.
