@@ -1,28 +1,33 @@
-### 03_video_ingestion - Workflow Steps
+03_video_ingestion - Workflow Steps
 
-A) Single-video Ingestion
--------------------------
-1. Receive an authorized job containing video_id, original_url, and import options.
-2. Validate/normalize the supported watch or short-link URL and confirm the job is current.
-3. Retrieve available video metadata: title, channel, thumbnail, and publication date.
-4. Look for accessible transcript tracks using TRANSCRIPT_LANGUAGES.
-5. Retrieve the selected track and normalize segment ordering and whitespace.
-6. Preserve start_seconds, duration_seconds, language, and segment IDs.
-7. Store provenance and a transcript content hash/version through 02_api_backend.
-8. If the transcript is unchanged and its index is current, reuse the existing result.
-9. Otherwise pass the normalized transcript/version to 04_rag_knowledge.
-10. Let the job coordinator mark ready only after successful indexing.
+A) Setup
+1. Follow README.md to install the locked 03 environment and configure server-side values.
+2. Initialize existing 02 schema and additive 04 manifest explicitly.
+3. Start API/worker with the same 03-owned live factory, database and index configuration.
 
-B) Missing Captions and Errors
-------------------------------
-1. If no accessible usable captions exist, report no_transcript with a clear reason.
-2. If a fetch fails temporarily, report a retryable error under the shared attempt limit.
-3. If the video is unavailable/restricted, return a specific failure instead of invented text.
-4. Use fresh transcription only if the optional adapter is implemented and explicitly enabled.
+B) Ingestion
+1. 02 validates URLs, deduplicates IDs and persists per-video jobs.
+2. The worker calls ingest(video_id, context); 03 checks ID, ownership and remaining time.
+3. Fetch metadata within a short budget; retain null metadata on classified failure.
+4. Start a caption SDK subprocess. Select configured language first, then manual before
+   generated captions in that language. Do not translate or synthesize captions.
+5. Monitor ownership/cancellation. Timeout/cancellation kills and reaps the child.
+6. Validate data, preserve Unicode/timing/overlaps, sort by start and normalize whitespace.
+7. Assign stable unique segment IDs; reject invalid intervals or mismatched video IDs.
+8. Return strict TranscriptResult with metadata/language/source/segments to 02.
+9. 02 stores transcript and computes version, calls 04 to index and verifies inventory.
+10. 02 publishes ready only after success. 03 never performs a duplicate index call.
 
-C) Channel / Playlist Refresh
------------------------------
-1. When discovery is implemented, enumerate video IDs with pagination and import limits.
-2. Compare the discovered IDs/versions with stored records.
-3. Enqueue only new or changed items and process them independently.
-4. Reuse the same workflow for manual refresh and a later configured scheduler.
+C) Errors
+1. No preferred usable captions: no_transcript, non-retryable.
+2. Unavailable/restricted video or IP/access block: distinct non-retryable code.
+3. Timeout/network/HTTP 429/5xx: classified retryable error; 02 owns bounded retry.
+4. Invalid output: explicit non-retryable failure without raw provider exception text.
+5. Metadata failure does not erase captions; missing channel/date never bypasses filters.
+
+D) Verification
+1. Run offline unit, SDK HTTP, subprocess and API/worker/real-Chroma checks.
+2. Run explicit live_check.py for a public video when live verification is needed.
+3. Record contacted providers and limitations in TEST_REPORT.md.
+
+Future: channel/playlist discovery, ready-video refresh, scheduling and optional ASR.
