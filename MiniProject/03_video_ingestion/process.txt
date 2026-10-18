@@ -1,47 +1,34 @@
-### 03_video_ingestion - Process & Techniques (README)
-
-Overview
---------
-This module transforms supported YouTube links into timestamped transcript records for the
-knowledge pipeline. It reads accessible captions, not the visual content of a video.
-The following architecture is a design for implementation.
+03_video_ingestion - Process & Techniques
 
 Architecture
-------------
-- URLNormalizer extracts a stable video ID from accepted URL formats.
-- MetadataAdapter retrieves available title/channel/thumbnail/date information.
-- TranscriptAdapter selects and fetches accessible caption tracks.
-- TranscriptNormalizer preserves the connection between text and original time intervals.
-- Persistence is owned by 02; indexing is owned by 04.
+- IngestionService: async orchestration under backend ownership and total deadline.
+- SubprocessCaptions / fetch_worker: synchronous SDK in a killable process.
+- YouTubeMetadata: bounded async oEmbed or optional Data API videos.list snippet lookup.
+- normalize: strict validation, stable IDs, original timestamps and provenance.
+- IngestionAdapters: 03-owned composition delegating index/delete/evidence/inventory to 04.
+- API/jobs/persistence/dedup/version/retries belong to 02; index publication belongs to 04.
 
-Techniques Used
----------------
-- Stable video IDs make duplicate imports idempotent within a data scope.
-- Language preference chooses among accessible caption tracks without claiming every
-  video supports Thai or English.
-- Content hashing/versioning identifies unchanged transcripts and supports selective reindexing.
-- Per-video jobs isolate failures in multi-link imports.
-- Bounded retries handle transient failures without repeatedly retrying permanent restrictions.
+Input / output
+- Actual contract: ingest(video_id: str, context: ExecutionContext) -> TranscriptResult.
+- Result uses existing 02 metadata, language, source and Segment schemas.
+- Segment: segment_id, text, start_seconds, duration_seconds; 02 assigns transcript version.
+- This supersedes the old design proposing additional per-segment video/version fields.
 
-Input / Output Contract
------------------------
-Input: { job_id, video_id, original_url, scope }.
-Output: video metadata plus segments containing segment_id, video_id, text,
-start_seconds, duration_seconds, language, and transcript_version.
-Keep the canonical URL and transcript provenance for traceable citations.
-Failure output includes a classified reason and retryable flag.
+Techniques
+- Language priority before manual/generated priority; no implicit translation/fallback language.
+- Hash normalized language/text/start/duration plus duplicate occurrence for stable unique IDs.
+- Retain overlaps and original time; reject invalid/nonfinite intervals rather than guessing.
+- Metadata failure is separate from caption failure; missing fields remain null.
+- Bound child stdout, discard stderr and strip provider credentials from child environment.
+- Monitor durable ownership; cancellation/deadline kills and reaps the subprocess.
+- 02 owns retries. Distinguish access blocks/no captions from transient service failures.
+- Errors/logs omit raw provider messages, keys, transcript text and arbitrary URLs.
 
-Design Rationale
-----------------
-Captions are the primary source because they provide text and timestamps that can be
-searched and cited. Keeping the ingestion adapter separate lets later transcription
-support be added without rewriting retrieval or answer generation.
-
-Things to Watch Out For
-----------------------
-- A public video does not guarantee accessible captions.
-- Preserve timing through normalization; do not attach guessed timestamps to generated text.
-- A title/thumbnail fetch failure and transcript failure should retain distinct diagnostics.
-- Silent cooking actions, gameplay movement, and code shown only on screen are outside
-  transcript-only understanding.
-- Channel discovery must handle pagination, quotas, duplicates, and deleted videos.
+Scope / verification
+- Reuse 02 watch/youtu.be URL support and deduplication.
+- No changes to other modules' source or existing factories.
+- Test actual SDK HTTP parsing with mocked HTTP and actual subprocess cancellation.
+- Integration: real 02 API/worker/migrations, real 04 Chroma and fixture embeddings.
+- Separate live public-caption check; observed results are in TEST_REPORT.md.
+- Root documentation may still describe the older planned-only status.
+- Discovery/refresh/scheduling/authenticated access/ASR/container deployment remain separate work.
