@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "youtube-knowledge-ingestion"
+version = "0.1.0"
+description = "Cancellable YouTube caption ingestion for YouTube Knowledge (module 03)"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "youtube-knowledge-backend",
+  "youtube-knowledge-rag",
+  "youtube-transcript-api>=1.2,<2",
+  "requests>=2.32,<3",
+  "httpx>=0.28,<1",
+  "pydantic-settings>=2.7,<3",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.11,<1"]
+
+[tool.uv.sources]
+youtube-knowledge-backend = { path = "../02_api_backend", editable = true }
+youtube-knowledge-rag = { path = "../04_rag_knowledge", editable = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/youtube_ingestion"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = ["live: opt-in public YouTube network check"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
