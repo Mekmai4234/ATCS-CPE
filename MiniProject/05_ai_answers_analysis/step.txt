@@ -1,32 +1,47 @@
 ### 05_ai_answers_analysis - Workflow Steps
 
+Installation and runnable commands: README.md
+Executed checks and limits: TEST_REPORT.md
+
 A) Grounded Question Answering
 ------------------------------
-1. Receive { question, conversation_id, scope, history } from 02_api_backend.
-2. Resolve follow-up references using relevant history while preserving explicit scope.
-3. Request supporting evidence from 04_rag_knowledge.
-4. If evidence is absent/inadequate, return status=insufficient_evidence with an explanation.
-5. Build the prompt with a YouTube research-assistant role, grounding rules, the question,
-   relevant history, and clearly labeled evidence references such as [1] and [2].
-6. Check the application context budget; retrieve fewer chunks or summarize appropriate
-   history if needed, and do not silently discard essential evidence.
-7. Call the configured Gemini model within the time/output limits.
-8. Validate the output schema and verify citation IDs against supplied evidence records.
-9. Map valid references to original video titles, IDs, time bounds, and timestamp URLs.
-10. Return { status, answer, citations[], coverage, conversation_id, provider_metadata } to 02.
+1. Receive request, frozen authorized Source records, history and ExecutionContext from 02.
+2. Validate matching video scope and retain bounded recent history as untrusted context.
+3. Add recent user context to the retrieval question within 04's query-byte budget.
+4. Obtain actual indexed inventory and scoped ranked search hits from 04.
+5. Validate each evidence video's identity/version; fit ranked evidence to the input guard
+   with explicit coverage notes when low-ranked items are omitted.
+6. If no hits exist, return insufficient_evidence without calling Gemini.
+7. Send policy-separated evidence and question/history through the bounded Gemini adapter.
+8. Validate structured output and require every statement's citation IDs in this model input.
+9. Re-read processed evidence, reject changed records and map citations to trusted sources.
+10. Return AnswerResult with measured partial coverage and provider metadata to 02.
+    02 revalidates, stores history and adds conversation_id/job_id for delivery.
 
 B) Summary and Comparison
 -------------------------
-1. Receive the task type and explicit video scope.
-2. Enumerate all eligible chunks from 04 for the requested whole-video coverage.
-3. Analyze bounded batches, preserving citations and a record of processed chunks.
-4. Combine batch findings into per-video summaries or a cross-video comparison.
-5. Validate sources and disclose missing videos/chunks or contradictory statements.
-6. Return the analysis with coverage metadata; label partial results explicitly.
+1. Validate the task and exact video IDs; comparison requires at least two selected videos.
+2. Enumerate all available chunks through 04 pagination, checking inventory consistency.
+3. Partition each video's evidence into bounded batches and generate cited summaries.
+4. Record distinct original chunks supplied to successful batch generation.
+5. Recursively merge summaries, preserving citations available in each synthesis input.
+6. Generate the final summary/comparison; answered analysis must cite every available video.
+7. Disclose missing sources or intermediate gaps; report actual processing coverage.
+8. Recheck processed evidence, assemble AnswerResult and return it to 02.
 
-C) Failures and Delivery
+C) Failure and Lifecycle
 ------------------------
-1. Retry only transient provider errors within the configured time/attempt budgets.
-2. If output/citations remain invalid, return a structured failure instead of invented sources.
-3. Default to validated JSON. If streaming is later enabled, define provisional vs final
-   events so unvalidated partial text cannot be mistaken for a checked final answer.
+1. Honor context checks before/after external awaits and the remaining backend job deadline.
+2. Disable SDK auto tools/retries. Classify transient transport/provider failures for 02.
+3. Reject fabricated citations, invalid JSON, truncated/blocked output and source changes.
+4. Fail explicitly when a chunk/context/call/time budget cannot support the operation.
+5. Propagate cancellation/lease loss. No provisional answer is published as final.
+6. Close generation clients, optional ingestion/Agent clients and shared RAG at shutdown.
+
+D) Verification
+---------------
+1. Run locked offline unit, SDK HTTP-mock and real 02/04/06 integration tests.
+2. Run Ruff lint and format checks.
+3. Inspect synthetic reference cases for semantic review requirements.
+4. Only when deliberately configured, run scripts/live_check.py --live for paid synthetic
+   generation checks. Real YouTube/embedding/team verification is a separate live exercise.
