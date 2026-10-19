@@ -1,0 +1,19 @@
+# Dockerfile-specific allowlist; overrides the root's module-02-only ignore file.
+**
+!02_api_backend/
+!02_api_backend/pyproject.toml
+!02_api_backend/src/
+!02_api_backend/src/**
+!04_rag_knowledge/
+!04_rag_knowledge/pyproject.toml
+!04_rag_knowledge/uv.lock
+!04_rag_knowledge/src/
+!04_rag_knowledge/src/**
+!04_rag_knowledge/tests/
+!04_rag_knowledge/tests/**
+!04_rag_knowledge/fixtures/
+!04_rag_knowledge/fixtures/**
+!04_rag_knowledge/scripts/
+!04_rag_knowledge/scripts/**
+**/__pycache__/
+**/*.pyc

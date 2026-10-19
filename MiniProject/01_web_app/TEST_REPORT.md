@@ -71,7 +71,7 @@ It establishes frontend/backend contract compatibility and lifecycle behavior on
 Live acceptance with the combined 02–06 deployment and provider credentials is still needed.
 Authentication, persistence of browser session state after reload, embedded playback and
 mascot animation are outside this implementation. No production deployment or load test
-was performed. The backend source was not merged into this branch.
+was performed. After the initial isolated checks, the branch was synchronized with develop before the PR; backend source is inherited unchanged from develop.
 
 ## Issues found and corrected during verification
 

@@ -4,8 +4,8 @@ Overview
 --------
 A runnable React/TypeScript workspace for importing YouTube URLs, selecting ready
 sources, asking grounded questions, and viewing analysis/research/learning outputs.
-The local checkout does not contain module 02 source. Integration follows the actual
-local develop@25427fe contract inspected through Git, not only the older proposed API.
+Integration follows the actual local develop@25427fe contract initially inspected
+through Git. The branch was synchronized with develop before publishing the PR.
 
 Architecture
 ------------

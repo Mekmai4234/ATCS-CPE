@@ -1,31 +1,34 @@
 ### 06_research_learning_agent - Workflow Steps
 
-A) Multi-step Research
-----------------------
-1. Receive { goal, scope, level, days } and a persisted run_id from 02_api_backend.
-2. Validate the selected sources, allowed task, and available run budget.
-3. Give Gemini the goal, evidence policy, remaining budget, and allowed tool schemas.
-4. Let the agent choose a relevant tool, such as search_evidence or read_video_chunks.
-5. Validate the requested tool/arguments and execute it within the original scope.
-6. Store a concise progress event and return the observation to the agent.
-7. Assess coverage and missing prerequisites; select another search/read/analysis action
-   when intermediate results show it is needed.
-8. Repeat only while step and total-time budgets remain.
-9. Compose a grounded research result or request a learning artifact.
-10. Validate citations/coverage and persist a completed or partial result through 02.
+A) Multi-step Research (implemented)
+1. 02 persists a job and invokes research(request, sources, execution_context).
+2. Validate the request and distinct authorized sources; read real index inventory from 04.
+3. Check remaining job/run time, reserve, context guard and decision iteration budget.
+4. Ask Gemini for one native function call with allowed tool declarations.
+5. Preserve native content/signatures; validate the tool name and strict argument schema.
+6. Execute search/read through 04, optional comparison through 05, or artifact generation.
+7. Persist a concise action/outcome event through context.event; return the observation.
+8. Let the next decision depend on that observation; credit evidence actually submitted.
+9. Stop duplicate actions and enforce limits. On finish, validate known citation IDs and coverage.
+10. Return ResearchResult completed only with complete coverage, otherwise partial.
+11. 02 revalidates current sources/citations/inventory and durably stores the result/artifacts.
 
-B) Learning Artifact Tools
---------------------------
-1. Receive an artifact request directly from 02 or as an allowed agent tool call.
-2. Gather evidence for the requested topic and explicit video scope.
-3. For a study plan, order supported topics and attach cited video intervals.
-4. For a quiz, generate questions, supported answers, explanations, and citations.
-5. For flashcards, create short question/answer pairs linked to source passages.
-6. Validate the output schema and sources, then return the artifact for storage.
+B) Direct Learning Artifacts (implemented)
+1. 02 invokes artifact(request, sources, execution_context); no decision loop is required.
+2. Enumerate authorized chunks from 04 in bounded pages; detect nonprogressing cursors.
+3. Reject input that exceeds the explicit context guard instead of silently truncating it.
+4. Generate a study plan, quiz with explanations, or flashcard set using the type's JSON schema.
+5. Check item citation IDs against the actual supplied evidence, and exact requested plan days.
+6. Count processed evidence after valid generation and return ArtifactResult for 02 to persist.
 
-C) Budget and Failure Handling
-------------------------------
-1. Before every call, check remaining time and steps; tool/model calls must respect both.
-2. On insufficient evidence, return the known findings and describe the gap.
-3. On exhausted budget, persist partial findings rather than claiming the task is complete.
-4. On fatal errors, persist failed with a classified reason; handle cancellation when supported.
+C) Failures and Delivery
+- Every awaited model/tool call has a timeout bounded by remaining run time minus reserve.
+- Cancellation/lost leases/source invalidation propagate and prevent publication.
+- Step/context/time exhaustion returns honest partial research before the hard deadline.
+- Partial findings preserve source excerpts and already validated artifacts, with coverage notes.
+- Direct artifact generation with inadequate evidence/invalid output returns a classified error.
+- Missing 05 is an explicit observation, allowing the agent to choose another supported action.
+- SDK transport/provider errors are redacted; no raw messages, credentials or private reasoning.
+- No automatic research replay/checkpoint resume is implemented.
+
+Installation, commands and limits: README.md. Executed validation: TEST_REPORT.md.

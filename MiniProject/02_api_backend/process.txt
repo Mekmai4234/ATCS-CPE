@@ -1,48 +1,65 @@
-### 02_api_backend - Process & Techniques (README)
+### 02_api_backend - Process & Techniques
 
 Overview
 --------
-The backend is the gateway between the web app and the ingestion/AI modules. It owns
-application persistence, request validation, import scheduling, conversation history, and
-delivery of results. This document specifies intended behavior, not a running service.
+The implemented backend owns application persistence, HTTP contracts, job coordination,
+history and delivery. The optional 02-owned team composition connects unchanged 04/06
+packages. It uses real Chroma and the real agent controller; offline model/embedding doubles
+are labelled. Live 03 ingestion and 05 answer/analysis remain pending.
 
 Architecture
 ------------
-- Router layer defines HTTP endpoints and validates input/output schemas.
-- Service layer coordinates imports, questions, analysis, and research runs.
-- Repository layer reads/writes application data through parameterized database operations.
-- A persistent worker processes ingestion/indexing jobs outside the HTTP request lifetime.
-- Modules 03-06 may be Python packages in the same deployment; separate network services
-  are optional, not required by the numbered work folders.
+- main.py defines typed HTTP requests/responses, validation, CORS and correlation IDs.
+- repository.py owns short transactional data operations and lifecycle decisions.
+- worker.py coordinates processing, heartbeat, cancellation, deadlines and retry outcomes.
+- integrations.py defines the async team contract and trusted adapter factory loading.
+- runtime.py owns lazy construction, capability reporting and exactly-once async closure.
+- team.py composes 04/06 with one resolved configuration; offline_model.py is a labelled double.
+- schemas.py defines transcript/evidence/answer/coverage/research/learning schemas.
+- database.py and frozen Alembic migrations define persistent application tables.
+- fixture_adapter.py is explicitly synthetic; fixture vectors live in a dedicated test table.
+- API and worker run separately with the same database and adapter configuration.
 
 Techniques Used
 ---------------
-- Persistent jobs and idempotency prevent lost work and duplicate imports.
-- Short import requests return job IDs while workers perform slow processing.
-- Worker claims, bounded retries, and restart recovery protect processing consistency.
-- Request IDs connect API events with worker and model telemetry.
-- Durable history storage preserves answers and citations for follow-up questions.
-- Optional authentication must enforce ownership before retrieval, not only after generation.
+- Persist-before-accept and transactional video-ID deduplication prevent lost/duplicate imports.
+- Atomic claims, renewable leases and unique tokens fence stale application writers.
+- Bounded retries/backoff and durable total deadlines constrain repeated processing.
+- Frozen source generations/versions and checks before publication prevent source drift.
+- Async adapters must honor cancellation; 04 must fence independent vector-store publication.
+- Final citation identity and overall transcript bounds are checked; URLs are constructed
+  from trusted video IDs/times. Semantic claim support still requires evaluation by 05/07.
+- Complete-coverage claims require known matching counts and actual index inventory.
+- Conversation user turns survive generation failure; successful assistant/citations/job
+  results commit atomically. Follow-up history never widens the selected source versions.
+- Idempotency keys avoid repeated AI work after network retries.
+- Request/job/run IDs correlate logs without dumping credentials or conversation bodies.
 
-Data Schema and Interfaces
---------------------------
-- Video: video_id, canonical_url, title, channel_id, published_at, import status.
-- TranscriptSegment: segment_id, video_id, text, start_seconds, duration_seconds,
-  language, transcript_version.
-- Job: job_id, video_id, stage, attempt_count, error_code, retryable, timestamps.
-- Conversation/Message: IDs, role, content, citations, scope, timestamps.
-- LearningArtifact/ResearchRun: IDs, task/type, scope, state, content, citations, coverage.
-- See docs/architecture.md for proposed HTTP endpoints and shared field conventions.
+Contracts
+---------
+See ../docs/backend_api_contract.md and the generated /docs and /openapi.json.
+Analysis, research, artifacts and deletion use durable 202 acceptance plus polling.
+Chat normally returns final JSON; pending/retrying chat also returns a job ID with 202.
+The default unavailable mode is honest about missing integrations; fixture mode labels
+synthetic output and never calls paid providers. A trusted custom factory connects 03-06.
 
-Design Rationale
-----------------
-The API owns persistent state while 03-06 own their processing responsibilities. This
-separation allows UI and AI development to proceed against agreed contracts.
+Current limitations
+-------------------
+Single-user local prototype; no authentication, playlist/channel discovery, scheduler,
+speech-to-text fallback, streaming or production deployment. Channel/date filtering uses
+available metadata and never silently ignores unsupported playlist scope.
+Research interruption cannot resume without a module 06 checkpoint contract; events remain,
+and a hard timeout is failed unless a valid partial result was returned before the deadline.
+Deletion preserves saved history/artifacts and minimal lifecycle audit, not all past source text.
+Live provider compatibility, answer quality and production backup/load evaluation remain open.
 
-Things to Watch Out For
-----------------------
-- In-memory background tasks alone do not provide the required restart recovery.
-- ready means transcript indexing succeeded, not merely that a title/thumbnail was fetched.
-- no_transcript is different from a network failure or provider restriction.
-- Handle deletion during processing so a late worker cannot recreate deleted knowledge.
-- Do not log provider keys, full credentials, or unnecessary conversation content.
+Current integration delivery
+----------------------------
+See integration/README.md and INTEGRATION_TEST_REPORT.md. Optional dependencies/lockfile,
+Docker runtime/test targets and Compose are owned entirely by module 02. The root shared
+templates and modules 04/06 are not edited. Jobs additionally retain a custom factory/profile
+identity, so an offline database cannot silently become live. Historical custom databases
+without this identity require explicit migration planning rather than automatic relabelling.
+Static missing capabilities fail before a request creates a doomed job. Health does not call
+paid providers. Hard total timeouts stop auto-retry even at timer/wall-clock rounding boundaries;
+per-call chat timeouts can retry while a total budget remains.

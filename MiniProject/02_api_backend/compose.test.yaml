@@ -1,0 +1,21 @@
+# Used only by scripts/docker_smoke.py with a fresh, uniquely named Compose project.
+# Force fixtures regardless of any existing host .env configuration.
+services:
+  migrate:
+    environment:
+      APP_ENV: test
+      ADAPTER_MODE: fixture
+  api:
+    environment:
+      APP_ENV: test
+      ADAPTER_MODE: fixture
+      JOB_RETRY_BASE_SECONDS: "0.1"
+      JOB_LEASE_SECONDS: "2"
+      WORKER_POLL_SECONDS: "0.1"
+  worker:
+    environment:
+      APP_ENV: test
+      ADAPTER_MODE: fixture
+      JOB_RETRY_BASE_SECONDS: "0.1"
+      JOB_LEASE_SECONDS: "2"
+      WORKER_POLL_SECONDS: "0.1"

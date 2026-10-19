@@ -2,8 +2,8 @@
 
 ระบบผู้ช่วยค้นคว้าและเรียนรู้จากวิดีโอ YouTube ด้วย RAG, LLM และ Agentic AI
 
-> สถานะใน checkout นี้: ส่วน 01 มีหน้าเว็บและชุดทดสอบแล้ว ดู [วิธีรันและข้อจำกัด](01_web_app/README.md)
-> เอกสารหมวดอื่นยังเป็นข้อกำหนดออกแบบ; source backend สำหรับการทดสอบเชื่อมต่ออ้างจาก local branch develop
+> สถานะปัจจุบัน: หมวด 01 มีหน้าเว็บและชุดทดสอบแล้ว หมวด 02 มี API, ฐานข้อมูล และ worker ที่รันได้
+> การทดสอบเชื่อมต่อเว็บใช้ fixture ที่ติดป้ายชัดเจน ยังไม่ยืนยันคุณภาพการทำงานกับ YouTube และ Gemini จริง
 
 ## เป้าหมาย
 
@@ -42,7 +42,9 @@
 4. ทำตาม [คู่มือทำงานร่วมกัน](CONTRIBUTING.md) เพื่อสร้าง branch และส่ง Pull Request
 5. เมื่อต้องตั้งค่าจริง ให้คัดลอก `.env.example` เป็น `.env` และเติมเฉพาะเครื่องของตนเอง
 
-ส่วน 01 มี manifest, lockfile และคำสั่งเริ่มเว็บแล้ว ให้ทำตาม [01_web_app/README.md](01_web_app/README.md) ส่วนหมวดอื่นให้ตรวจ source และคู่มือของ branch ที่ใช้งานก่อนติดตั้ง
+การติดตั้งและรันหน้าเว็บดู [คู่มือส่วน 01](01_web_app/README.md) ซึ่งมี manifest, pnpm-lock.yaml และคำสั่งทดสอบแล้ว
+การติดตั้งและรันหมวด 02 ดู [คู่มือ Backend](02_api_backend/README.md) และ [ข้อตกลง API](docs/backend_api_contract.md)
+หมวด 02 มี manifest, uv.lock, migration, คำสั่งทดสอบ และ Docker Compose สำหรับ Backend แล้ว
 
 ## Branch
 
