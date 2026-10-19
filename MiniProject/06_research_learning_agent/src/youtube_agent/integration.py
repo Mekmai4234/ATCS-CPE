@@ -1,5 +1,6 @@
 """06-owned composition: reuse 04, implement research/artifact, leave 03/05 explicit."""
 
+from youtube_rag.config import RagSettings
 from youtube_rag.integration import RagAdapters
 from youtube_rag.manifest import BackendExecution
 
@@ -38,8 +39,12 @@ class AgentAdapters(RagAdapters):
         analyzer=None,
     ):
         # Construct the model first so missing generation configuration cannot leak RAG resources.
-        config = agent_settings or AgentSettings()
+        config = agent_settings or AgentSettings.from_backend(settings)
         gateway = model or GeminiModel(config)
+        rag_settings = rag_settings or RagSettings(
+            _env_file=None,
+            **{name: getattr(settings, name) for name in RagSettings.model_fields},
+        )
         super().__init__(
             settings=settings, repository=repository, rag_settings=rag_settings, embedder=embedder
         )
@@ -58,6 +63,14 @@ class AgentAdapters(RagAdapters):
             await super().close()
 
 
-def create_adapters(*, settings, repository):
+async def create_adapters(*, settings, repository):
     """Trusted ADAPTER_FACTORY entrypoint. Live ingestion and module 05 are not supplied."""
-    return AgentAdapters(settings=settings, repository=repository)
+    config = AgentSettings.from_backend(settings)
+    gateway = GeminiModel(config)
+    try:
+        return AgentAdapters(
+            settings=settings, repository=repository, agent_settings=config, model=gateway
+        )
+    except BaseException:
+        await gateway.close()
+        raise
