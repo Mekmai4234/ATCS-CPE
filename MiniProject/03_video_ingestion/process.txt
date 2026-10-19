@@ -21,6 +21,10 @@ Techniques
 - Metadata failure is separate from caption failure; missing fields remain null.
 - Bound child stdout, discard stderr and strip provider credentials from child environment.
 - Monitor durable ownership; cancellation/deadline kills and reaps the subprocess.
+- Drain stdout after kill before wait/reap, within a 2-second cleanup budget. If drainage
+  stalls, close the asyncio process transport and allow at most 0.5 seconds for final reap.
+- Shield cleanup from repeated cancellation. Service close cancels and joins active fetches
+  before any further cleanup, preventing concurrent reads from the same stdout pipe.
 - 02 owns retries. Distinguish access blocks/no captions from transient service failures.
 - Errors/logs omit raw provider messages, keys, transcript text and arbitrary URLs.
 
@@ -30,5 +34,8 @@ Scope / verification
 - Test actual SDK HTTP parsing with mocked HTTP and actual subprocess cancellation.
 - Integration: real 02 API/worker/migrations, real 04 Chroma and fixture embeddings.
 - Separate live public-caption check; observed results are in TEST_REPORT.md.
+- FOLLOWUP_REPORT.md records the cleanup regression and real Thai/English acceptance checks.
+- scripts/acceptance_check.py uses a new isolated DB/index and explicit fixture embeddings
+  to check live captions, all stored timestamps, ready status and duplicate URL reuse.
 - Root documentation may still describe the older planned-only status.
 - Discovery/refresh/scheduling/authenticated access/ASR/container deployment remain separate work.
