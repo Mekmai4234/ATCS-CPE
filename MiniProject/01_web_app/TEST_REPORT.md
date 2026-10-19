@@ -9,6 +9,9 @@ subsequent delivery; no deployment was performed during these checks.
 ## Observed results
 
 `pnpm format:check` also passed after formatting the source and test files.
+After synchronizing with develop for the PR, the unit/API suite (35), browser
+suite (22, plus the intentional backend skip), formatting and production build
+passed again. The separate fixture API/worker result below remains the integration evidence.
 
 | Check                                      | Result                                                                    |
 | ------------------------------------------ | ------------------------------------------------------------------------- |
