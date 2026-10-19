@@ -12,14 +12,19 @@ from youtube_answers.gemini import GeminiModel
 from youtube_answers.prompts import payload
 
 
-async def evaluate(output):
-    config = AnswerSettings()
+async def evaluate(output, env_file=None):
+    config = AnswerSettings(_env_file=env_file) if env_file else AnswerSettings(_env_file=None)
     model = GeminiModel(config)
     dataset = json.loads(
         (Path(__file__).parents[1] / "fixtures/evaluation.json").read_text("utf-8")
     )
-    results = []
+    results, catalog = [], None
     try:
+        try:
+            catalog = await model.check_access(config.llm_timeout_seconds)
+        except AppError as exc:
+            # An alias may generate successfully even when catalog lookup is unavailable.
+            catalog = {"error_code": exc.code, "generation_verified": False}
         for case in dataset["cases"]:
             try:
                 result = await model.generate(
@@ -58,6 +63,8 @@ async def evaluate(output):
         json.dumps(
             {
                 "synthetic_fixture_only": True,
+                "run_kind": "live_synthetic_generation",
+                "model_catalog_check": catalog,
                 "semantic_quality_requires_manual_review": True,
                 "results": results,
             },
@@ -74,11 +81,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true", help="Explicitly allow paid Gemini calls")
     parser.add_argument("--output", type=Path, default=Path("runtime/answers05/live-check.json"))
+    parser.add_argument("--env-file", type=Path, help="Only this env file plus process variables")
     args = parser.parse_args()
     if not args.live:
         parser.error("Pass --live to explicitly enable Gemini requests")
+    if args.env_file and not args.env_file.is_file():
+        parser.error("The selected env file does not exist")
     try:
-        return asyncio.run(evaluate(args.output))
+        return asyncio.run(evaluate(args.output, args.env_file))
     except AppError as exc:
         print(f"Live evaluation unavailable: {exc.code}")
         return 1

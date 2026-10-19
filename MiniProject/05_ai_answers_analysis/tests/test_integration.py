@@ -405,7 +405,6 @@ async def test_full_team_factory_constructs_shared_services_without_network(
 ):
     from youtube_answers import team
 
-    monkeypatch.setattr(team, "ENV_FILES", ())
     for key, value in {
         "GEMINI_API_KEY": "test-only-secret",
         "EMBEDDING_PROVIDER": "gemini",
@@ -414,7 +413,14 @@ async def test_full_team_factory_constructs_shared_services_without_network(
         "CHROMA_PERSIST_DIR": str(tmp_path / "unused-live-store"),
     }.items():
         monkeypatch.setenv(key, value)
-    settings = integrated.settings.model_copy(update={"backend_integration_profile": "live"})
+    settings = integrated.settings.model_copy(
+        update={
+            "backend_integration_profile": "live",
+            "adapter_factory": "youtube_answers.team:create_adapters",
+            "gemini_api_key": AnswerSettings(_env_file=None).gemini_api_key,
+            "chroma_persist_dir": str(tmp_path / "unused-live-store"),
+        }
+    )
     adapters = await team.create_adapters(settings=settings, repository=integrated.repo)
     try:
         assert adapters.agent.knowledge.rag is adapters.answers.rag
@@ -433,3 +439,24 @@ async def test_full_team_factory_rejects_offline_profile(integrated):
     with pytest.raises(AppError) as caught:
         await team.create_adapters(settings=settings, repository=integrated.repo)
     assert caught.value.code == "integration_configuration"
+
+
+async def test_real_acceptance_rejects_seeded_fixture_transcripts_despite_live_health(integrated):
+    from youtube_answers.acceptance import AcceptanceCase, AcceptancePlan, AcceptanceRunner
+
+    plan = AcceptancePlan(
+        videos=[f"https://youtu.be/{VIDEO_A}", f"https://youtu.be/{VIDEO_B}"],
+        expected_model="gemini-3.5-flash",
+        cases=[
+            AcceptanceCase(
+                id="qa",
+                category="supported",
+                kind="chat",
+                request={"question": "RAG", "scope": {"video_ids": [VIDEO_A]}},
+                review_criteria="Review actual imported evidence.",
+            )
+        ],
+    )
+    with pytest.raises(AppError) as caught:
+        await AcceptanceRunner(integrated.client).run(plan)
+    assert caught.value.code == "acceptance_synthetic_source"
