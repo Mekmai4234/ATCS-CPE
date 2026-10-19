@@ -1,51 +1,49 @@
-### 05_ai_answers_analysis - Process & Techniques (README)
+### 05_ai_answers_analysis - Process & Techniques
 
 Overview
 --------
-This module turns transcript evidence into understandable answers, summaries, and
-comparisons using Gemini. It relies on 04 for evidence and returns results to 02 for
-storage/delivery. This is a planned generation design, not an implemented service.
+youtube_answers generates grounded answers, summaries and comparisons. It consumes
+versioned evidence from 04 and returns the existing 02 AnswerResult.
+02 owns conversation IDs, persistence, jobs, leases, retries and HTTP delivery.
+Installation, runnable commands and full integration are documented in README.md.
 
 Architecture
 ------------
-- TaskHandler selects question-answering, summary, or comparison behavior.
-- EvidenceCollector calls scoped retrieval or complete chunk enumeration.
-- PromptBuilder separates trusted instructions, history, questions, and untrusted excerpts.
-- GeminiAdapter calls the configurable model through google-genai.
-- OutputValidator checks schemas and maps citations to supplied source records.
-- CoverageTracker records which videos/chunks were actually processed.
+- AnswerService coordinates ranked question answering and hierarchical analysis.
+- RagKnowledge adapts 04 search/read/inventory/evidence using BackendExecution.
+- Versioned prompts separate trusted policy from untrusted questions/history/evidence.
+- GeminiModel performs one bounded async countTokens + structured generation attempt.
+- GeneratedAnswer requires a source ID list for every factual statement.
+- Result assembly validates citations, rechecks evidence, builds trusted timestamp URLs,
+  counts processed original chunks and aggregates provider metadata.
+- AnswerAdapters supplies 05 and 04 methods to 02 without changing existing factories.
+- Optional TeamAdapters composes existing 03/04/05/06 and passes analyze to 06.
 
-Techniques Used
----------------
-- Retrieval-augmented prompting gives Gemini evidence with stable reference labels.
-- Grounding instructions require an honest insufficient-evidence result when support is absent.
-- Context budgeting bounds input size without pretending omitted evidence was analyzed.
-- Hierarchical batch summarization supports whole-video analysis beyond one model request.
-- Citation mapping creates URLs from trusted video IDs and validated timestamps.
-- Structured outputs support predictable frontend/API handling.
-- Reference validation checks source identity; semantic support still needs evaluation and
-  cannot be guaranteed merely because a citation ID exists.
+Techniques
+----------
+- Scoped ranked retrieval for topical questions; recent user messages help follow-ups.
+- Full chunk pagination, per-video batches and recursive cited-summary reduction for analysis.
+- Conservative serialized UTF-8 input guard plus live countTokens with config allowance.
+- Strict output validation and per-request citation allowlists, including intermediate stages.
+- Every final title/time/URL comes from source records; models cannot choose those fields.
+- Evidence is re-read before returning; 02 validates again before publishing durably.
+- Missing indexes produce explicit partial coverage; operational errors remain failures.
 
-Communication / Data Schema
----------------------------
-Input: question/task, authorized scope, conversation ID, relevant history.
-Output: { status, answer, citations[], coverage, conversation_id, provider_metadata }.
-Status: answered or insufficient_evidence for successful task outcomes; operational errors
-use the backend's structured error contract.
-Citation: { citation_id, chunk_id, video_id, title, start_seconds, end_seconds, url }.
-Provider metadata may include the requested/returned model version, usage, and latency.
+Contracts
+---------
+answer(request, sources, history, context) -> AnswerResult
+analyze(request, sources, context) -> AnswerResult
+Result: status, answer, citations[], coverage, provider_metadata.
+02 adds conversation_id/job_id and handles HTTP responses/storage.
+The analyze signature also matches 06's optional comparison analyzer.
 
-Design Rationale
-----------------
-Keep answer generation separate from storage and retrieval so the Gemini model can be
-configured without rebuilding the knowledge index. Preserve evidence identifiers through
-batch analysis so users can inspect the original video.
-
-Things to Watch Out For
-----------------------
-- Never use transcript instructions as authorization to run tools or change system rules.
-- Cite the passage actually supporting a claim, not merely a related video title.
-- A ranked score is not a percentage of answer correctness.
-- Full comparisons need evidence from every selected video or a clear coverage limitation.
-- Game-version advice and other changing content should retain source dates/context.
-- Gemini model availability and alias routing must be verified at integration time.
+Limits
+------
+- Reference validation proves identity/scope, not semantic support or resistance to injection.
+- Processing coverage counts original chunks supplied to successful generation, including
+  insufficient-evidence batches; it does not measure retained facts or understanding.
+- Ranked question answering never claims complete whole-video analysis.
+- Missing total inventory uses null chunk counts. Partial coverage notes are shown in text.
+- No internal provider retries; 02 alone owns durable retry policy.
+- Hard deadlines/context/call/chunk limits can fail a task; no resumable 05 checkpoints.
+- Live generation, real-video quality and production deployment require further evaluation.
