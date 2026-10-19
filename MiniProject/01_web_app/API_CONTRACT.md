@@ -3,7 +3,7 @@
 Reference: local Git `develop@25427fe`, `MiniProject/docs/backend_api_contract.md`
 and `MiniProject/02_api_backend/src/youtube_backend/schemas.py`. This file records
 the frontend's integration assumptions; it does not replace the backend contract.
-No backend files were merged into this branch.
+The branch was subsequently synchronized with develop before the PR; backend files are inherited unchanged from develop.
 
 | Operation           | Request                                                          | Response handling                                             |
 | ------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------- |
