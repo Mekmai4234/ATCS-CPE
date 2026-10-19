@@ -27,6 +27,14 @@ from .gemini import byte_size, json_text
 from .models import TOOL_MODELS, Usage, error
 
 CONTENTS = {"study_plan": StudyPlanContent, "quiz": QuizContent, "flashcards": FlashcardsContent}
+SOURCE_ERRORS = {
+    "source_changed",
+    "invalid_evidence",
+    "index_configuration_mismatch",
+    "index_incomplete",
+    "incomplete_index",
+    "invalid_coverage",
+}
 
 
 @dataclass
@@ -40,6 +48,7 @@ class Run:
     processed: set = field(default_factory=set)
     pending: set = field(default_factory=set)
     artifacts: list = field(default_factory=list)
+    step: int = 0
 
     def remaining(self):
         self.context.check()
@@ -80,17 +89,68 @@ class AgentService:
     def _event(self, run, step, name, state, summary):
         run.context.event(ProgressEvent(step=step, tool_name=name, state=state, summary=summary))
 
-    def _records(self, run, values):
-        allowed = {s.video_id: s for s in run.sources}
+    def _records(self, run, values, *, sources=None):
+        allowed = {s.video_id: s for s in (sources if sources is not None else run.sources)}
         records = [Evidence.model_validate(v) for v in values]
+        unique = {}
         for item in records:
             source = allowed.get(item.video_id)
             if not source or source.transcript_version != item.transcript_version:
                 raise error("invalid_evidence", "Tool evidence exceeds authorized sources")
-            old = run.evidence.get(item.chunk_id)
+            old = unique.get(item.chunk_id, run.evidence.get(item.chunk_id))
             if old is not None and old != item:
                 raise error("invalid_evidence", "Evidence ID changed within the run")
-        return records
+            unique[item.chunk_id] = item
+        if run.total is not None and len(set(run.evidence) | set(unique)) > run.total:
+            raise error("invalid_coverage", "Evidence exceeds the indexed chunk inventory")
+        return list(unique.values())
+
+    def _request(self, schema, request, run):
+        request = schema.model_validate(request).model_dump(mode="json")
+        # Channel/date filters may legitimately narrow the original explicit video set in 02.
+        if not {s.video_id for s in run.sources}.issubset(request["scope"]["video_ids"]):
+            raise error(
+                "invalid_scope", "Authorized sources exceed the requested videos", status=422
+            )
+        return request
+
+    async def _deliver(self, run, result):
+        """Recheck exported evidence before using the finalization reserve to publish."""
+        citations = list(result.citations)
+        for artifact in getattr(result, "artifacts", []):
+            citations.extend(artifact.citations)
+        ids = sorted({c.chunk_id for c in citations})
+        for offset in range(0, len(ids), 1000):
+            batch = ids[offset : offset + 1000]
+            current = await self._bounded(
+                run,
+                lambda _, chunk_ids=batch: self.knowledge.evidence(
+                    run.sources, chunk_ids, run.context
+                ),
+                reserve=False,
+            )
+            records = self._records(run, current)
+            if {e.chunk_id for e in records} != set(batch):
+                raise error("source_changed", "Cited evidence is no longer available")
+            if any(e != run.evidence[e.chunk_id] for e in records):
+                raise error("source_changed", "Cited evidence changed before finalization")
+        if run.total is not None:
+            count = await self._bounded(
+                run, lambda _: self.knowledge.inventory(run.sources, run.context), reserve=False
+            )
+            if type(count) is not int or count != run.total:
+                raise error("source_changed", "Index inventory changed before finalization")
+        run.context.check()
+        state = getattr(result, "state", "completed")
+        self._event(
+            run,
+            run.step,
+            "run_controller",
+            state,
+            f"Validated output; processed_chunks={result.coverage.processed_chunks}; "
+            f"complete={result.coverage.complete}",
+        )
+        return result
 
     def _remember(self, run, records):
         run.evidence.update({e.chunk_id: e for e in records})
@@ -234,17 +294,17 @@ class AgentService:
         return artifact
 
     async def artifact(self, request, sources, context):
-        request = ArtifactRequest.model_validate(request).model_dump(mode="json")
         run = self._run(sources, context)
-        await self._inventory(run)
+        request = self._request(ArtifactRequest, request, run)
         try:
+            self._event(run, 0, "create_learning_artifact", "running", "Collecting scoped evidence")
+            await self._inventory(run)
             result = await self._artifact(request, run)
+            return await self._deliver(run, result)
         except TimeoutError:
             raise error(
                 "agent_budget_exhausted", "Artifact exceeded its time budget", status=504
             ) from None
-        context.check()
-        return result
 
     async def _tool(self, name, args, request, run):
         if name == "search_evidence":
@@ -264,7 +324,7 @@ class AgentService:
                     sources, run.context, limit=args.limit, cursor=args.cursor
                 ),
             )
-            records = self._records(run, [e.evidence() for e in page.items])
+            records = self._records(run, [e.evidence() for e in page.items], sources=sources)
             observation = {
                 "evidence": [e.model_dump() for e in records],
                 "next_cursor": page.next_cursor,
@@ -296,7 +356,10 @@ class AgentService:
                 await self._bounded(
                     run, lambda _: self.knowledge.evidence(sources, ids, run.context)
                 ),
+                sources=sources,
             )
+            if len({c.citation_id for c in answer.citations}) != len(answer.citations):
+                raise error("invalid_citation", "Comparison citation IDs are not unique")
             by_id = {e.chunk_id: e for e in records}
             for citation in answer.citations:
                 evidence = by_id.get(citation.chunk_id)
@@ -312,6 +375,8 @@ class AgentService:
             observation = {
                 "answer": answer.answer,
                 "status": answer.status,
+                "citations": [c.model_dump() for c in answer.citations],
+                "coverage": answer.coverage.model_dump(),
                 "evidence": [e.model_dump() for e in records],
             }
         else:
@@ -354,8 +419,8 @@ class AgentService:
         )
 
     async def research(self, request, sources, context):
-        request = ResearchRequest.model_validate(request).model_dump(mode="json")
         run = self._run(sources, context)
+        request = self._request(ResearchRequest, request, run)
         history = [
             {
                 "role": "user",
@@ -369,6 +434,7 @@ class AgentService:
         try:
             await self._inventory(run)
             for step in range(1, self.settings.agent_max_steps + 1):
+                run.step = step
                 self._input_fits(
                     [{k: v for k, v in entry.items() if k != "native"} for entry in history]
                 )
@@ -407,14 +473,18 @@ class AgentService:
                 else:
                     fingerprint = (reply.name, json_text(args.model_dump()))
                     if fingerprint in seen:
-                        return self._partial(run, "Repeated action without a new observation.")
+                        return await self._deliver(
+                            run, self._partial(run, "Repeated action without a new observation.")
+                        )
                     seen.add(fingerprint)
                     self._event(
                         run, step, reply.name, "running", "Executing validated scoped action"
                     )
                     if reply.name == "finish_research":
                         if not args.citation_ids:
-                            return self._partial(run, "No cited final answer was supplied.")
+                            return await self._deliver(
+                                run, self._partial(run, "No cited final answer was supplied.")
+                            )
                         citations = self._citations(run, args.citation_ids)
                         coverage = self._coverage(run)
                         result = ResearchResult(
@@ -425,10 +495,8 @@ class AgentService:
                             coverage=coverage,
                             provider_metadata=run.usage.result(),
                         )
-                        self._event(
-                            run, step, reply.name, result.state, "Validated research result"
-                        )
-                        return result
+                        self._event(run, step, reply.name, "validating", "Rechecking final sources")
+                        return await self._deliver(run, result)
                     try:
                         observation = await self._tool(reply.name, args, request, run)
                     except AppError as exc:
@@ -449,13 +517,18 @@ class AgentService:
                 history.append(
                     {"role": "tool", "name": reply.name, "call_id": call_id, "result": observation}
                 )
-            return self._partial(run, "Agent decision step limit reached.")
+            return await self._deliver(
+                run, self._partial(run, "Agent decision step limit reached.")
+            )
         except TimeoutError:
             context.check()
-            return self._partial(run, "Agent operation exceeded its remaining time budget.")
+            return await self._deliver(
+                run, self._partial(run, "Agent operation exceeded its remaining time budget.")
+            )
         except AppError as exc:
             context.check()
+            if exc.code in SOURCE_ERRORS:
+                raise
             if exc.code in {"agent_budget_exhausted", "context_budget_exceeded"} or run.evidence:
-                self._event(run, 0, "run_controller", "partial", exc.code)
-                return self._partial(run, f"Stopped: {exc.code}.")
+                return await self._deliver(run, self._partial(run, f"Stopped: {exc.code}."))
             raise

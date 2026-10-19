@@ -19,7 +19,10 @@ uv run --project 06_research_learning_agent --locked ruff format --check 06_rese
 The module lockfile includes local packages 02 and 04. It does not modify their manifests,
 lockfiles or source. Tests use isolated temporary SQLite/Chroma data, labelled synthetic
 transcripts, deterministic embedding/model doubles and the real GenAI SDK with HTTP mocks.
-There are no paid calls or model downloads. See [TEST_REPORT.md](TEST_REPORT.md) for results.
+There are no paid calls or model downloads. The development environment also installs
+05 for cross-module acceptance tests, without changing 05's files or runtime dependencies.
+See [ACCEPTANCE_REPORT.md](ACCEPTANCE_REPORT.md) for current checks and
+[TEST_REPORT.md](TEST_REPORT.md) for the original 55-test baseline.
 
 Docker Desktop must be running with Linux containers. From `MiniProject`:
 
@@ -56,6 +59,11 @@ process environment > `06_research_learning_agent/.env` > shared `MiniProject/.e
 The generation model is independent of 04's embedding model. Module 06 does not migrate
 existing indexes. No real key is included or needed for offline tests.
 
+The 06-owned `create_adapters` factory now builds AgentSettings and RagSettings from the
+backend's already-resolved Settings, so it does not reread conflicting 04/06 env overrides.
+Standalone `AgentSettings()` still uses the precedence above. Explicitly injected settings
+and the existing 05 team composition retain their own configuration ownership.
+
 ## Connection to 02 and 04
 
 ```python
@@ -91,10 +99,11 @@ Initialize 02's schema and 04's manifest with the existing `yk-db upgrade head` 
 `yk-rag init` commands, targeting an intended development database. Supply 04's compatible
 configuration separately as described in its README.
 
-The default factory intentionally leaves 03 ingestion and 05 answer/analyze unavailable.
-Live URL import therefore requires the team's real 03 adapter; full application composition
-is a separate integration task. Existing fixture databases must not be relabelled as live.
-The tests seed labelled transcripts through a test-only ingestion adapter.
+The 06-only default factory leaves 03 ingestion and 05 answer/analyze unavailable.
+The existing `youtube_answers.team:create_adapters` factory in module 05 already connects
+03/04/05/06, supplies `answers.analyze` to the agent, and shares its RAG instance. Follow
+05's integration instructions for that composition; do not replace its configured factory
+with the 06-only factory. Existing fixture databases must not be relabelled as live.
 
 ## Runtime behavior
 
@@ -114,7 +123,15 @@ ownership propagate to 02. Research is not silently restarted after a crash.
 Artifacts follow 02's existing schemas. Each study day, quiz question or flashcard has
 supporting citation IDs; quiz questions include answers and explanations. Plans have
 consecutive days and exactly the requested day count. Citation URLs are constructed from
-trusted video IDs/times. 02 revalidates evidence/version/bounds before storing results.
+trusted video IDs/times. 06 re-reads exported citations and checks inventory before delivery,
+including partial findings and artifacts retained from previous steps. Changed/missing
+evidence or index-configuration failures cannot become a seemingly usable partial result.
+02 also revalidates evidence/version/bounds before storing results.
+
+Comparison observations include 05's citation-label-to-chunk mapping and declared coverage.
+Tool evidence is checked against the requested subset, not just the larger run scope.
+Backend channel/date filters may narrow the original request but cannot introduce videos
+absent from its explicit selection.
 
 Coverage counts distinct evidence supplied to a successful subsequent model decision or
 validated artifact generation, not merely fetched chunks. This is an operational processing
@@ -125,7 +142,41 @@ real vector inventory. Backend 02 currently requires complete research coverage 
 On step/context/time limits, partial research preserves existing artifacts and source
 excerpts with explicit limitations. It does not manufacture new synthesis. Finalization
 starts before the hard deadline; hard expiry or lost ownership may still cause 02 to record
-a failure/cancellation. Fatal errors before evidence is obtained use classified errors.
+a failure/cancellation. Terminal `run_controller` events use the last decision step and
+actual completed/partial outcome after source revalidation. A proposed finish stays in
+`validating` until that recheck succeeds. Cancellation is reported through the durable
+job state and never publishes a final result.
+
+## Reproducible quality-review preparation
+
+Run six synthetic Thai/English scenarios in a NEW isolated directory:
+
+```powershell
+uv run --project 06_research_learning_agent --locked python -m youtube_agent.evaluation --state 06_research_learning_agent/runtime/review-new --output 06_research_learning_agent/runtime/review.json
+```
+
+The runner covers research in both languages, multiple clips, quiz explanations,
+flashcards, seven-day study plans and a one-step partial result. It uses real backend
+jobs/validation and Chroma, with deterministic offline generation/embeddings. Its JSON
+report retains each result, wall latency, provider metadata/usage and a manual review
+checklist. A passing contract is not a passing semantic review: each checklist remains
+`passed=null`, and `semantic_quality_verified=false`.
+
+For real-video review, prepare a dataset matching `fixtures/acceptance.json` from authorized
+03 transcript exports. Set `provenance` to `exported_transcripts`, preserve actual segment
+IDs/timestamps, and update case scopes/topics/review criteria. Videos are explicit
+`TranscriptResult` records, not raw unfiltered API response objects. The runner does not
+fetch YouTube, overwrite an application database, or reuse a previous state directory.
+
+With a configured account/model, adding `--dataset PATH --live` explicitly enables live
+Gemini generation AND embeddings on those exports. This mode makes paid requests and
+uses its own SQLite/Chroma pair; no live mode was invoked in this acceptance run.
+Actual module-05 comparison/cancellation are additionally covered by integration tests,
+which inject real `AnswerService` into the same RAG instance and mock only model responses.
+
+Module 04's known runtime-versus-maintenance store/configuration mismatch is unchanged.
+The 06 factory alignment and isolated runner do not repair 04's `reindex/gc` safeguards;
+that remains a separate 04/02/05 coordination task.
 
 ## Limits and next integration work
 

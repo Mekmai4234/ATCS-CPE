@@ -10,11 +10,14 @@ COPY 02_api_backend/pyproject.toml /app/02_api_backend/pyproject.toml
 COPY 02_api_backend/src /app/02_api_backend/src
 COPY 04_rag_knowledge/pyproject.toml /app/04_rag_knowledge/pyproject.toml
 COPY 04_rag_knowledge/src /app/04_rag_knowledge/src
+COPY 05_ai_answers_analysis/pyproject.toml /app/05_ai_answers_analysis/pyproject.toml
+COPY 05_ai_answers_analysis/src /app/05_ai_answers_analysis/src
 COPY 06_research_learning_agent/pyproject.toml 06_research_learning_agent/uv.lock ./
 COPY 06_research_learning_agent/src ./src
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked
 ENV PATH="/app/06_research_learning_agent/.venv/bin:$PATH"
 COPY 06_research_learning_agent/tests ./tests
+COPY 06_research_learning_agent/fixtures ./fixtures
 RUN groupadd --gid 10001 agent \
     && useradd --uid 10001 --gid agent --no-create-home agent
 USER 10001:10001
