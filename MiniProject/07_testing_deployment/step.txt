@@ -1,32 +1,17 @@
-### 07_testing_deployment - Workflow Steps
+Module 07: Workflow
 
-A) Verification and AI Evaluation
----------------------------------
-1. Prepare fixtures for captioned, missing-caption, duplicate, unavailable, Thai,
-   and English video cases, plus known supporting transcript intervals.
-2. Run component checks for URL parsing, timestamp preservation, indexing, and API schemas.
-3. Run the integrated flow: paste URL -> import -> index -> question -> cited timestamp.
-4. Check unsupported questions produce an honest insufficient-evidence result.
-5. Evaluate retrieval against known supporting chunks and inspect claim/source support.
-6. Verify whole-video summary/comparison coverage and disclose missing inputs.
-7. Verify agent tool selection, scope constraints, step/time budgets, and learning artifacts.
-8. Test worker restart recovery, retry classification, deletion during processing, and
-   multi-user isolation when that feature is implemented.
-9. Record observed import/answer latency and model usage with dataset/configuration details.
+1. Read README.md and KNOWN_ISSUES.md; install the locked 07 environment.
+2. Run scripts/check.py from MiniProject; retain logs/JUnit/JSON under 07/runtime.
+3. Run existing suites separately, combined domain-service/recovery checks, known-defect
+   assertions and read-only lint/format. A regression failure keeps the release gate red.
+4. Send reproducible 03 cleanup and 04 configuration/store failures to their owners;
+   do not edit production implementations inside the 07-only task.
+5. Validate Compose, then build/start containers when Docker Engine is available.
+   Initialization precedes API and worker; all use the same explicit database/index config.
+6. Explicitly opt into live smoke with intended credentials/data/budget.
+7. Perform human Thai/English semantic review using ACCEPTANCE.md; add browser acceptance
+   when module 01 supplies an application. Keep offline and live evidence separate.
+8. Stop services, then perform paired cold backup/restore using RECOVERY.md.
+9. Record measured results and remaining blockers in TEST_REPORT.md before release.
 
-B) Deployment
---------------
-1. Add manifests, lockfiles, entrypoints, and tested startup instructions for actual components.
-2. Build/package the web, API, and worker; combine AI packages where appropriate.
-3. Provide environment values and persistent storage without committing credentials.
-4. Run migration/index checks and health checks in an isolated test environment.
-5. Configure allowed origins and HTTPS for the deployed web/API.
-6. Verify the release candidate, then use a PR from develop to main for the agreed release.
-7. Document deployment, backup/restore, and rollback commands once verified.
-
-C) Monitoring and Improvement
------------------------------
-1. Collect job failures, provider errors, latency, model usage, and citation-validation errors.
-2. Correlate events using request/job/run IDs and redact sensitive values.
-3. Review retrieval misses and unsupported claims to improve data, prompts, or chunking.
-4. Re-run relevant evaluations when data, prompt, embedding configuration, or model changes.
+No PR, commit, public deployment or live provider call is implicit in offline verification.
