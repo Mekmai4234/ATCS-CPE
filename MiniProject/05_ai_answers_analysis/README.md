@@ -1,0 +1,162 @@
+# Module 05 — AI Answers and Analysis
+
+`youtube_answers` generates cited answers, whole-video summaries and comparisons.
+02 owns HTTP routes, durable jobs, history, retries and result storage. 04 owns versioned
+evidence and embeddings. 05 supplies `answer(request, sources, history, context)` and
+`analyze(request, sources, context)`, returning 02's existing `AnswerResult`.
+
+All implementation changes are local to this folder. Existing 02/03/04/06 source and
+their factories are unchanged. The optional `youtube_answers.team:create_adapters`
+composition connects existing 03 ingestion, 04 RAG, 05 answers and 06 research/artifacts,
+with 06's comparison tool delegated to 05 and one shared RAG service.
+
+## Install and test
+
+From **MiniProject root**, Python 3.11–3.13 and uv:
+
+```powershell
+python -m uv sync --project 05_ai_answers_analysis --extra team --locked
+python -m uv run --project 05_ai_answers_analysis --extra team --locked pytest 05_ai_answers_analysis/tests -q -W error
+python -m uv run --project 05_ai_answers_analysis --extra team --locked ruff check 05_ai_answers_analysis
+python -m uv run --project 05_ai_answers_analysis --extra team --locked ruff format --check 05_ai_answers_analysis
+```
+
+`team` installs 03 and 06 for integration tests and full composition. Without that extra,
+05's service and `youtube_answers.integration:create_adapters` require only 02/04.
+The latter factory enables index/delete/evidence/inventory/answer/analyze; ingestion,
+research and learning artifacts remain unavailable through that smaller factory.
+
+Offline tests use labelled synthetic transcripts and model/embedding doubles. Integration
+tests exercise real FastAPI HTTP handling (ASGI in process), the actual worker, migrated
+SQLite and persistent Chroma subprocesses. SDK tests use the real Google GenAI client
+with HTTP mocks. No test requires credentials, downloads a model or calls a paid service.
+This verifies mechanisms; it does not establish real-video answer quality.
+
+## Configuration
+
+Copy this module's `.env.example` to `.env` only if no local file already exists.
+Credentials are server-only. Never commit `.env` or include keys in shell arguments.
+
+Standalone 05 precedence: process environment > 05/.env > shared root .env > defaults.
+The full team factory uses process > 05/.env > 06/.env > 03/.env > 04/.env > root .env
+for each service's own settings. This ensures explicit module-05 overrides apply across
+the composition. The backend's existing Settings does not automatically load 05/.env;
+set its adapter/database variables explicitly in both API and worker terminals below.
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `GEMINI_API_KEY` | empty | Required only for live generation/embeddings |
+| `LLM_MODEL` | `gemini-3.5-flash` | Configurable project-requested generation model |
+| `LLM_TIMEOUT_SECONDS` | 60 | Per-operation ceiling, also limited by the job deadline |
+| `MAX_CONTEXT_TOKENS` | 24000 | Application input budget, not provider capacity |
+| `ANSWER_MAX_OUTPUT_TOKENS` | 1200 | Maximum output per model request |
+| `RETRIEVAL_TOP_K` | 8 | Ranked question-answer retrieval |
+| `ANSWER_READ_PAGE_SIZE` | 100 | Whole-video enumeration page size |
+| `ANSWER_MAX_CHUNKS` | 5000 | Evidence memory/processing limit |
+| `ANSWER_MAX_MODEL_CALLS` | 64 | Maximum generation requests per answer/analysis |
+| `ANSWER_MAX_HISTORY_MESSAGES` | 12 | Maximum recent history entries |
+| `ANSWER_MAX_HISTORY_BYTES` | 4000 | Serialized UTF-8 history budget |
+| `ENABLE_STREAMING` | false | True rejected; only validated final results are supported |
+
+Generation and embedding models remain independent. Verify actual Gemini model/account
+access before using live mode; the configured identifier is not a claim of availability.
+Requested and returned model/version, aggregate usage and provider-call latency are kept.
+
+## Run the optional full team integration
+
+Use a new SQLite/Chroma pair, separate from previous fixture/demo state. Configure 05/.env
+with a key and the compatible 04 embedding settings from `.env.example`. The root legacy
+OpenAI proposal must not override Gemini embeddings. Do not change an existing index's
+configuration without following 04's explicit reindex procedure.
+
+In terminal 1, from MiniProject:
+
+```powershell
+$env:ADAPTER_MODE = "custom"
+$env:ADAPTER_FACTORY = "youtube_answers.team:create_adapters"
+$env:BACKEND_INTEGRATION_PROFILE = "live"
+$env:DATABASE_URL = "sqlite:///./runtime/answers05/app.db"
+python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-db upgrade head
+python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-rag init
+python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-api
+```
+
+In terminal 2, set the **same four environment variables**, then:
+
+```powershell
+python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-worker
+```
+
+Open [Swagger](http://127.0.0.1:8000/docs). Import a caption-accessible YouTube URL through
+`POST /api/videos/import` and poll its job until `ready`. Then submit:
+
+```json
+{"question":"สรุปแนวคิดสำคัญจากคลิปนี้","scope":{"video_ids":["YOUR_VIDEO_ID"]}}
+```
+
+to `POST /api/chat`. For a whole-video summary use `POST /api/analysis`:
+
+```json
+{"type":"summary","instruction":"สรุปเป็นภาษาไทย","scope":{"video_ids":["YOUR_VIDEO_ID"]}}
+```
+
+For comparison use `type=compare` and at least two selected IDs. Poll `GET /api/jobs/{job_id}`
+for asynchronous results. 02 handles conversation IDs, idempotency and saved messages.
+06 research can call `compare_videos` through the same factory. Existing caption access
+restrictions and 06's large-artifact context limits still apply. The root Docker Compose
+image does not package this integration; the commands above use the local 05 environment.
+
+## Behavior and guarantees
+
+- Question answering adds bounded recent user history to retrieval for follow-up context,
+  then generates only from retrieved evidence. This is a heuristic, not a semantic query
+  rewriting guarantee. History is explicitly untrusted and cannot widen the frozen scope.
+- Low-ranked evidence that does not fit the conservative input guard is omitted with a
+  coverage note. If no usable item fits, the operation fails with `context_budget_exceeded`.
+- Whole-video analysis enumerates every available selected chunk, summarizes bounded batches
+  per video and recursively merges cited summaries. All available selected videos must be
+  cited in an answered analysis. Missing indexes yield explicit partial coverage.
+- Coverage measures distinct original chunks supplied to successful batch/answer generation,
+  including batches reporting insufficient evidence. It does not prove every fact survived
+  compression or was understood. Ranked QA always reports `complete=false`. Missing total
+  inventory uses null chunk counts, as required by 02's schema.
+- Each generated factual statement requires chunk IDs from its actual model input. Intermediate
+  synthesis cannot cite an original chunk that was omitted from its supplied summaries.
+  Final citation titles, exact intervals and timestamp URLs come from trusted source records.
+  05 re-reads processed evidence before finalization; 02 revalidates before durable publication.
+- A missing answer yields `insufficient_evidence`. Invalid JSON/citations, blocked/truncated
+  output, source changes, budget exhaustion and timeouts produce classified failures, never
+  a substitute factual answer. Partial coverage is in the AnswerResult; 02's analysis job
+  state can still be `completed` because the operation returned a valid partial result.
+- No SDK auto tools, no internal provider retries, no transcript-triggered external actions.
+  SDK preflight+generation share one timeout. 02 owns durable transient retries and lease
+  renewal. Cancellation/lease loss propagates and prevents final publication.
+- Local budgeting reserves serialized UTF-8 bytes for evidence, policy and schema. Live
+  requests also use Gemini countTokens on content plus a serialized-config byte allowance.
+  This deliberately conservative allowance is not exact full-request token accounting.
+
+## Evaluation and limits
+
+`fixtures/evaluation.json` includes supported Thai, unsupported, conflicting cross-video,
+follow-up and transcript-injection cases with manual review criteria. An optional live
+smoke check makes paid generation requests on this small synthetic corpus only:
+
+```powershell
+python -m uv run --project 05_ai_answers_analysis --locked python 05_ai_answers_analysis/scripts/live_check.py --live --output runtime/answers05/live-check.json
+```
+
+It checks expected status and citation identity and saves outputs for semantic review.
+It does not fetch YouTube, create embeddings or modify an application database. Inspect
+each claim against the fixture, source attribution, contradictions, relevance and Thai
+readability. Passing structural checks does not prove factual support or prompt-injection
+resistance. Real-video grounding, model access, production throughput and live team behavior
+still require separate evaluation. No live calls were made during offline verification.
+
+Long analyses can exceed context, call-count or job-time limits and fail explicitly.
+There are no resumable 05 checkpoints or guaranteed partial synthesis after a hard timeout.
+There is no frontend, ASR, web search, scheduler, authentication or production deployment
+provided by this module. See `TEST_REPORT.md` for executed checks and their limits.
+
+References: [Gemini structured output](https://ai.google.dev/gemini-api/docs/generate-content/structured-output),
+[token counting](https://ai.google.dev/gemini-api/docs/tokens),
+[Google GenAI Python SDK](https://googleapis.github.io/python-genai/).
