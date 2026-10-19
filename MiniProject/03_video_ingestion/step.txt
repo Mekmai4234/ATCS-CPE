@@ -29,5 +29,10 @@ D) Verification
 1. Run offline unit, SDK HTTP, subprocess and API/worker/real-Chroma checks.
 2. Run explicit live_check.py for a public video when live verification is needed.
 3. Record contacted providers and limitations in TEST_REPORT.md.
+4. Run production-limit overflow/full-pipe timeout/cancel/shutdown regressions; cleanup
+   must drain or close pipes and reap children within its separate bounded budget.
+5. Use acceptance_check.py with --fixture-embeddings and a new empty state directory
+   to verify live Thai/English captions through 02/04, every stored timestamp and dedup.
+6. Record the 2026-10-20 follow-up results separately in FOLLOWUP_REPORT.md.
 
 Future: channel/playlist discovery, ready-video refresh, scheduling and optional ASR.
