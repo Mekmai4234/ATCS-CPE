@@ -1,35 +1,62 @@
 ### 02_api_backend - Workflow Steps
 
+Setup and entrypoints
+---------------------
+See README.md for PowerShell install/start/demo/test commands. From MiniProject:
+uv sync --project 02_api_backend --locked
+uv run --project 02_api_backend --locked yk-db upgrade head
+uv run --project 02_api_backend --locked yk-api
+uv run --project 02_api_backend --locked yk-worker
+Select the same ADAPTER_MODE and DATABASE_URL for API and worker before starting them.
+
+Optional 04/06 integration
+--------------------------
+Use integration/README.md and its dedicated .env.example and lockfile. Initialize 02 then
+04 using yk-backend-init. Explicit offline demo seeding must run with API/workers stopped.
+API and worker check schema/profile before constructing adapters, share resolved budgets,
+and close model/RAG resources before the DB. /health reports actual capability declarations;
+missing 03/05 operations fail before enqueue. Docker integration has its own Compose file,
+named persistent data/index volume and network-disabled suite target, all inside module 02.
+
 A) Import Request
 ------------------
-1. Receive { urls[] } through POST /api/videos/import.
-2. Validate accepted YouTube URL formats, normalize video IDs, and check import limits.
-3. Check existing video records and jobs within the authorized data scope.
-4. Persist new video/job records or return existing records for duplicate input.
-5. Return jobs[] without waiting for transcript retrieval or indexing.
-6. A worker claims a persisted job and calls 03_video_ingestion.
-7. If a usable transcript is returned, call 04_rag_knowledge to build the index.
-8. Persist each stage and mark ready only when indexing completes.
-9. Expose status through GET /api/jobs/{job_id}; record no_transcript or a classified failure.
+1. Receive urls[]; validate the batch limit and supported HTTPS watch/short-link URLs.
+2. Normalize video IDs; return accepted/existing/rejected outcomes per input_index.
+3. Persist video/job records transactionally before returning 202.
+4. Worker atomically claims a due job, receives a unique execution lease and durable deadline.
+5. Mark fetching_transcript and invoke 03 through the async adapter interface.
+6. Validate and persist ordered timestamped segments, provenance and transcript content hash.
+7. Mark indexing and invoke 04. Verify completion receipt/source/chunk inventory.
+8. Recheck lease, cancellation and lifecycle; only then commit ready.
+9. Classify no_transcript separately; use bounded retries/backoff for temporary failures.
 
 B) Chat and Analysis Request
 ----------------------------
-1. Receive a question or summary/comparison request with an explicit source scope.
-2. Validate ready videos and load relevant conversation history when requested.
-3. Call 05_ai_answers_analysis with the task, authorized scope, and history.
-4. Receive the answer, citations, coverage, and provider metadata.
-5. Save the conversation turn/result, then send the validated response to the frontend.
-6. Return structured errors for invalid input, unavailable dependencies, and timeouts.
+1. Validate explicit ready-video scope and supported channel/date filters.
+2. Freeze generation/index versions; reject unsupported filters instead of dropping them.
+3. Reuse matching Idempotency-Key jobs or reject changed input under an existing key.
+4. For chat, persist the user turn and load bounded completed history inside current sources.
+5. Run chat immediately when claimable; long analysis returns 202 and runs in the worker.
+6. Invoke 05; validate output, scoped evidence identity, timestamps, coverage and metadata.
+7. Construct trusted citation URLs and save assistant/citations/result atomically.
+8. Return a final chat answer, or 202 for pending/retrying work; expose result via job polling.
 
 C) Research and Learning Request
 --------------------------------
-1. Receive a research goal, or a direct learning-artifact request.
-2. Create a persisted run for long tasks and dispatch 06_research_learning_agent.
-3. Save progress events and final completed, partial, or failed results.
-4. Return run status/artifacts only to callers authorized to access them.
+1. Validate the goal/task/scope and persist a research or artifact job before 202.
+2. Invoke 06 with the frozen sources, execution context, deadline and event callback.
+3. Save bounded progress events without private model reasoning.
+4. Validate result/artifact types, item citations, explanations and coverage.
+5. Persist completed/partial results and learning artifacts in the same transaction.
+6. On hard timeout/fatal interruption, retain events and record failed; do not replay a
+   research agent with fresh budgets when 06 has not supplied resumable checkpoints.
 
-D) Deletion and Recovery
-------------------------
-1. On an authorized deletion, coordinate job cancellation and remove related vector/data records.
-2. On restart, recover unfinished persisted jobs according to the claim/retry policy.
-3. Use bounded retries and record attempt_count; do not retry permanent errors indefinitely.
+D) Deletion, Cancellation and Recovery
+--------------------------------------
+1. Hide a deleting video immediately, cancel dependent queued work and signal active work.
+2. Queue durable cleanup; serialize active import/delete operations for that video.
+3. Call 04's fenced, generation-aware deletion; remove transcript/segment records on success.
+4. Retain minimal tombstone/audit/history/artifacts and mark historical sources unavailable.
+5. On lease expiry, recover retryable unfinished jobs within their existing attempt/deadline
+   budgets. Old execution tokens cannot publish application results.
+6. Explicit eligible manual retry creates a new bounded job; repeated clicks reuse active work.

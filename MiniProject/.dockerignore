@@ -1,0 +1,15 @@
+# Allow only backend build inputs. Local credentials, runtime data and Windows venvs
+# must never be sent to the Docker builder.
+**
+!.env.example
+!02_api_backend/
+!02_api_backend/Dockerfile
+!02_api_backend/pyproject.toml
+!02_api_backend/uv.lock
+!02_api_backend/src/
+!02_api_backend/src/**
+!02_api_backend/tests/
+!02_api_backend/tests/**
+02_api_backend/**/__pycache__/
+02_api_backend/**/.pytest_cache/
+02_api_backend/**/.ruff_cache/

@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "youtube-knowledge-backend"
+version = "0.1.0"
+description = "Durable API and job coordinator for YouTube Knowledge (module 02)"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+  "sqlalchemy>=2.0,<2.1",
+  "alembic>=1.14,<2",
+  "pydantic-settings>=2.7,<3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<10",
+    "pytest-asyncio>=0.25,<2",
+    "httpx>=0.28,<1",
+    "ruff>=0.11,<1",
+    "httpx2>=2.13.1",
+]
+
+[project.scripts]
+yk-api = "youtube_backend.cli:api"
+yk-worker = "youtube_backend.cli:worker"
+yk-db = "youtube_backend.cli:migrate"
+yk-backend-init = "youtube_backend.cli:integration_init"
+yk-backend-demo-seed = "youtube_backend.cli:demo_seed"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/youtube_backend"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

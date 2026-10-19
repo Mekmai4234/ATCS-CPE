@@ -41,7 +41,7 @@ pnpm dev
 
 ## API contract ที่อ้างอิง
 
-ตรวจจาก **local `develop@25427fe`**, `MiniProject/docs/backend_api_contract.md` และ Pydantic schemas ของ module 02 ด้วย `git show` ไม่มีการ merge หรือเปลี่ยน branch เพื่อดึงไฟล์มา ใน checkout ปัจจุบันยังไม่มี backend source ตาม contract นี้ ดู [API_CONTRACT.md](API_CONTRACT.md) สำหรับ mapping ที่ใช้กับ frontend
+ตรวจจาก **local `develop@25427fe`**, `MiniProject/docs/backend_api_contract.md` และ Pydantic schemas ของ module 02 ด้วย `git show` การทดสอบแรกอ่าน source ผ่าน Git โดยไม่เปลี่ยน branch และภายหลัง sync develop ก่อนเปิด PR จึงมี backend source ใน checkout แล้ว ดู [API_CONTRACT.md](API_CONTRACT.md) สำหรับ mapping ที่ใช้กับ frontend
 
 ## ตรวจสอบ
 
