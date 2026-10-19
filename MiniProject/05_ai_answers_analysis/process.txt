@@ -18,6 +18,10 @@ Architecture
   counts processed original chunks and aggregates provider metadata.
 - AnswerAdapters supplies 05 and 04 methods to 02 without changing existing factories.
 - Optional TeamAdapters composes existing 03/04/05/06 and passes analyze to 06.
+- Team services consume resolved backend settings without reading module dotenv files.
+- The main runtime/maintenance launcher is 02's yk-full, a separate integration dependency.
+- The real HTTP acceptance client imports/polls videos and produces pending human claim
+  review packets with actual transcript excerpts, exact source intervals and usage/latency.
 
 Techniques
 ----------
@@ -47,3 +51,4 @@ Limits
 - No internal provider retries; 02 alone owns durable retry policy.
 - Hard deadlines/context/call/chunk limits can fail a task; no resumable 05 checkpoints.
 - Live generation, real-video quality and production deployment require further evaluation.
+- Real semantic acceptance is never inferred from mock passes or citation identity alone.

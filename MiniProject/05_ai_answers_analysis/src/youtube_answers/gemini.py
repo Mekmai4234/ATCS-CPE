@@ -111,3 +111,21 @@ class GeminiModel:
         finally:
             if self._http is not None:
                 await self._http.aclose()
+
+    async def check_access(self, timeout):
+        """Read account-visible model metadata; this does not establish generation access."""
+        try:
+            async with asyncio.timeout(timeout):
+                model = await self.client.aio.models.get(model=self.settings.llm_model)
+            return {
+                "requested_model": self.settings.llm_model,
+                "catalog_name": model.name,
+                "supported_actions": model.supported_actions or [],
+                "generation_verified": False,
+            }
+        except (httpx.TimeoutException, TimeoutError):
+            raise error("model_check_timeout", "Model lookup exceeded its deadline") from None
+        except (errors.APIError, httpx.TransportError):
+            raise error(
+                "model_check_failed", "Model lookup was not available to this account"
+            ) from None

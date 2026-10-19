@@ -1,5 +1,8 @@
 # Module 05 — AI Answers and Analysis
 
+Latest follow-up changes and executed results: [FOLLOWUP_REPORT.md](FOLLOWUP_REPORT.md).
+Live acceptance prerequisites and review workflow: [ACCEPTANCE.md](ACCEPTANCE.md).
+
 `youtube_answers` generates cited answers, whole-video summaries and comparisons.
 02 owns HTTP routes, durable jobs, history, retries and result storage. 04 owns versioned
 evidence and embeddings. 05 supplies `answer(request, sources, history, context)` and
@@ -37,11 +40,14 @@ This verifies mechanisms; it does not establish real-video answer quality.
 Copy this module's `.env.example` to `.env` only if no local file already exists.
 Credentials are server-only. Never commit `.env` or include keys in shell arguments.
 
-Standalone 05 precedence: process environment > 05/.env > shared root .env > defaults.
-The full team factory uses process > 05/.env > 06/.env > 03/.env > 04/.env > root .env
-for each service's own settings. This ensures explicit module-05 overrides apply across
-the composition. The backend's existing Settings does not automatically load 05/.env;
-set its adapter/database variables explicitly in both API and worker terminals below.
+The full-team factory consumes the backend's **resolved Settings**, with dotenv loading
+disabled for all downstream services. Shared fields always use the supplied backend values;
+module-specific fields missing from a legacy backend use process values/defaults only.
+Use 02's **yk-full** launcher to select one file and export all service fields for API,
+worker and reindex/GC: process environment > selected file > launcher defaults. Module-local
+dotenv files must not silently select a different database, Chroma store or embedding model.
+The narrow 05 factory follows the same resolved-backend rule; direct manual construction
+of `AnswerSettings` is a separate standalone API, not the full runtime configuration contract.
 
 | Setting | Default | Purpose |
 |---|---|---|
@@ -62,29 +68,34 @@ Generation and embedding models remain independent. Verify actual Gemini model/a
 access before using live mode; the configured identifier is not a claim of availability.
 Requested and returned model/version, aggregate usage and provider-call latency are kept.
 
-## Run the optional full team integration
+## Run the full team integration
 
-Use a new SQLite/Chroma pair, separate from previous fixture/demo state. Configure 05/.env
-with a key and the compatible 04 embedding settings from `.env.example`. The root legacy
-OpenAI proposal must not override Gemini embeddings. Do not change an existing index's
-configuration without following 04's explicit reindex procedure.
+The main runtime dependency set is **02_api_backend/full**, factory
+`youtube_answers.team:create_adapters`. The older `02_api_backend/integration` set connects
+only 04/06 and cannot supply 05 answers. `05 --extra team` remains the development/test
+environment; it does not add 02's launcher when that backend version is absent.
 
-In terminal 1, from MiniProject:
+**Integration prerequisite:** this feature checkout does not yet contain 02's `yk-full`
+delivery, available on `origin/feature/02_api_backend@ec3dff8`. Integrate that delivery before
+using the commands below; no other module or branch was merged during this change.
+See [ACCEPTANCE.md](ACCEPTANCE.md) for version/handoff details and maintenance commands.
+
+Copy the example only if 05/.env does not exist, fill the key locally, and select a fresh
+SQLite/Chroma pair. Every command must select the same file and process environment.
+From MiniProject after the prerequisite is integrated:
 
 ```powershell
-$env:ADAPTER_MODE = "custom"
-$env:ADAPTER_FACTORY = "youtube_answers.team:create_adapters"
-$env:BACKEND_INTEGRATION_PROFILE = "live"
-$env:DATABASE_URL = "sqlite:///./runtime/answers05/app.db"
-python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-db upgrade head
-python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-rag init
-python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-api
+python -m uv sync --project 02_api_backend/full --locked
+python -m uv run --project 02_api_backend/full --locked yk-full --env-file 05_ai_answers_analysis/.env config
+python -m uv run --project 02_api_backend/full --locked yk-full --env-file 05_ai_answers_analysis/.env init
+python -m uv run --project 02_api_backend/full --locked yk-full --env-file 05_ai_answers_analysis/.env check
+python -m uv run --project 02_api_backend/full --locked yk-full --env-file 05_ai_answers_analysis/.env api
 ```
 
-In terminal 2, set the **same four environment variables**, then:
+In terminal 2, select the same configuration:
 
 ```powershell
-python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-worker
+python -m uv run --project 02_api_backend/full --locked yk-full --env-file 05_ai_answers_analysis/.env worker
 ```
 
 Open [Swagger](http://127.0.0.1:8000/docs). Import a caption-accessible YouTube URL through
@@ -142,15 +153,23 @@ follow-up and transcript-injection cases with manual review criteria. An optiona
 smoke check makes paid generation requests on this small synthetic corpus only:
 
 ```powershell
-python -m uv run --project 05_ai_answers_analysis --locked python 05_ai_answers_analysis/scripts/live_check.py --live --output runtime/answers05/live-check.json
+python -m uv run --project 05_ai_answers_analysis --locked python 05_ai_answers_analysis/scripts/live_check.py --live --env-file 05_ai_answers_analysis/.env --output runtime/answers05/live-synthetic.json
 ```
 
-It checks expected status and citation identity and saves outputs for semantic review.
+It attempts an account-visible model catalog lookup, then checks expected status and citation
+identity and saves outputs for semantic review. Catalog visibility does not prove generation
+access; alias lookup failures are recorded separately from generation results.
 It does not fetch YouTube, create embeddings or modify an application database. Inspect
 each claim against the fixture, source attribution, contradictions, relevance and Thai
 readability. Passing structural checks does not prove factual support or prompt-injection
 resistance. Real-video grounding, model access, production throughput and live team behavior
 still require separate evaluation. No live calls were made during offline verification.
+
+For **real-video** import → ready → QA/summary/compare acceptance, use the new
+`yk-answers-acceptance` client and `fixtures/real_acceptance.template.json` as described in
+[ACCEPTANCE.md](ACCEPTANCE.md). It records wall latency, provider usage and a human review
+packet pairing each cited paragraph with actual transcript segments and timestamps.
+It refuses fixture/limited runtimes and never labels structural success as semantic acceptance.
 
 Long analyses can exceed context, call-count or job-time limits and fail explicitly.
 There are no resumable 05 checkpoints or guaranteed partial synthesis after a hard timeout.
