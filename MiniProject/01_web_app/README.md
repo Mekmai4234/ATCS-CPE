@@ -4,6 +4,8 @@
 
 ## เริ่มใช้งาน
 
+ดูภาพตัวอย่าง: [หน้าคลังวิดีโอบนคอมพิวเตอร์](docs/screenshots/desktop.png) · [หน้าแชตบนมือถือ](docs/screenshots/mobile.png)
+
 ใช้ Node.js 22.12+ หรือ 24 LTS และ pnpm 11.25.0 คำสั่งทั้งหมดด้านล่างรันจาก `MiniProject/01_web_app`:
 
 ```powershell
