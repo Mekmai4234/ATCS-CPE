@@ -65,6 +65,16 @@ class ManagedAdapters:
                 return
             self.repository.db.check_schema()
             self.repository.check_mode()
+            if self.settings.backend_full_preflight:
+                from .config import Settings
+                from .full import FullSettings
+                from .full_pair import check_pair
+
+                config = FullSettings(
+                    _env_file=None,
+                    **{name: getattr(self.settings, name) for name in Settings.model_fields},
+                )
+                check_pair(config)
             if self.adapter is None:
                 candidate = load_adapters(self.settings, self.repository)
                 self.adapter = await candidate if inspect.isawaitable(candidate) else candidate
