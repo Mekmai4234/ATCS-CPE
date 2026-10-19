@@ -1,47 +1,49 @@
-### 01_web_app - Process & Techniques (README)
+### 01_web_app - Process & Techniques
 
 Overview
 --------
-The frontend is the user's entry point to YouTube Knowledge. It turns pasted video links
-into a manageable library, presents evidence-based answers, and displays learning artifacts.
-The interface shows planned system behavior; implementation is still pending.
+A runnable React/TypeScript workspace for importing YouTube URLs, selecting ready
+sources, asking grounded questions, and viewing analysis/research/learning outputs.
+The local checkout does not contain module 02 source. Integration follows the actual
+local develop@25427fe contract inspected through Git, not only the older proposed API.
 
 Architecture
 ------------
-- VideoImportForm collects URLs and displays per-item validation results.
-- VideoLibrary shows cards, processing stages, selection filters, and deletion actions.
-- VideoPlayer displays a supported YouTube embed and timestamp navigation.
-- ChatWindow displays questions, grounded answers, and evidence cards.
-- LearningWorkspace presents research progress, plans, quizzes, and flashcards.
-- The frontend communicates with 02_api_backend, not directly with ChromaDB or Gemini.
+- App.tsx coordinates library, import, selection, task forms and lifecycle state.
+- api.ts is the typed HTTP boundary, classified errors and sequential job observer.
+- domain.ts validates supported URLs, source constraints, timestamps and terminal states.
+- Results.tsx renders safe answer text, citations, coverage and typed learning content.
+- demo.ts is explicitly enabled synthetic transport for development and acceptance.
+- vite.config.ts loads only public API configuration and builds static assets.
+- API_CONTRACT.md maps frontend operations to module 02 behavior.
 
-Techniques Used
----------------
-- Job polling keeps video import responsive while background processing continues.
-- Query caching avoids unnecessary repeated library/history requests.
-- Optimistic display applies to the user's message only; AI results must come from the backend.
-- State-specific UI distinguishes missing captions, processing failures, and insufficient evidence.
-- Citation mapping connects source records to actual video IDs and time bounds.
-- Optional streaming is added only when the API defines event and final-validation semantics.
+Techniques and Contract
+-----------------------
+- Import returns per-input accepted/existing/rejected; 202 is not universal success.
+- Video stage is independent of queued/running/completed/partial/failed/cancelled job state.
+- Chat can return 200 or 202; analysis/research/artifacts return durable jobs.
+- Polling is sequential and cancellable, stops at terminal states, and bounds transient
+  read failures. A client observation timeout does not imply server task failure.
+- Logical task requests freeze payload/scope and reuse Idempotency-Key on uncertain
+  delivery. Once a job ID is known, retry observation instead of submitting new work.
+- Preserve ready-video scope, channels and inclusive dates; never widen empty results.
+- Pagination is explicit. Filters operate on loaded pages; playlist is unsupported.
+- Full-analysis coverage and partial outcomes stay visible, independent of HTTP success.
+- Stored artifact IDs are retrieved before displaying quizzes, cards and study plans.
+- Model text is escaped; citation links are built only from validated video ID/time.
+- Historical unavailable sources disable links, including sources of nested artifacts.
+- Fixture headers/body modes produce a persistent visible synthetic-data notice.
+- No automatic fallback to demo, provisional streaming or browser provider credentials.
 
-Communication With the Backend
-------------------------------
-- POST /api/videos/import: { urls[] } -> { jobs[] }.
-- GET /api/jobs/{job_id}: import stage, errors, and measured progress if available.
-- GET /api/videos and GET /api/videos/{video_id}/transcript: library and timestamped text.
-- POST /api/chat: { question, conversation_id, scope } -> answer and citations.
-- POST /api/analysis, POST /api/research, and POST /api/learning-artifacts:
-  summaries, comparisons, research runs, and study outputs.
+Verification and Boundaries
+---------------------------
+Vitest checks domain/HTTP/polling behavior; Playwright checks browser flows on desktop
+and mobile, state handling, escaping, scope, pagination and idempotent retries.
+The optional isolated smoke runner extracts module 02 into ignored runtime storage,
+uses its real HTTP/API/worker and a new fixture DB, then stops its own processes.
+This validates integration mechanics without claiming live YouTube/model quality.
+See TEST_REPORT.md for actual commands/results, not assumed acceptance.
 
-Design Rationale
-----------------
-Separate the library, chat, and learning views so users can understand which videos support
-each result. Keep processing state visible so metadata availability is not confused with
-AI readiness.
-
-Things to Watch Out For
-----------------------
-- A video may allow normal playback but disallow embedding; offer its original link.
-- A missing transcript does not imply the video itself is unavailable.
-- Do not present mock answers as real results or invent processing percentages.
-- Chat history alone does not authorize searching outside the selected source scope.
+No authentication, reload/session restoration, animated mascot or embedded player is
+implemented. External YouTube playback and timestamp links are provided. Deployment
+is outside the verified frontend runtime; delivery is tracked through Git and PR history.
