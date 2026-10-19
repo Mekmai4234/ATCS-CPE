@@ -52,6 +52,12 @@ chunks = sa.Table(
     sa.Column("data", sa.JSON, nullable=False),
     sa.UniqueConstraint("run_id", "ordinal"),
 )
+store_binding = sa.Table(
+    "rag04_store_binding",
+    metadata,
+    sa.Column("id", sa.Integer, primary_key=True),
+    sa.Column("store_id", sa.String, nullable=False),
+)
 
 
 def initialize(database):
@@ -143,6 +149,26 @@ class Manifest:
                 ) from None
         if version != 1:
             raise error("index_schema_mismatch", "Unsupported module 04 schema version")
+
+    def binding(self):
+        with self.database.read() as connection:
+            try:
+                return connection.scalar(
+                    sa.select(store_binding.c.store_id).where(store_binding.c.id == 1)
+                )
+            except sa.exc.OperationalError:
+                raise error(
+                    "index_schema_missing", "Run yk-rag init to add the store binding table"
+                ) from None
+
+    def all_runs(self, connection=None):
+        if connection is None:
+            with self.database.read() as reader:
+                return self.all_runs(reader)
+        return [
+            dict(row)
+            for row in connection.execute(sa.select(runs).order_by(runs.c.run_id)).mappings()
+        ]
 
     def current(self, sources, config, *, require=False):
         records, missing = [], []
