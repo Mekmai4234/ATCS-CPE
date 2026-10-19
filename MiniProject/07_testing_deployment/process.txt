@@ -1,48 +1,21 @@
-### 07_testing_deployment - Process & Techniques (README)
+Module 07: Process and boundaries
 
-Overview
---------
-This module verifies that the application works end to end and that its AI outputs are
-supported by the imported videos. It also plans packaging, deployment, monitoring, and
-recovery. These processes require implementation before any release claim is made.
+Inputs: existing 02-06 implementations/tests, reference fixtures and acceptance criteria.
+The 07 lockfile composes dependencies without changing other manifests.
 
-Architecture
-------------
-- Component checks validate each module's contracts and failure handling.
-- Integration scenarios exercise web/API/worker/index/model interactions.
-- AI evaluation compares retrieved evidence and generated claims with known references.
-- Packaging may run web, API, and worker as separate processes/containers; modules 03-06
-  can share Python packages instead of becoming independent services.
-- Structured telemetry tracks operational behavior while persistent stores hold user data.
+Offline: separate suite processes -> real domain-service integration -> cold recovery ->
+known-defect assertions -> lint/format -> logs/JUnit/JSON -> readiness report.
+External providers are doubles; actual SQLite, Chroma and domain services are used.
+Hash vectors and mock model responses cannot establish semantic quality or model access.
 
-Techniques Used
----------------
-- Reference-based retrieval checks measure whether expected supporting segments are found.
-- Citation/grounding review checks whether claims are actually supported, not merely linked.
-- Coverage checks validate full-video summaries and cross-video comparisons.
-- Fault scenarios exercise provider timeouts, missing captions, retries, and worker restarts.
-- Reproducible configurations record SDK/model/embedding versions and dataset details.
-- Regression evaluation catches changes after prompt, model, or index updates.
-- Database/vector backup and restore procedures protect persistent knowledge.
+Deployment: package 02-06 -> shared configuration preflight -> migration/RAG initialization
+-> API health -> separate worker -> explicitly authorized live acceptance.
+Test containers disable networking and mount no application data volume.
 
-Communication / Deliverables
----------------------------
-Receive acceptance scenarios from 01-06 and report reproducible failures to the responsible
-module. Deliver a test report, AI evaluation report, measured latency/usage results,
-deployment instructions, and a rollback procedure.
-Required telemetry fields include event time, request/job/run ID, stage, outcome,
-latency, requested/returned model metadata where available, and provider usage if returned.
+Recovery: acknowledged stopped services -> integrity/pending-job checks -> paired data
+bundle -> SHA-256 verification -> new restore destination -> retrieval/source checks.
+No online Chroma backup, automatic destructive rollback or overwrite is provided.
 
-Design Rationale
-----------------
-Operational success and AI answer quality are different checks. A successful HTTP request
-does not establish correct evidence, complete coverage, or a useful learning plan.
-Keep measured results separate from design targets.
-
-Things to Watch Out For
-----------------------
-- Do not require paid live-model calls for every small offline check; use fixtures where suitable.
-- Embedding changes may require a full reindex, and schema changes may require migrations.
-- A code rollback is incomplete if data/index versions are incompatible.
-- Keep local/test/deployed credentials and data separate.
-- State what was measured, which cases were inspected, and which limitations remain.
+Outputs: runner, integration/regression/recovery tests, reports, Docker/Compose, passive
+CI template and operational guides. All edits remain inside 07. Active CI/root docs and
+03/04 fixes belong to their owners. Missing frontend/live/container evidence stays pending.
