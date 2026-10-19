@@ -10,8 +10,10 @@ A) Multi-step Research (implemented)
 7. Persist a concise action/outcome event through context.event; return the observation.
 8. Let the next decision depend on that observation; credit evidence actually submitted.
 9. Stop duplicate actions and enforce limits. On finish, validate known citation IDs and coverage.
-10. Return ResearchResult completed only with complete coverage, otherwise partial.
-11. 02 revalidates current sources/citations/inventory and durably stores the result/artifacts.
+10. Re-read exported citations and inventory; reject changed/missing sources before delivery.
+11. Return completed only with complete coverage, otherwise partial, and emit a terminal
+    run_controller event using the current step after validation.
+12. 02 revalidates current sources/citations/inventory and durably stores the result/artifacts.
 
 B) Direct Learning Artifacts (implemented)
 1. 02 invokes artifact(request, sources, execution_context); no decision loop is required.
@@ -31,4 +33,4 @@ C) Failures and Delivery
 - SDK transport/provider errors are redacted; no raw messages, credentials or private reasoning.
 - No automatic research replay/checkpoint resume is implemented.
 
-Installation, commands and limits: README.md. Executed validation: TEST_REPORT.md.
+Installation, evaluation commands and limits: README.md. Current validation: ACCEPTANCE_REPORT.md.
