@@ -1,12 +1,11 @@
 import json
-from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from youtube_agent.evaluation import Dataset, evaluate
+from youtube_agent.evaluation import Dataset, default_dataset, evaluate
 
-DATASET = Path(__file__).resolve().parents[1] / "fixtures" / "acceptance.json"
+DATASET = default_dataset()
 
 
 async def test_acceptance_report_covers_tasks_latency_usage_and_pending_quality(

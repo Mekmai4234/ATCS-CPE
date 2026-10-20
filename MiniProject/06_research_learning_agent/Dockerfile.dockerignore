@@ -18,7 +18,10 @@
 !06_research_learning_agent/src/**
 !06_research_learning_agent/tests/
 !06_research_learning_agent/tests/**
-!06_research_learning_agent/fixtures/
-!06_research_learning_agent/fixtures/**
+!06_research_learning_agent/acceptance/
+!06_research_learning_agent/acceptance/pyproject.toml
+!06_research_learning_agent/acceptance/uv.lock
+!06_research_learning_agent/acceptance/tests/
+!06_research_learning_agent/acceptance/tests/**
 **/__pycache__/
 **/*.pyc

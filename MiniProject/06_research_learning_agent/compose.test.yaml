@@ -3,6 +3,18 @@ services:
     build:
       context: ..
       dockerfile: 06_research_learning_agent/Dockerfile
+      target: tests
+    network_mode: none
+    init: true
+    environment:
+      APP_ENV: test
+      GEMINI_API_KEY: ""
+      MINIPROJECT_ROOT: /app
+  acceptance:
+    build:
+      context: ..
+      dockerfile: 06_research_learning_agent/Dockerfile
+      target: acceptance
     network_mode: none
     init: true
     environment:

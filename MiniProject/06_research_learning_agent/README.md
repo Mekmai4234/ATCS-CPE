@@ -19,9 +19,22 @@ uv run --project 06_research_learning_agent --locked ruff format --check 06_rese
 The module lockfile includes local packages 02 and 04. It does not modify their manifests,
 lockfiles or source. Tests use isolated temporary SQLite/Chroma data, labelled synthetic
 transcripts, deterministic embedding/model doubles and the real GenAI SDK with HTTP mocks.
-There are no paid calls or model downloads. The development environment also installs
-05 for cross-module acceptance tests, without changing 05's files or runtime dependencies.
-See [ACCEPTANCE_REPORT.md](ACCEPTANCE_REPORT.md) for current checks and
+There are no paid calls or model downloads. The public agent manifest retains its original
+dependencies so consumers' existing locks remain valid. Tests requiring actual module 05
+live in the separate, non-package `acceptance/` environment, which has its own lockfile:
+
+```powershell
+uv sync --project 06_research_learning_agent/acceptance --locked
+uv run --project 06_research_learning_agent/acceptance --locked pytest -c 06_research_learning_agent/acceptance/pyproject.toml 06_research_learning_agent/tests 06_research_learning_agent/acceptance/tests -q -W error
+```
+
+Core checks run 75 tests with no 05 installation. The acceptance environment runs those
+same 75 plus the two actual-05 comparison/cancellation checks, for 77 total; no tests are
+silently skipped. The source mappings for 05 exist only in the acceptance manifest and
+do not add dependency metadata to the public agent package.
+
+See [DEPENDENCY_REVIEW_REPORT.md](DEPENDENCY_REVIEW_REPORT.md) for current checks,
+[ACCEPTANCE_REPORT.md](ACCEPTANCE_REPORT.md) for the previous 77-test acceptance run and
 [TEST_REPORT.md](TEST_REPORT.md) for the original 55-test baseline.
 
 Docker Desktop must be running with Linux containers. From `MiniProject`:
@@ -31,6 +44,8 @@ docker compose -f 06_research_learning_agent/compose.test.yaml -p yk06-check bui
 docker compose -f 06_research_learning_agent/compose.test.yaml -p yk06-check run --rm --no-deps tests
 docker compose -f 06_research_learning_agent/compose.test.yaml -p yk06-check run --rm --no-deps tests ruff check src tests
 docker compose -f 06_research_learning_agent/compose.test.yaml -p yk06-check run --rm --no-deps tests ruff format --check src tests
+docker compose -f 06_research_learning_agent/compose.test.yaml -p yk06-check build acceptance
+docker compose -f 06_research_learning_agent/compose.test.yaml -p yk06-check run --rm --no-deps acceptance
 ```
 
 The test container is non-root, has networking disabled, receives an empty Gemini key,
@@ -38,6 +53,8 @@ and mounts no application database. Each run is disposable. A Dockerfile-specifi
 allowlist excludes local keys, .env files, runtime data and unrelated project files.
 Root Compose files are unchanged. This image is a verification image, not a production
 deployment of the entire application.
+The `tests` target packages only 02/04/06. The optional `acceptance` target adds 05 and
+the isolated acceptance environment. Both install with --locked; neither uses --frozen.
 
 ## Configuration
 
@@ -162,11 +179,13 @@ report retains each result, wall latency, provider metadata/usage and a manual r
 checklist. A passing contract is not a passing semantic review: each checklist remains
 `passed=null`, and `semantic_quality_verified=false`.
 
-For real-video review, prepare a dataset matching `fixtures/acceptance.json` from authorized
+For real-video review, prepare a dataset matching `src/youtube_agent/data/acceptance.json` from authorized
 03 transcript exports. Set `provenance` to `exported_transcripts`, preserve actual segment
 IDs/timestamps, and update case scopes/topics/review criteria. Videos are explicit
 `TranscriptResult` records, not raw unfiltered API response objects. The runner does not
 fetch YouTube, overwrite an application database, or reuse a previous state directory.
+The default dataset is an installed package resource loaded with importlib.resources;
+no consumer Dockerfile needs a separate copy of a repository-level fixtures directory.
 
 With a configured account/model, adding `--dataset PATH --live` explicitly enables live
 Gemini generation AND embeddings on those exports. This mode makes paid requests and
@@ -174,9 +193,8 @@ uses its own SQLite/Chroma pair; no live mode was invoked in this acceptance run
 Actual module-05 comparison/cancellation are additionally covered by integration tests,
 which inject real `AnswerService` into the same RAG instance and mock only model responses.
 
-Module 04's known runtime-versus-maintenance store/configuration mismatch is unchanged.
-The 06 factory alignment and isolated runner do not repair 04's `reindex/gc` safeguards;
-that remains a separate 04/02/05 coordination task.
+Module 04 owns maintenance/storage-pair safeguards. Follow its current README for
+`reindex/gc` and configuration checks; this 06 dependency repair changes no 04 code.
 
 ## Limits and next integration work
 
