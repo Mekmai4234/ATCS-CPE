@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     adapter_mode: str = "unavailable"
     adapter_factory: str | None = None
     backend_integration_profile: Literal["live", "offline"] = "live"
+    backend_full_preflight: bool = False
     enable_streaming: bool = False
     job_max_attempts: int = Field(default=3, ge=1, le=10)
     job_lease_seconds: float = Field(default=30, ge=0.3, le=600)

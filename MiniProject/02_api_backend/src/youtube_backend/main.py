@@ -144,6 +144,7 @@ def create_app(settings=None, database=None, adapters=None):
             mode=settings.adapter_mode,
             adapters_configured=settings.adapter_mode != "unavailable",
             live_provider_verified=False,
+            full_pair_preflight=settings.backend_full_preflight,
             single_user=True,
             capabilities=runtime.capabilities,
             integration_profile=settings.backend_integration_profile
