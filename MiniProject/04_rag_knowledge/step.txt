@@ -34,4 +34,9 @@ C) Coverage, Replacement and Deletion
 3. Keep old indexes until replacement succeeds; never combine incompatible vector spaces.
 4. Hide authorized generations before deleting vectors; retain retryable failed cleanup.
 5. Stop API/workers for explicit per-video reindex and abandoned-staging GC.
-6. Back up compatible application DB and Chroma data together.
+6. Inspect yk-rag config with the runtime profile/env files before maintenance.
+7. Upgrade existing stores with init then verified bind-store while stopped.
+8. Reject mismatched SQLite/Chroma identities before changing any index metadata.
+9. Verify deletion before forgetting cleanup metadata; retry incomplete cleanup later.
+10. Back up the application DB and whole Chroma directory, including the pair marker,
+    together while stopped. Verify inventory/evidence after restoring both snapshots.
