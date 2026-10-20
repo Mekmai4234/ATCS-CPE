@@ -38,12 +38,16 @@ COPY --from=build /app/05_ai_answers_analysis /app/05_ai_answers_analysis
 COPY --from=build /app/06_research_learning_agent /app/06_research_learning_agent
 COPY 02_api_backend/tests /app/02_api_backend/tests
 COPY 02_api_backend/integration/tests /app/02_api_backend/integration/tests
+COPY 02_api_backend/full/tests /app/02_api_backend/full/tests
 COPY 03_video_ingestion/tests /app/03_video_ingestion/tests
+COPY 03_video_ingestion/scripts /app/03_video_ingestion/scripts
 COPY 04_rag_knowledge/tests /app/04_rag_knowledge/tests
 COPY 04_rag_knowledge/fixtures /app/04_rag_knowledge/fixtures
 COPY 05_ai_answers_analysis/tests /app/05_ai_answers_analysis/tests
 COPY 05_ai_answers_analysis/fixtures /app/05_ai_answers_analysis/fixtures
-COPY 06_research_learning_agent/tests /app/06_research_learning_agent/tests
+# Includes tests AND any fixtures/ directory through the build allowlist; newer
+# 06 also packages src/youtube_agent/data/ in the installed wheel.
+COPY 06_research_learning_agent/ /app/06_research_learning_agent/
 COPY 07_testing_deployment/tests /app/07_testing_deployment/tests
 COPY 07_testing_deployment/pyproject.toml /app/07_testing_deployment/pyproject.toml
 CMD ["python", "07_testing_deployment/scripts/check.py"]

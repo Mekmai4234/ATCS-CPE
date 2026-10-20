@@ -12,9 +12,14 @@
 !*/tests/**
 !*/fixtures/
 !*/fixtures/**
+!03_video_ingestion/scripts/
+!03_video_ingestion/scripts/**
 !02_api_backend/integration/
 !02_api_backend/integration/tests/
 !02_api_backend/integration/tests/**
+!02_api_backend/full/
+!02_api_backend/full/tests/
+!02_api_backend/full/tests/**
 !07_testing_deployment/uv.lock
 !07_testing_deployment/scripts/
 !07_testing_deployment/scripts/**

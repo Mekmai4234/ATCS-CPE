@@ -2,7 +2,7 @@ Module 07: Workflow
 
 1. Read README.md and KNOWN_ISSUES.md; install the locked 07 environment.
 2. Run scripts/check.py from MiniProject; retain logs/JUnit/JSON under 07/runtime.
-3. Run existing suites separately, combined domain-service/recovery checks, known-defect
+3. Run existing suites (including 02/full) separately, domain-service/recovery checks, regression
    assertions and read-only lint/format. A regression failure keeps the release gate red.
 4. Send reproducible 03 cleanup and 04 configuration/store failures to their owners;
    do not edit production implementations inside the 07-only task.
@@ -12,6 +12,7 @@ Module 07: Workflow
 7. Perform human Thai/English semantic review using ACCEPTANCE.md; add browser acceptance
    when module 01 supplies an application. Keep offline and live evidence separate.
 8. Stop services, then perform paired cold backup/restore using RECOVERY.md.
-9. Record measured results and remaining blockers in TEST_REPORT.md before release.
+9. Record current results/remaining gates in REVIEW_FIX_REPORT.md; preserve TEST_REPORT.md
+   as the historical baseline. Compare current develop and isolated pending-PR sources.
 
 No PR, commit, public deployment or live provider call is implicit in offline verification.

@@ -1,5 +1,8 @@
 # Module 07 verification report
 
+Historical 19 October results. See [REVIEW_FIX_REPORT.md](REVIEW_FIX_REPORT.md) for the
+20 October follow-up against updated develop and the isolated pending-PR composition.
+
 Date: 19 October 2026 (Asia/Bangkok). Base commit: `25427fe`.
 Working branch: `feature/07_testing_deployment`. Verification completed before publication.
 All tracked/untracked deliverables are inside `MiniProject/07_testing_deployment`.
