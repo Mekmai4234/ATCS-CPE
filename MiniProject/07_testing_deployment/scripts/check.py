@@ -6,6 +6,7 @@ import os
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -38,8 +39,18 @@ def clean_environment():
                 "CHUNK_",
                 "RETRIEVAL_",
                 "RUN_LIVE_",
+                "INGEST_",
+                "TRANSCRIPT_",
+                "METADATA_",
+                "YOUTUBE_",
             )
-        ) or key.upper() in {"DATABASE_URL", "MINIPROJECT_ROOT", "APP_ENV"}:
+        ) or key.upper() in {
+            "DATABASE_URL",
+            "MINIPROJECT_ROOT",
+            "APP_ENV",
+            "ENABLE_STREAMING",
+            "MAX_CONTEXT_TOKENS",
+        }:
             env.pop(key)
     env.update(
         GEMINI_API_KEY="",
@@ -58,6 +69,7 @@ def commands(group, output):
     if group in {"all", "baseline"}:
         suites = [(p, [f"{p}/tests"]) for p in MODULES]
         suites.append(("02-integration", ["02_api_backend/integration/tests"]))
+        suites.append(("02-full", ["02_api_backend/full/tests"]))
         for name, paths in suites:
             yield (
                 name,
@@ -128,19 +140,28 @@ def main():
         "--group", choices=["all", "baseline", "acceptance", "regressions", "lint"], default="all"
     )
     parser.add_argument("--timeout", type=int, default=900)
+    parser.add_argument(
+        "--temp-root",
+        type=Path,
+        default=Path(os.environ.get("YK07_TEMP_ROOT", tempfile.gettempdir())),
+        help="Short temporary-state parent; reports stay in 07/runtime",
+    )
     args = parser.parse_args()
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     output = MODULE / "runtime" / stamp
     output.mkdir(parents=True)
+    temp_root = args.temp_root.expanduser().resolve()
+    temp_root.mkdir(parents=True, exist_ok=True)
+    temporary = Path(tempfile.mkdtemp(prefix="yk7-", dir=temp_root))
     results = []
     plan = list(commands(args.group, output))
-    for name, command in plan:
+    for index, (name, command) in enumerate(plan):
         started = time.monotonic()
         print(f"Running {name}", flush=True)
         if "pytest" in command:
-            command.extend(["--basetemp", str(output / f"tmp-{name}")])
+            command.extend(["--basetemp", str(temporary / str(index))])
         code, log = run_command(command, clean_environment(), args.timeout)
         (output / f"{name}.log").write_bytes(log)
         item = dict(name=name, exit_code=code, seconds=round(time.monotonic() - started, 3))
@@ -151,6 +172,7 @@ def main():
                 dict(
                     mode="offline",
                     generated_at_utc=stamp,
+                    temporary_state=str(temporary),
                     results=results,
                     complete=len(results) == len(plan),
                     live_quality_verified=False,
