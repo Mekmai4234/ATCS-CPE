@@ -41,7 +41,7 @@ services:
     restart: "no"
   api:
     <<: *team
-    command: ["yk-api"]
+    command: ["python", "07_testing_deployment/scripts/preflight.py", "--run", "api"]
     ports:
       - "127.0.0.1:${TEAM07_PORT:-8007}:8000"
     depends_on:
@@ -55,7 +55,7 @@ services:
     restart: unless-stopped
   worker:
     <<: *team
-    command: ["yk-worker"]
+    command: ["python", "07_testing_deployment/scripts/preflight.py", "--run", "worker"]
     depends_on:
       api:
         condition: service_healthy

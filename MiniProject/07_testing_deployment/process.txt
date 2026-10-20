@@ -8,8 +8,8 @@ known-defect assertions -> lint/format -> logs/JUnit/JSON -> readiness report.
 External providers are doubles; actual SQLite, Chroma and domain services are used.
 Hash vectors and mock model responses cannot establish semantic quality or model access.
 
-Deployment: package 02-06 -> shared configuration preflight -> migration/RAG initialization
--> API health -> separate worker -> explicitly authorized live acceptance.
+Deployment: package 02-06 -> resolved FullSettings snapshot -> guarded-pair initialization
+-> export identical settings to API/worker -> health -> explicitly authorized live acceptance.
 Test containers disable networking and mount no application data volume.
 
 Recovery: acknowledged stopped services -> integrity/pending-job checks -> paired data

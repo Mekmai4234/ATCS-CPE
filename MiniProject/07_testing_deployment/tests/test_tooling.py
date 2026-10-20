@@ -1,4 +1,7 @@
 import importlib.util
+import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -64,3 +67,72 @@ def test_live_smoke_refuses_calls_without_opt_in(monkeypatch):
     with pytest.raises(SystemExit) as caught:
         live.main()
     assert caught.value.code == 2
+
+
+def test_verification_plan_includes_full_backend_suite(tmp_path):
+    plan = dict(load("check").commands("baseline", tmp_path))
+    assert "02_api_backend/full/tests" in plan["02-full"]
+
+
+def test_runner_keeps_reports_in_runtime_and_uses_selected_short_temp_root(tmp_path, monkeypatch):
+    check = load("check")
+    monkeypatch.setattr(check, "MODULE", tmp_path / "workspace")
+    captured = []
+    monkeypatch.setattr(
+        check,
+        "commands",
+        lambda *args: iter(
+            [
+                ("probe", [sys.executable, "-m", "pytest"]),
+            ]
+        ),
+    )
+    monkeypatch.setattr(
+        check, "run_command", lambda args, *rest: captured.append(args) or (0, b"passed")
+    )
+    short = tmp_path / "t"
+    monkeypatch.setattr(sys, "argv", ["check", "--temp-root", str(short)])
+    assert check.main() == 0
+    base = Path(captured[0][captured[0].index("--basetemp") + 1])
+    assert base.is_relative_to(short) and not base.is_relative_to(check.MODULE)
+    report = json.loads(next((check.MODULE / "runtime").glob("*/report.json")).read_text())
+    assert report["complete"] and report["passed"]
+    assert Path(report["temporary_state"]).is_relative_to(short)
+
+
+def test_preflight_cli_initializes_guarded_pair_from_selected_snapshot(tmp_path):
+    selected = tmp_path / "full.env"
+    selected.write_text(
+        f"DATABASE_URL=sqlite:///{(tmp_path / 'state/app.db').as_posix()}\n"
+        f"CHROMA_PERSIST_DIR={(tmp_path / 'state/chroma').as_posix()}\n"
+        "GEMINI_API_KEY=synthetic-only\nLLM_MODEL=config-only\n",
+        encoding="utf-8",
+    )
+    check = load("check")
+    env = check.clean_environment()
+    env.pop("GEMINI_API_KEY")  # Explicit selected file is the only key source here.
+    args = [
+        sys.executable,
+        str(MODULE / "scripts/preflight.py"),
+        "--env-file",
+        str(selected),
+        "--require-key",
+        "--initialize",
+    ]
+    result = subprocess.run(args, env=env, capture_output=True, text=True, timeout=30, check=True)
+    report = json.loads(result.stdout)
+    assert report["pair_verified"] and report["llm_model"] == "config-only"
+    assert "synthetic-only" not in result.stdout + result.stderr
+    from youtube_backend.full_pair import check_pair
+
+    preflight = load("preflight")
+    with preflight.exported(preflight.resolve(selected)):
+        assert check_pair(preflight.resolve(selected))["pair_id"]
+
+
+def test_preflight_restores_process_settings_after_inspection(tmp_path):
+    selected = tmp_path / "full.env"
+    selected.write_text("LLM_MODEL=only-in-snapshot\n", encoding="utf-8")
+    before = dict(os.environ)
+    load("preflight").inspect(env_file=selected)
+    assert dict(os.environ) == before

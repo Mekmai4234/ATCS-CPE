@@ -29,8 +29,8 @@ uv run --project 07_testing_deployment --locked python 07_testing_deployment/scr
    removing its disposable original state.
 6. For incompatible schema/index changes, roll back code AND data into a new location
    using the prior known-compatible image/config. Validate before switching; retain the
-   original state. Do not use reindex/gc to repair an unknown mismatch while K04-STORE
-   remains open.
+   original state. Do not use reindex/gc to repair an unknown mismatch; resolve the paired
+   configuration first. Preserve all Chroma pair marker files during recovery.
 
 Production-volume restore and image rollback remain operational acceptance work. The
 offline drill is not evidence that a production deployment has been recovered.

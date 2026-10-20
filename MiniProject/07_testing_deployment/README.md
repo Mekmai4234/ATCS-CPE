@@ -26,10 +26,16 @@ Append `--group baseline` for existing suites, `--group acceptance` for 07 integ
 recovery/tooling, `--group regressions` for upstream blockers, or `--group lint` for Ruff.
 `--timeout 900` sets maximum seconds per command (default 900).
 
-**The full command is expected to return nonzero while the recorded upstream defects
-remain.** These are failing assertions, not xfail/skips or accepted successes. See
-[KNOWN_ISSUES.md](KNOWN_ISSUES.md) and [TEST_REPORT.md](TEST_REPORT.md). Passing a subset
-does not establish release readiness.
+Baseline includes `02_api_backend/full/tests` as a separate process. Pytest state uses
+fresh short OS temporary paths to avoid deep Windows workspace/Chroma path failures.
+Override with `--temp-root C:\t` or `YK07_TEMP_ROOT`; logs/JUnit/JSON stay in 07/runtime.
+The report records the temporary-state path, which is retained for failure diagnosis.
+
+Regression gates now check the repaired 03/04 safeguards through supported interfaces,
+including exact `index_store_mismatch` errors and unchanged manifests for wrong-store
+reindex AND garbage collection. No xfail/skips hide setup failures. See
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md) and [REVIEW_FIX_REPORT.md](REVIEW_FIX_REPORT.md) for current
+results; [TEST_REPORT.md](TEST_REPORT.md) preserves the historical 19 October baseline.
 
 ## CI template
 
@@ -54,12 +60,29 @@ docker compose -f 07_testing_deployment/compose.yaml up -d
 docker compose -f 07_testing_deployment/compose.yaml ps
 ```
 
-API docs: `http://127.0.0.1:8007/docs`, bound to localhost. Initialization checks effective
-runtime/maintenance settings and key presence before initializing schemas. Shared explicit
-environment overrides stale root defaults; local .env/keys/data/Windows environments are
-excluded from image inputs. `/health` checks schema/capabilities, not provider/model access
-or an active worker. Complete an import and chat to check readiness. Public hosting needs
-an agreed HTTPS/authentication setup; this is a local single-user prototype.
+API docs: `http://127.0.0.1:8007/docs`, bound to localhost. Initialization, API and worker
+all resolve `FullSettings` once and export every service field. New 05 uses its resolved
+loader; develop's legacy loader is checked under the identical exported snapshot. The
+removed `youtube_answers.team.ENV_FILES` constant is never imported. Preflight compares
+runtime and maintenance database/vector/fingerprint/model values before initialization.
+
+02's initializer creates/verifies a guarded SQLite/Chroma pair and refuses old unbound
+state. All service children receive the same snapshot and verify this pair before startup.
+No .env files, keys, data or Windows environments are included in Docker build inputs.
+`/health` checks schema/capabilities, not provider access or useful worker completion.
+This remains a localhost single-user prototype; public HTTPS/authentication is separate.
+
+For local commands, select one full-system environment file explicitly:
+
+```powershell
+uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/preflight.py --env-file YOUR_FULL_ENV
+uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/preflight.py --env-file YOUR_FULL_ENV --initialize
+```
+
+`--run api` and `--run worker` use that selected file, require a key and export the same
+snapshot. The test image includes 02 full tests and all allowed 06 test/fixtures inputs.
+Latest 06 packages its dataset in `youtube_agent/data` inside the wheel; copying the
+whole allowlisted 06 directory also supports a fixtures/ directory when present.
 
 Offline container checks mount no application volume and disable networking:
 
@@ -105,8 +128,8 @@ Follow [RECOVERY.md](RECOVERY.md) for cold paired backups with checksums and new
 destinations. Retain compatible image/schema/embedding/chunk configuration.
 
 - 07: central runner/reports, integration and acceptance, packaging, recovery drill.
-- 02/04/05: align runtime/maintenance configuration and physical-store protection.
-- 03: fix subprocess cleanup; 07 retains the regression gate.
+- 02/04/05: retain shared configuration and physical-store safeguards as interfaces evolve.
+- 03: retain bounded subprocess cleanup; 07 keeps the regression gate.
 - 05/06 with 07: human review of supported claims and educational quality.
 - 01: runnable UI, citation seek/error states and browser acceptance.
 
