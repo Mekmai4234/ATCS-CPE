@@ -63,3 +63,13 @@ without this identity require explicit migration planning rather than automatic 
 Static missing capabilities fail before a request creates a doomed job. Health does not call
 paid providers. Hard total timeouts stop auto-retry even at timer/wall-clock rounding boundaries;
 per-call chat timeouts can retry while a total budget remains.
+
+Full-system configuration and deployment
+----------------------------------------
+The 02-owned yk-full entrypoint exports every resolved 02/03/04/05/06 setting to
+child processes, overriding module-local dotenv files without editing modules.
+The existing 05 team factory owns service composition. An additive 02 SQLite table
+and a Chroma-directory marker bind fresh stores to one profile/factory/fingerprint.
+Explicit init and startup/maintenance checks do not rebind or migrate legacy data.
+The full Docker image is separate from the 04/06-only integration image.
+See full/README.md and FULL_TEST_REPORT.md for deployment and verification limits.
