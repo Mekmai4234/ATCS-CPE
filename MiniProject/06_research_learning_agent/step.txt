@@ -33,4 +33,6 @@ C) Failures and Delivery
 - SDK transport/provider errors are redacted; no raw messages, credentials or private reasoning.
 - No automatic research replay/checkpoint resume is implemented.
 
-Installation, evaluation commands and limits: README.md. Current validation: ACCEPTANCE_REPORT.md.
+Installation, evaluation commands and limits: README.md. Current validation: DEPENDENCY_REVIEW_REPORT.md.
+Core tests remain installable without module 05; the two real-05 checks use the separately
+locked acceptance/ environment. Both sets run with --locked, including Docker.

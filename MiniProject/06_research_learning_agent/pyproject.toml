@@ -15,13 +15,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.11,<1", "httpx>=0.28,<1",
-       "youtube-knowledge-answers"]
+dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.11,<1", "httpx>=0.28,<1"]
 
 [tool.uv.sources]
 youtube-knowledge-backend = { path = "../02_api_backend", editable = true }
 youtube-knowledge-rag = { path = "../04_rag_knowledge", editable = true }
-youtube-knowledge-answers = { path = "../05_ai_answers_analysis", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/youtube_agent"]

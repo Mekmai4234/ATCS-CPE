@@ -2486,7 +2486,6 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
-    { name = "youtube-knowledge-answers" },
 ]
 
 [package.metadata]
@@ -2500,38 +2499,6 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "httpx", specifier = ">=0.28,<1" },
-    { name = "pytest", specifier = ">=8,<10" },
-    { name = "pytest-asyncio", specifier = ">=1,<2" },
-    { name = "ruff", specifier = ">=0.11,<1" },
-    { name = "youtube-knowledge-answers", editable = "../05_ai_answers_analysis" },
-]
-
-[[package]]
-name = "youtube-knowledge-answers"
-version = "0.1.0"
-source = { editable = "../05_ai_answers_analysis" }
-dependencies = [
-    { name = "google-genai" },
-    { name = "httpx" },
-    { name = "pydantic-settings" },
-    { name = "youtube-knowledge-backend" },
-    { name = "youtube-knowledge-rag" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "google-genai", specifier = ">=1.60,<3" },
-    { name = "httpx", specifier = ">=0.28,<1" },
-    { name = "pydantic-settings", specifier = ">=2.7,<3" },
-    { name = "youtube-knowledge-agent", marker = "extra == 'team'", editable = "." },
-    { name = "youtube-knowledge-backend", editable = "../02_api_backend" },
-    { name = "youtube-knowledge-ingestion", marker = "extra == 'team'", editable = "../03_video_ingestion" },
-    { name = "youtube-knowledge-rag", editable = "../04_rag_knowledge" },
-]
-provides-extras = ["team"]
-
-[package.metadata.requires-dev]
-dev = [
     { name = "pytest", specifier = ">=8,<10" },
     { name = "pytest-asyncio", specifier = ">=1,<2" },
     { name = "ruff", specifier = ">=0.11,<1" },
