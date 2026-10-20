@@ -7,6 +7,8 @@ import sys
 from .errors import failure
 
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+CLEANUP_TIMEOUT_SECONDS = 2.0
+REAP_TIMEOUT_SECONDS = 0.5
 ERRORS = {
     "no_transcript": ("No usable captions in the requested languages", 409, False),
     "invalid_video_id": ("Provide a valid YouTube video ID", 422, False),
@@ -32,20 +34,70 @@ class SubprocessCaptions:
 
     def __init__(self):
         self.processes = set()
+        self.fetches = set()
+        self.stopping = {}
         self.closed = False
 
-    async def _stop(self, process):
+    async def _cleanup(self, process):
+        if process.stdin is not None:
+            process.stdin.close()
         if process.returncode is None:
             try:
                 process.kill()
             except ProcessLookupError:
                 pass
-        await process.wait()
+        try:
+            async with asyncio.timeout(CLEANUP_TIMEOUT_SECONDS):
+                # wait() alone can deadlock on a paused stdout reader, even after kill().
+                # Kill first so communicate() drains only buffered/in-flight pipe data,
+                # not an unbounded producer. It also closes the stdout transport.
+                await process.communicate()
+                if process.stdin is not None:
+                    await process.stdin.wait_closed()
+        except (TimeoutError, OSError, RuntimeError):
+            # asyncio.Process has no public close() API. On failed/stalled drainage,
+            # close its transport to release pipe waiters, then bound the final reap.
+            process._transport.close()
+            try:
+                async with asyncio.timeout(REAP_TIMEOUT_SECONDS):
+                    await process.wait()
+            except TimeoutError:
+                self.closed = True
+                raise failure(
+                    "ingest_cleanup_timeout", "Caption subprocess could not be reaped in time", 503
+                ) from None
+
+    async def _stop(self, process):
+        task = self.stopping.get(process)
+        if task is None:
+            task = asyncio.create_task(self._cleanup(process))
+            self.stopping[process] = task
+        interrupted = False
+        try:
+            # A second cancellation (for example worker stop during job cancellation)
+            # must not abandon pipe cleanup. The cleanup task has its own hard budget.
+            while not task.done():
+                try:
+                    await asyncio.shield(task)
+                except asyncio.CancelledError:
+                    if task.cancelled():
+                        raise
+                    interrupted = True
+            task.result()
+        finally:
+            if task.done():
+                self.stopping.pop(process, None)
+            if process.returncode is not None:
+                self.processes.discard(process)
+        if interrupted:
+            raise asyncio.CancelledError
 
     async def fetch(self, video_id, languages, timeout):
         if self.closed:
             raise failure("ingest_unavailable", "Caption adapter is closed", 503)
         process = None
+        owner = asyncio.current_task()
+        self.fetches.add(owner)
         try:
             async with asyncio.timeout(timeout):
                 env = {
@@ -95,11 +147,23 @@ class SubprocessCaptions:
         except (ValueError, TypeError, KeyError, AttributeError):
             raise remote_error("caption_provider_error") from None
         finally:
-            if process is not None:
-                await self._stop(process)
-                self.processes.discard(process)
+            try:
+                if process is not None:
+                    await self._stop(process)
+            finally:
+                self.fetches.discard(owner)
 
     async def close(self):
         self.closed = True
+        # The fetch coroutine owns stdout. Cancel and join it before another coroutine
+        # drains the same StreamReader; concurrent read() calls are not supported.
+        active = [task for task in self.fetches if task is not asyncio.current_task()]
+        for task in active:
+            task.cancel()
+        if active:
+            results = await asyncio.gather(*active, return_exceptions=True)
+            for result in results:
+                if getattr(result, "code", None) == "ingest_cleanup_timeout":
+                    raise result
         for process in list(self.processes):
             await self._stop(process)

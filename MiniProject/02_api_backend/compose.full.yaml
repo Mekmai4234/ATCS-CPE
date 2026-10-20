@@ -1,0 +1,82 @@
+name: youtube-backend-full
+
+x-backend: &backend
+  image: ${COMPOSE_PROJECT_NAME:-youtube-backend-full}-runtime:local
+  build:
+    context: ..
+    dockerfile: 02_api_backend/Dockerfile.full
+    target: runtime
+  init: true
+  env_file:
+    - path: ./full/.env
+      required: false
+  environment: &settings
+    MINIPROJECT_ROOT: /app
+    APP_ENV: development
+    ADAPTER_MODE: custom
+    ADAPTER_FACTORY: youtube_answers.team:create_adapters
+    BACKEND_INTEGRATION_PROFILE: live
+    BACKEND_FULL_PREFLIGHT: "true"
+    DATABASE_URL: sqlite:////app/runtime/full-live/app.db
+    CHROMA_PERSIST_DIR: /app/runtime/full-live/chroma
+    GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    LLM_MODEL: ${LLM_MODEL:-gemini-3.5-flash}
+    EMBEDDING_PROVIDER: gemini
+    EMBEDDING_MODEL: ${EMBEDDING_MODEL:-gemini-embedding-2}
+    EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1536}
+    API_HOST: 0.0.0.0
+    API_PORT: "8000"
+    WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+    TRANSCRIPT_LANGUAGES: ${TRANSCRIPT_LANGUAGES:-th,en}
+    ENABLE_STREAMING: "false"
+  volumes:
+    - full-data:/app/runtime
+
+services:
+  migrate:
+    <<: *backend
+    command: ["yk-full", "init"]
+    restart: "no"
+  api:
+    <<: *backend
+    command: ["yk-full", "api"]
+    ports:
+      - "127.0.0.1:${BACKEND_FULL_PORT:-8002}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+  worker:
+    <<: *backend
+    command: ["yk-full", "worker"]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+  maintenance:
+    <<: *backend
+    profiles: ["maintenance"]
+    command: ["yk-full", "check"]
+    restart: "no"
+  tests:
+    image: ${COMPOSE_PROJECT_NAME:-youtube-backend-full}-tests:local
+    build:
+      context: ..
+      dockerfile: 02_api_backend/Dockerfile.full
+      target: test
+    profiles: ["test"]
+    init: true
+    network_mode: none
+    environment:
+      MINIPROJECT_ROOT: /app
+      GEMINI_API_KEY: ""
+      OPENAI_API_KEY: ""
+
+volumes:
+  full-data:
