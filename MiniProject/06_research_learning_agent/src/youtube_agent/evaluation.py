@@ -5,11 +5,12 @@ import asyncio
 import json
 import sys
 import time
+from importlib.resources import files
 from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, model_validator
-from youtube_backend.config import PROJECT_ROOT, Settings
+from youtube_backend.config import Settings
 from youtube_backend.database import Database
 from youtube_backend.errors import AppError
 from youtube_backend.migration import upgrade_database
@@ -23,6 +24,11 @@ from youtube_rag.manifest import initialize
 from .config import AgentSettings
 from .gemini import GeminiModel
 from .integration import AgentAdapters
+
+
+def default_dataset():
+    """Installed package resource; consumers need no repository-level fixtures directory."""
+    return files("youtube_agent").joinpath("data", "acceptance.json")
 
 
 class Case(Schema):
@@ -67,7 +73,11 @@ class DatasetAdapters(AgentAdapters):
 
 
 async def evaluate(dataset_path, state, *, live=False):
-    dataset = Dataset.model_validate_json(Path(dataset_path).read_text(encoding="utf-8"))
+    dataset = Dataset.model_validate_json(
+        dataset_path.read_text(encoding="utf-8")
+        if hasattr(dataset_path, "read_text")
+        else Path(dataset_path).read_text(encoding="utf-8")
+    )
     state = Path(state).resolve()
     # A new directory prevents fixture/live relabelling and accidental mutation of user indexes.
     state.mkdir(parents=True, exist_ok=False)
@@ -171,7 +181,7 @@ def main():
     parser.add_argument(
         "--dataset",
         type=Path,
-        default=(PROJECT_ROOT / "06_research_learning_agent" / "fixtures" / "acceptance.json"),
+        default=default_dataset(),
     )
     parser.add_argument("--state", type=Path, required=True, help="New isolated directory only")
     parser.add_argument(

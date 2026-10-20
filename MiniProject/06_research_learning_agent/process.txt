@@ -47,7 +47,11 @@ Techniques and Limits
 
 Verification and Operations
 README.md contains reproducible Windows/Linux Docker commands and integration notes.
-ACCEPTANCE_REPORT.md records current results; TEST_REPORT.md retains the original baseline.
+DEPENDENCY_REVIEW_REPORT.md records current packaging/consumer results; prior reports are historical.
+Actual-05 tests have a separate acceptance environment; the public agent manifest keeps
+its original dependency metadata. Core and acceptance Docker targets both use --locked.
+The default evaluation dataset is a package resource, available in installed wheels and
+consumer Docker images without copying an extra repository fixtures directory.
 The evaluation runner accepts explicit transcript exports in a NEW isolated store and records
 outputs/latency/usage plus pending human-review criteria. Live services require --live.
 No other module's source, global Compose, shared env template or database migrations are changed.

@@ -1,5 +1,8 @@
 # Module 06 — Integration acceptance and hardening
 
+Historical 2026-10-19 verification. The dependency layout and dataset packaging were
+subsequently corrected; see DEPENDENCY_REVIEW_REPORT.md for the 2026-10-20 results.
+
 Date: 2026-10-19 (Asia/Bangkok). Base checkout: `25427fe`.
 All changes in this round are confined to `06_research_learning_agent`. Verification
 was completed before publication for review.
