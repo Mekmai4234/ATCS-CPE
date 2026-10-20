@@ -30,6 +30,23 @@ uv run --project 03_video_ingestion --locked python 03_video_ingestion/scripts/l
 This contacts public YouTube, writing only the optional report. It reports counts,
 timestamps/provenance and classified errors without transcript text or keys.
 See [TEST_REPORT.md](TEST_REPORT.md) for the observed result and limits.
+The subprocess cleanup fix and the 2026-10-20 acceptance results are recorded in
+[FOLLOWUP_REPORT.md](FOLLOWUP_REPORT.md).
+
+To check real captions through the actual API/worker, transcript persistence and
+Chroma indexing without paid embeddings, use a new isolated directory:
+
+```powershell
+$ingestionCheckState = "runtime/ingestion-acceptance-$(Get-Date -Format yyyyMMdd-HHmmss)"
+uv run --project 03_video_ingestion --locked python 03_video_ingestion/scripts/acceptance_check.py --state $ingestionCheckState --video-id wD3NSzYtsMc --video-id dQw4w9WgXcQ --fixture-embeddings
+```
+
+This explicitly uses real YouTube captions/oEmbed with **fixture embedding values**,
+real SQLite/Chroma and in-process HTTP. It verifies all stored segment timestamps
+against provider output and checks that duplicate URLs reuse the same job without
+another caption request. Existing nonempty directories are rejected. Its database
+has an acceptance-only identity and cannot be reused by the production live factory.
+The result is a mechanics check, not semantic retrieval/model-quality validation.
 
 ## Configuration
 
@@ -120,6 +137,14 @@ budget. No uncancellable fetch threads or internal retry loops are used. Child p
 credentials are stripped, stderr discarded, and output bounded to 8 MiB/100,000 segments.
 Caption text remains untrusted data, never tool instructions.
 
+Cleanup kills the child **before** draining buffered pipe data and reaping it. Cleanup
+has a separate 2-second budget after the fetch attempt; a stalled drain closes the
+asyncio process transport, with a further 0.5-second final-reap budget. Thus an attempt
+may take its configured timeout plus up to 2.5 seconds of cleanup. Repeated cancellation
+cannot abandon this bounded cleanup. Service shutdown cancels/joins all active fetches,
+so stdout has only one reader. If final reaping still fails, the adapter closes itself
+and returns `ingest_cleanup_timeout` rather than silently starting more children.
+
 | Error | Retry by 02? |
 |---|---|
 | `no_transcript` | no; completed inspection / no_transcript |
@@ -128,6 +153,7 @@ Caption text remains untrusted data, never tool instructions.
 | `youtube_rate_limited`, `caption_provider_transient` | yes, bounded |
 | `ingest_timeout`, `ingest_unavailable` | yes, bounded |
 | `invalid_transcript`, `caption_provider_error` | no |
+| `ingest_cleanup_timeout` | no; adapter shuts down for investigation |
 
 Unknown errors are redacted; no raw provider messages or credentials are returned/logged.
 YouTube can block public caption access. A block is not treated as missing captions.
