@@ -155,10 +155,13 @@ def install_doubles(monkeypatch):
 
 
 @pytest.fixture
-async def full(tmp_path, monkeypatch):
+async def full(tmp_path, monkeypatch, request):
     settings = FullSettings(
         _env_file=None,
         app_env="test",
+        auth_enabled=getattr(request, "param", False),
+        google_client_id="fixture-client",
+        session_cookie_secure=False,
         database_url=f"sqlite:///{(tmp_path / 'app.db').as_posix()}",
         chroma_persist_dir=str(tmp_path / "chroma"),
         gemini_api_key="test-only-not-a-real-key",
@@ -205,6 +208,7 @@ async def full(tmp_path, monkeypatch):
         ) as c:
             yield SimpleNamespace(
                 settings=settings,
+                app=app,
                 runtime_settings=runtime_settings,
                 db=database,
                 repo=repo,
@@ -311,3 +315,102 @@ async def test_full_analysis_cannot_publish_after_cancel_or_delete(full, monkeyp
         if not running.done():
             running.cancel()
             await asyncio.gather(running, return_exceptions=True)
+
+
+@pytest.mark.parametrize("full", [True], indirect=True)
+async def test_authenticated_accounts_share_real_rag_without_cross_account_access(full):
+    import time
+
+    async def sign_in(client, subject):
+        challenge = (await client.get("/api/auth/challenge")).json()
+        full.app.state.auth.verifier = lambda credential, audience: dict(
+            sub=subject,
+            aud=audience,
+            iss="https://accounts.google.com",
+            exp=time.time() + 300,
+            nonce=challenge["nonce"],
+            name=f"[FIXTURE] {subject}",
+        )
+        result = await client.post(
+            "/api/auth/google",
+            headers={"Origin": "http://localhost:3000"},
+            json={"credential": "fixture-credential", "csrf_token": challenge["csrf_token"]},
+        )
+        assert result.status_code == 200, result.text
+        client.headers.update(
+            {"Origin": "http://localhost:3000", "X-CSRF-Token": result.json()["csrf_token"]}
+        )
+
+    a = full.client
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(full.app), base_url="http://test"
+    ) as b:
+        await sign_in(a, "a")
+        await sign_in(b, "b")
+        data = {"urls": [f"https://youtu.be/{VIDEO_A}"]}
+        first = (await a.post("/api/videos/import", json=data)).json()["jobs"][0]["job_id"]
+        await full.worker.run_once(first)
+        assert (await a.get(f"/api/jobs/{first}")).json()["stage"] == "ready"
+        assert (await b.get(f"/api/jobs/{first}")).status_code == 404
+        assert (await b.get(f"/api/videos/{VIDEO_A}/transcript")).status_code == 404
+        request_body = {"question": "RAG", "scope": {"video_ids": [VIDEO_A]}}
+        assert (await b.post("/api/chat", json=request_body)).status_code == 404
+        second = (await b.post("/api/videos/import", json=data)).json()["jobs"][0]["job_id"]
+        assert second != first
+        response = await b.post("/api/chat", json=request_body)
+        assert response.status_code == 200, response.text
+        assert response.json()["citations"]
+        conversation_id = response.json()["conversation_id"]
+        assert (await a.get(f"/api/conversations/{conversation_id}")).status_code == 404
+        await a.delete(f"/api/videos/{VIDEO_A}")
+        assert (await a.get(f"/api/videos/{VIDEO_A}/transcript")).status_code == 404
+        assert (await b.get(f"/api/videos/{VIDEO_A}/transcript")).status_code == 200
+        deleted = (await b.delete(f"/api/videos/{VIDEO_A}")).json()["job_id"]
+        await full.worker.run_once(deleted)
+        assert (await b.get(f"/api/jobs/{deleted}")).json()["state"] == "completed"
+        assert await full.runtime.adapter.answers.rag.vectors.call("count", 10) == 0
+
+
+async def test_legacy_migration_preserves_actual_sqlite_chroma_pair(full, tmp_path):
+    from pathlib import Path
+
+    import sqlalchemy as sa
+    from alembic import command
+    from youtube_rag.vectors import ChromaStore
+
+    from youtube_backend import database as tables
+    from youtube_backend.auth_cli import paired_backup
+    from youtube_backend.migration import alembic_config, upgrade_database
+
+    await import_ready(full)
+    pending = full.repo.enqueue("analysis", {"type": "summary", "scope": {"video_ids": [VIDEO_A]}})
+    original = check_pair(full.settings)
+    marker_path = Path(full.settings.chroma_persist_dir) / ".yk04-store.json"
+    marker = marker_path.read_bytes()
+    await full.runtime.close()  # stop actual Chroma subprocess before paired backup
+    with full.db.engine.begin() as connection:
+        command.downgrade(alembic_config(connection), "0001")
+    backup = tmp_path / "paired-backup"
+    paired_backup(full.settings, backup)
+    upgrade_database(full.db, allow_legacy=True)
+    assert check_pair(full.settings) == original
+    assert marker_path.read_bytes() == marker == (backup / "chroma/.yk04-store.json").read_bytes()
+    with full.db.read() as connection:
+        assert connection.scalar(sa.select(sa.func.count()).select_from(tables.legacy_sources)) == 2
+        assert connection.scalar(sa.select(sa.func.count()).select_from(tables.user_videos)) == 0
+        job = (
+            connection.execute(
+                sa.select(tables.jobs).where(tables.jobs.c.job_id == pending["job_id"])
+            )
+            .mappings()
+            .one()
+        )
+        assert job["state"] == "cancelled" and job["error_code"] == "legacy_owner_required"
+        assert job["owner_id"] is None
+    store = ChromaStore(
+        Path(full.settings.chroma_persist_dir), full.settings.services()["rag"].collection_name
+    )
+    try:
+        assert await store.call("count", 15) > 0
+    finally:
+        await store.close()

@@ -87,6 +87,8 @@ class FullSettings(Settings):
                 value = value.get_secret_value()
             elif isinstance(value, bool):
                 value = str(value).lower()
+            elif isinstance(value, (list, dict)):
+                value = json.dumps(value)
             environment[name.upper()] = "" if value is None else str(value)
         environment["MINIPROJECT_ROOT"] = str(PROJECT_ROOT)
         return environment
@@ -105,10 +107,21 @@ class FullSettings(Settings):
             "llm_model": self.llm_model,
             "gemini_key_configured": bool(self.gemini_api_key.get_secret_value()),
             "live_provider_verified": False,
+            "authentication_required": self.auth_enabled,
+            "google_login_configured": bool(self.google_client_id),
         }
 
 
 def command_arguments(args):
+    if args.command in {"migrate", "bootstrap-admin", "claim-legacy"}:
+        command = [sys.executable, "-m", "youtube_backend.auth_cli", args.command]
+        if args.command == "migrate":
+            command += ["--workers-stopped", "--backup-dir", str(args.backup_dir)]
+        elif args.command == "bootstrap-admin":
+            command += ["--google-sub", args.google_sub]
+        else:
+            command += ["--admin-sub", args.admin_sub, "--owner-sub", args.owner_sub]
+        return command
     if args.command in {"gc", "reindex"}:
         command = [sys.executable, "-m", "youtube_rag.cli", args.command, "--workers-stopped"]
         if args.command == "reindex":
@@ -123,6 +136,14 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("config", "init", "check", "api", "worker"):
         commands.add_parser(name)
+    migration = commands.add_parser("migrate")
+    migration.add_argument("--workers-stopped", action="store_true", required=True)
+    migration.add_argument("--backup-dir", type=Path, required=True)
+    bootstrap = commands.add_parser("bootstrap-admin")
+    bootstrap.add_argument("--google-sub", required=True)
+    claim = commands.add_parser("claim-legacy")
+    claim.add_argument("--admin-sub", required=True)
+    claim.add_argument("--owner-sub", required=True)
     for name in ("gc", "reindex"):
         command = commands.add_parser(name)
         command.add_argument("--workers-stopped", required=True, action="store_true")
@@ -147,7 +168,8 @@ def main():
             print("Full-system SQLite/Chroma pair initialized; no provider requests made.")
             return
         hint = "Verify SQLite/Chroma binding and fingerprint with the same config used for init."
-        check_pair(settings)
+        if args.command != "migrate":
+            check_pair(settings)
         if args.command == "check":
             print(json.dumps(dict(settings.summary(), pair_verified=True), indent=2))
             return
