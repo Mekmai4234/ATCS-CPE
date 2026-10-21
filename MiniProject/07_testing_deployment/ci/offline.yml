@@ -1,5 +1,5 @@
-# TEMPLATE ONLY: GitHub runs this only after an authorized maintainer installs it
-# at repository-root .github/workflows/miniproject-offline.yml.
+# HISTORICAL TEMPLATE: superseded by the authorized repository-root workflow.
+# Do not install this older copy; it does not contain frontend/auth checks.
 name: MiniProject offline verification
 on:
   push:

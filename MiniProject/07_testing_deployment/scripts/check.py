@@ -43,6 +43,9 @@ def clean_environment():
                 "TRANSCRIPT_",
                 "METADATA_",
                 "YOUTUBE_",
+                "GOOGLE_",
+                "SESSION_",
+                "AUTH_",
             )
         ) or key.upper() in {
             "DATABASE_URL",
@@ -90,7 +93,7 @@ def commands(group, output):
                 ],
             )
     if group in {"all", "acceptance", "regressions"}:
-        expression = "regression" if group == "regressions" else "not regression"
+        expression = "regression" if group == "regressions" else "not regression and not auth"
         yield (
             "07-acceptance" if group != "regressions" else "07-regressions",
             [
@@ -128,6 +131,23 @@ def commands(group, output):
                     f"cache_dir={output / 'cache-regressions'}",
                 ],
             )
+    if group == "auth":
+        yield (
+            "07-auth",
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "07_testing_deployment/tests/auth",
+                "-q",
+                "-W",
+                "error",
+                "--junitxml",
+                str(output / "07-auth.xml"),
+                "-o",
+                f"cache_dir={output / 'cache-auth'}",
+            ],
+        )
     if group in {"all", "lint"}:
         paths = [*MODULES, "07_testing_deployment"]
         yield "lint", [sys.executable, "-m", "ruff", "check", *paths]
@@ -137,7 +157,9 @@ def commands(group, output):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--group", choices=["all", "baseline", "acceptance", "regressions", "lint"], default="all"
+        "--group",
+        choices=["all", "baseline", "acceptance", "regressions", "auth", "lint"],
+        default="all",
     )
     parser.add_argument("--timeout", type=int, default=900)
     parser.add_argument(
