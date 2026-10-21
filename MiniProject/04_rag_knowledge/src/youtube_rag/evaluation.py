@@ -53,6 +53,7 @@ async def evaluate(state: Path, *, phase="seed", live=False, dataset=None):
     backend = Settings(
         _env_file=None,
         app_env="test",
+        auth_enabled=False,
         adapter_mode="fixture",
         database_url=f"sqlite:///{(state / 'app.db').as_posix()}",
         job_lease_seconds=30,
