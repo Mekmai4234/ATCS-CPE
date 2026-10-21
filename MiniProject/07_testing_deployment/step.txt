@@ -9,10 +9,13 @@ Module 07: Workflow
 5. Validate Compose, then build/start containers when Docker Engine is available.
    Initialization precedes API and worker; all use the same explicit database/index config.
 6. Explicitly opt into live smoke with intended credentials/data/budget.
-7. Perform human Thai/English semantic review using ACCEPTANCE.md; add browser acceptance
-   when module 01 supplies an application. Keep offline and live evidence separate.
+7. Run module 01 typecheck/format/unit/build/browser checks. Follow AUTH_ACCEPTANCE.md
+   for strict auth fixtures and an immutable pending-PR candidate. Keep backend fixture,
+   SessionPort browser fixture and real Google/manual evidence separate.
 8. Stop services, then perform paired cold backup/restore using RECOVERY.md.
 9. Record current results/remaining gates in REVIEW_FIX_REPORT.md; preserve TEST_REPORT.md
    as the historical baseline. Compare current develop and isolated pending-PR sources.
+10. Follow AUTH_DEPLOYMENT.md before public auth deployment: paired legacy migration,
+    explicit first-admin bootstrap, Google origins and complete release evidence.
 
 No PR, commit, public deployment or live provider call is implicit in offline verification.

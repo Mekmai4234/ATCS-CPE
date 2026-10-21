@@ -16,6 +16,7 @@ Recovery: acknowledged stopped services -> integrity/pending-job checks -> paire
 bundle -> SHA-256 verification -> new restore destination -> retrieval/source checks.
 No online Chroma backup, automatic destructive rollback or overwrite is provided.
 
-Outputs: runner, integration/regression/recovery tests, reports, Docker/Compose, passive
-CI template and operational guides. All edits remain inside 07. Active CI/root docs and
-03/04 fixes belong to their owners. Missing frontend/live/container evidence stays pending.
+Outputs: runner, strict auth/ownership fixtures, candidate provenance, browser configuration,
+reports, Docker/Caddy/Compose, active GitHub CI and operational guides. Edits remain in
+07 plus the explicitly authorized root workflow. Module 01-06 production fixes belong
+to their owners. Auth release stays blocked until real integration and Google smoke pass.

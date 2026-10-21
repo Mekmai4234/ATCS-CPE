@@ -1,0 +1,104 @@
+name: MiniProject offline verification
+on:
+  pull_request:
+    branches: [develop]
+    paths: ['MiniProject/**', '.github/workflows/miniproject-offline.yml']
+  push:
+    branches: [develop]
+    paths: ['MiniProject/**', '.github/workflows/miniproject-offline.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: miniproject-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  python:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: MiniProject
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.9'
+          python-version: '3.11'
+      - run: uv sync --project 07_testing_deployment --locked
+      - run: uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/check.py
+      - name: Auth acceptance when backend contract is present
+        shell: pwsh
+        run: |
+          if (Test-Path '02_api_backend/src/youtube_backend/auth.py') {
+            uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/check.py --group auth
+            exit $LASTEXITCODE
+          }
+          'Auth release BLOCKED: develop has no backend identity contract.' >> $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-${{ matrix.os }}
+          path: |
+            MiniProject/07_testing_deployment/runtime/**/*.json
+            MiniProject/07_testing_deployment/runtime/**/*.xml
+            MiniProject/07_testing_deployment/runtime/**/*.log
+          retention-days: 7
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: MiniProject/01_web_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --global pnpm@11.25.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm format:check
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm run --if-present test:production
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright test --config ../07_testing_deployment/playwright.config.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-browser
+          path: |
+            MiniProject/07_testing_deployment/runtime/browser-results/
+            MiniProject/07_testing_deployment/runtime/browser-report/
+            MiniProject/01_web_app/runtime/screenshots/
+          retention-days: 7
+  packaging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: MiniProject
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.9'
+          python-version: '3.11'
+      - run: uv sync --project 07_testing_deployment --locked
+      - run: docker build -f 07_testing_deployment/Dockerfile.web -t youtube-knowledge-team07-web:auth-check .
+      - run: uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/web_smoke.py
+      - run: docker compose -f 07_testing_deployment/compose.yaml build api
+      - run: uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/docker_startup.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: container-drills
+          path: |
+            MiniProject/07_testing_deployment/runtime/**/*.json
+            MiniProject/07_testing_deployment/runtime/**/*.log
+          retention-days: 7
