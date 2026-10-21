@@ -37,6 +37,13 @@ Important details
 - Physical GC checks refs/jobs under the writer fence and relies on 02's deleting
   tombstone during asynchronous vector deletion. Ordinary AI jobs cannot run maintenance.
 - The permission upgrade is additive and preserves embedding fingerprints and vectors.
+- Consumer metadata includes backend google-auth/requests without package upgrades.
+- Integration checks export full backend metadata/source and this module's locked files,
+  install them with uv sync --locked, then build/test that same Docker candidate.
+- No PYTHONPATH-only source override establishes lock validity. Independent consumer
+  suites, browser login and whole-system release acceptance remain separate gates.
+- Use native 02 jobs/memberships plus 03 IngestionService in the selected full factory;
+  the alternative member_ingestion_backend proposal is not activated by module 04.
 
 Interfaces
 ----------

@@ -11,6 +11,10 @@ See [AUTHORIZATION.md](AUTHORIZATION.md) for the trusted execution boundary,
 account-bound signed cursors, shared-source GC and the additive stopped upgrade.
 No embedding/vector metadata migration or bulk re-embedding is needed. Do not
 deploy this as a standalone Google login implementation.
+The consumer lock targets backend `b047e809` or compatible account-aware metadata;
+before #18 merges, use the locked-candidate procedure in AUTHORIZATION.md instead
+of installing against old develop. Latest evidence is in
+[LOCK_HANDOFF_TEST_REPORT.md](LOCK_HANDOFF_TEST_REPORT.md).
 
 ## Install and test
 

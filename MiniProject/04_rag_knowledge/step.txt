@@ -50,3 +50,8 @@ C) Coverage, Replacement and Deletion
     fence. 02's deleting tombstone must reject reimport throughout the vector operation.
 13. Upgrade after 02 ownership migration, then stopped init for cursor signing state.
     Existing vector/chunk metadata remains compatible; see AUTHORIZATION.md.
+14. For the full launcher use yk-full rag-init --workers-stopped with the selected
+    runtime configuration; repeating full init alone does not add the cursor table.
+15. Validate the actual consumer lock with the full pinned backend manifest, run
+    uv sync --locked, then test the same candidate on host and in a freshly built image.
+    Use the native 02/03 full-factory source contract; no separate member wrapper is enabled.
