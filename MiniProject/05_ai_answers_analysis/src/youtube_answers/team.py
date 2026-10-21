@@ -1,24 +1,11 @@
 """Optional 05-owned full team composition; shares one RAG instance for all tools."""
 
-from youtube_backend.config import PROJECT_ROOT
 from youtube_backend.integrations import UnavailableAdapters
-from youtube_rag.config import RagSettings
 
-from .config import AnswerSettings
+from .configuration import load_team_configuration
 from .gemini import GeminiModel
 from .integration import AnswerAdapters, RagKnowledge
 from .models import error
-
-ENV_FILES = tuple(
-    PROJECT_ROOT / path
-    for path in (
-        ".env",
-        "04_rag_knowledge/.env",
-        "03_video_ingestion/.env",
-        "06_research_learning_agent/.env",
-        "05_ai_answers_analysis/.env",
-    )
-)
 
 
 class TeamAdapters(UnavailableAdapters):
@@ -83,42 +70,32 @@ class TeamAdapters(UnavailableAdapters):
 
 async def create_adapters(*, settings, repository):
     try:
-        from youtube_agent.config import AgentSettings
         from youtube_agent.gemini import GeminiModel as AgentModel
         from youtube_agent.service import AgentService
-        from youtube_ingestion.config import IngestionSettings
         from youtube_ingestion.service import IngestionService
     except ImportError:
         raise error(
             "integration_not_installed", "Install module 05 with --extra team", status=503
         ) from None
-    if settings.backend_integration_profile != "live":
-        raise error(
-            "integration_configuration", "Team factory requires the live profile", status=503
-        )
-    config = AnswerSettings(_env_file=ENV_FILES)
-    rag_config = RagSettings(_env_file=ENV_FILES)
-    if rag_config.embedding_provider != "gemini":
-        raise error("integration_configuration", "Live team requires Gemini embeddings", status=503)
-    gateway = GeminiModel(config)
+    config = load_team_configuration(settings)
+    gateway = GeminiModel(config.answers)
     try:
         answers = AnswerAdapters(
             settings=settings,
             repository=repository,
-            answer_settings=config,
+            answer_settings=config.answers,
             model=gateway,
-            rag_settings=rag_config,
+            rag_settings=config.rag,
         )
     except BaseException:
         await gateway.close()
         raise
     ingestion, agent_model = None, None
     try:
-        ingestion = IngestionService(IngestionSettings(_env_file=ENV_FILES))
-        agent_config = AgentSettings(_env_file=ENV_FILES)
-        agent_model = AgentModel(agent_config)
+        ingestion = IngestionService(config.ingestion)
+        agent_model = AgentModel(config.agent)
         agent = AgentService(
-            agent_config, agent_model, RagKnowledge(answers.rag), analyzer=answers.analyze
+            config.agent, agent_model, RagKnowledge(answers.rag), analyzer=answers.analyze
         )
         return TeamAdapters(answers, ingestion, agent)
     except BaseException:
