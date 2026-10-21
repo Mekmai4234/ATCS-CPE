@@ -1,4 +1,4 @@
-# Module 05 follow-up acceptance — 2026-10-20
+# Module 05 follow-up acceptance — updated 2026-10-21
 
 This checklist responds to the review of `develop@25427fe`. It separates code changes,
 offline mechanism tests, live provider access and human semantic acceptance.
@@ -36,12 +36,12 @@ fixture index. Direct `yk-rag`/`yk-api` commands do not select the common full e
 The smaller `youtube_backend.team` factory connects only 04/06; it cannot perform 05 QA.
 The required full factory remains `youtube_answers.team:create_adapters`.
 
-**Dependency status:** the `yk-full` files are present on the local remote-tracking branch
-`origin/feature/02_api_backend@ec3dff8`, not in this feature branch's checked-out 02 package.
-04's independent maintenance/pair changes are on `origin/feature/04_rag_knowledge@ae2ab1a`.
-Neither branch was merged, copied into other modules, committed or published in this work.
-The commands above require the team to integrate 02's full launcher first. This is an
-explicit prerequisite, not a claim that those commands already exist on this checkout.
+**Dependency status:** this feature branch now includes `develop@6520b4c`, which merged
+02 / PR #9, 04 / PR #10 and 03 / PR #14. The full launcher and store safeguards are
+available in this checkout. The 02 full-flow test now checks resolved settings and hostile
+dotenv inputs through supported interfaces instead of patching 05's removed `ENV_FILES`.
+Pending 06/07 revisions are tested in an ignored isolated integration tree, without merging
+their source changes into this branch; see `REVIEW_FIX_REPORT.md` for exact versions/results.
 
 Offline tests verify shared backend values, hostile process/dotenv values, and identical
 runtime/maintenance storage/fingerprints after a full environment export. The 05 tests use
@@ -81,7 +81,7 @@ This is still **synthetic generation**, not acceptance against real videos.
    Chat accepts both immediate 200 and asynchronous 202; follow-ups reuse conversation IDs.
 
 ```powershell
-python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-answers-acceptance --live --base-url http://127.0.0.1:8000 --plan runtime/answers05/real-plan.json --output runtime/answers05/real-report.json
+python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-answers-acceptance --live --base-url http://127.0.0.1:8000 --plan runtime/answers05/real-plan.json --output runtime/answers05/real-report.json --request-timeout 210 --poll-timeout 300
 ```
 
 The client rejects fixture/offline/limited capabilities before import, checks status,
@@ -90,6 +90,15 @@ fetches paginated real transcripts and includes the overlapping segments for eac
 Changed transcript versions/titles during the run fail acceptance. Wall latency and provider
 usage/latency remain separate. A missing expected test category is recorded explicitly.
 No semantic pass is ever assigned automatically.
+
+HTTP read/write timeout defaults to 210 seconds, allowing the default 180-second backend
+job budget plus 30 seconds for delivery. Connect timeout is capped at 10 seconds. These
+are HTTPX per-operation limits, not a single wall-clock deadline for the whole acceptance
+run. Polling has its own per-job budget (default 300 seconds). Increase both selected values
+when using larger server/job budgets; invalid, zero, negative or infinite values are rejected
+before any requests. Reports record the selected budgets and distinguish request timeout
+from failed jobs. A timed-out HTTP request may leave a server job running: inspect jobs
+before manually retrying rather than silently resubmitting a potentially paid request.
 
 Each paragraph containing citations becomes a **claim candidate** with its source excerpts
 and `pending_human_review`. Split paragraphs containing several factual claims during review.

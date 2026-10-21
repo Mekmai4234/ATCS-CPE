@@ -1,6 +1,7 @@
 # Module 05 — AI Answers and Analysis
 
-Latest follow-up changes and executed results: [FOLLOWUP_REPORT.md](FOLLOWUP_REPORT.md).
+Latest review fixes and combined verification: [REVIEW_FIX_REPORT.md](REVIEW_FIX_REPORT.md).
+Previous follow-up results: [FOLLOWUP_REPORT.md](FOLLOWUP_REPORT.md).
 Live acceptance prerequisites and review workflow: [ACCEPTANCE.md](ACCEPTANCE.md).
 
 `youtube_answers` generates cited answers, whole-video summaries and comparisons.
@@ -8,8 +9,9 @@ Live acceptance prerequisites and review workflow: [ACCEPTANCE.md](ACCEPTANCE.md
 evidence and embeddings. 05 supplies `answer(request, sources, history, context)` and
 `analyze(request, sources, context)`, returning 02's existing `AnswerResult`.
 
-All implementation changes are local to this folder. Existing 02/03/04/06 source and
-their factories are unchanged. The optional `youtube_answers.team:create_adapters`
+Runtime changes are local to this folder. A 02 full-flow test consumer is also updated
+to verify the resolved-settings interface; 02/03/04/06 runtime factories are unchanged.
+The optional `youtube_answers.team:create_adapters`
 composition connects existing 03 ingestion, 04 RAG, 05 answers and 06 research/artifacts,
 with 06's comparison tool delegated to 05 and one shared RAG service.
 
@@ -75,10 +77,10 @@ The main runtime dependency set is **02_api_backend/full**, factory
 only 04/06 and cannot supply 05 answers. `05 --extra team` remains the development/test
 environment; it does not add 02's launcher when that backend version is absent.
 
-**Integration prerequisite:** this feature checkout does not yet contain 02's `yk-full`
-delivery, available on `origin/feature/02_api_backend@ec3dff8`. Integrate that delivery before
-using the commands below; no other module or branch was merged during this change.
-See [ACCEPTANCE.md](ACCEPTANCE.md) for version/handoff details and maintenance commands.
+This branch now includes `develop@6520b4c`, containing 02's full launcher (PR #9),
+04's store safeguards (PR #10) and 03's follow-up changes (PR #14). The full-flow test
+consumer was updated to validate resolved service values instead of the removed private
+`ENV_FILES` constant. See [ACCEPTANCE.md](ACCEPTANCE.md) for maintenance commands.
 
 Copy the example only if 05/.env does not exist, fill the key locally, and select a fresh
 SQLite/Chroma pair. Every command must select the same file and process environment.
@@ -170,6 +172,13 @@ For **real-video** import → ready → QA/summary/compare acceptance, use the n
 [ACCEPTANCE.md](ACCEPTANCE.md). It records wall latency, provider usage and a human review
 packet pairing each cited paragraph with actual transcript segments and timestamps.
 It refuses fixture/limited runtimes and never labels structural success as semantic acceptance.
+
+The acceptance client defaults to a **210-second HTTP read/write timeout** (the default
+180-second backend job budget plus a 30-second delivery margin), with a 10-second connect
+timeout and a separate 300-second polling budget. Override `--request-timeout` and
+`--poll-timeout` when the server has different budgets. All values must be finite and
+positive. The report records these budgets. A request timeout does not mean the server
+cancelled its job: inspect existing jobs before submitting another request.
 
 Long analyses can exceed context, call-count or job-time limits and fail explicitly.
 There are no resumable 05 checkpoints or guaranteed partial synthesis after a hard timeout.
