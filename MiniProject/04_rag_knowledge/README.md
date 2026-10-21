@@ -141,15 +141,63 @@ Changing from the old OpenAI index requires explicit reindex; matching vector di
 alone does not make providers compatible. Provider/model, formatting, dimensions, counting,
 chunk layout and chunk schema participate in the new fingerprint. Old configurations fail
 clearly rather than mixing vectors. The existing rag04 DB table schema remains version 1;
-the version-2 chunk JSON needs no destructive table migration.
+the version-2 chunk JSON needs no destructive table migration. The October 19 update
+adds `rag04_store_binding` through `yk-rag init`, without altering backend tables.
+
+### Runtime configuration and store pairing
+
+`yk-rag config` prints resolved SQLite/Chroma locations, provider/model/dimensions,
+collection and index fingerprint, never credentials. Maintenance defaults to `--profile auto`,
+which selects the RAG configuration used by the configured `ADAPTER_FACTORY`:
+
+| Profile | RAG configuration source |
+|---|---|
+| `module04` | Root `.env`, then `04_rag_knowledge/.env` |
+| `ingestion03` | Root, 04, then `03_video_ingestion/.env` |
+| `team05` | Root, 04, 03, 06, then `05_ai_answers_analysis/.env` (same order as 05) |
+| `backend` | Resolved backend settings, including 02's offline fixture overrides |
+
+The SQLite configuration follows backend `Settings`: root `.env`, then
+`02_api_backend/integration/.env`. Process environment takes precedence over env files.
+Use an explicit profile for a custom factory that uses one of these conventions.
+For another deployment, repeat `--env-file PATH` in precedence order; this replaces
+default file lists for both settings objects. Every explicit file must exist. In the
+backend profile, the runtime's offline overrides still apply. These options belong
+after the subcommand. No module 02/03/05 configuration files are edited by this CLI.
+
+Each database is paired with the Chroma directory through a random identity stored in
+`rag04_store_binding` and `.yk04-store.json` inside that directory. A new empty index is
+paired on first indexing. A populated foreign Chroma cannot be paired automatically.
+Wrong/missing/corrupt markers fail before staging, publication, deletion or GC changes
+the manifest. Read/delete requests do not create missing Chroma collections. Maintenance
+also refuses a nonexistent SQLite path without creating a database there.
+
+**Existing indexes need a one-time stopped upgrade.** Back up the pair first, inspect
+`yk-rag config`, run `yk-rag init`, then `yk-rag bind-store --workers-stopped` using the
+same profile/env files. Binding verifies exact persisted IDs for every published/retired
+run against SQLite before recording an identity; it neither embeds nor reindexes data.
+Missing/incomplete legacy vectors or a legacy store with no complete run are refused.
+Use a known complete paired backup to recover these cases. Do not delete/rewrite markers
+to bypass a mismatch. Pair creation is not a distributed transaction: an interruption
+between marker creation and SQLite commit fails closed. Explicit legacy binding can
+recover a complete verified index; an interrupted empty initialization requires its
+pre-upgrade backup or a fresh isolated state directory.
 
 Finish/cancel queued/running jobs, stop API AND workers, back up SQLite plus Chroma, set
 the Gemini configuration, then run from `MiniProject`:
 
 ```powershell
+uv run --project 04_rag_knowledge --locked yk-rag config
+uv run --project 04_rag_knowledge --locked yk-rag init
+uv run --project 04_rag_knowledge --locked yk-rag bind-store --workers-stopped
 uv run --project 04_rag_knowledge --locked yk-rag reindex --video-id dQw4w9WgXcQ --workers-stopped
 uv run --project 04_rag_knowledge --locked yk-rag gc --workers-stopped
 ```
+
+For example, add `--profile team05` to **each** command when explicitly targeting the
+05 team factory, or add `--env-file .env --env-file 04_rag_knowledge/.env` to each command
+when those two existing files are the complete deployment configuration. Compare the
+`config` output with the running API/worker before stopping them for maintenance.
 
 Reindex every selected ready video. Replacement publishes only after success; failures
 keep the previous index. Superseded runs are cleaned afterward. Deletion hides manifests
@@ -157,15 +205,20 @@ before deleting generations <= the authorized bound, and cleanup is retryable. A
 update also replaces the run, because the title participates in Gemini's embedding input
 even though 02's transcript hash excludes metadata. GC removes
 retired/deleting/abandoned staging records; never run staging GC with writers active.
+GC needs no Gemini key and makes no embedding calls. Metadata is removed only after
+deletion and an empty-vector verification succeed; failures retain retryable cleanup state.
 The maintenance flag asserts processes are stopped; it is not a process manager.
 
 Chroma uses a private killable subprocess so blocking calls cannot stop async heartbeats
 or keep mutating in an abandoned thread after cancellation. Chunking yields/checks between
 pieces/chunks, preserves Unicode and keeps the original segment interval when splitting
 oversized captions. Transcript text, including instruction-like text, is evidence only.
-Back up/restore SQLite and Chroma together while stopped, then verify compatible configs,
-inventory and citations. Production load, hybrid search and operational restore drills
-remain future work.
+Back up/restore SQLite and the **whole Chroma directory including `.yk04-store.json`**
+together while stopped. Close database/vector clients or use a consistent SQLite backup;
+do not copy a live SQLite file without its WAL state. The pair can move to a new path
+without changing its identity. Verify compatible configs, inventory and citations after
+restore. A matching marker identifies the pair, not its backup age: both snapshots must
+come from the same stopped backup. Production load and hybrid search remain future work.
 
 ## Evaluation and Docker
 

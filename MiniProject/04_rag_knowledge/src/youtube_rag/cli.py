@@ -6,14 +6,16 @@ import tempfile
 from pathlib import Path
 
 import sqlalchemy as sa
+from sqlalchemy.engine import make_url
 from youtube_backend import database as db
-from youtube_backend.config import Settings
 from youtube_backend.database import Database
 from youtube_backend.errors import AppError
 from youtube_backend.schemas import Segment, Source, TranscriptResult
 
-from .config import RagSettings
+from .binding import StoreBinding
+from .configuration import describe_configuration, load_configuration
 from .embeddings import FixtureEmbedder, GeminiEmbedder
+from .errors import error
 from .evaluation import evaluate
 from .maintenance import MaintenanceExecution
 from .manifest import Manifest, initialize
@@ -21,7 +23,13 @@ from .service import RagService
 
 
 async def maintenance(args):
-    settings = Settings()
+    settings, config, profile = load_configuration(
+        profile=getattr(args, "profile", "auto"), env_files=getattr(args, "env_file", None)
+    )
+    if args.command == "config":
+        return describe_configuration(settings, config, profile)
+    if args.command != "init" and not Path(make_url(settings.database_url).database).is_file():
+        raise error("index_schema_missing", "Selected SQLite database does not exist")
     database = Database(settings.database_url)
     service = None
     try:
@@ -32,13 +40,22 @@ async def maintenance(args):
             raise ValueError("Stop API/workers first and provide --workers-stopped")
         execution = MaintenanceExecution(database)
         execution.check()
-        config = RagSettings()
+        manifest = Manifest(database)
+        binding = StoreBinding(manifest, config.chroma_persist_dir)
+        if args.command == "bind-store":
+            await binding.adopt(execution)
+            return {"store_bound": True, **describe_configuration(settings, config, profile)}
+        binding.check()
+        if manifest.all_runs():
+            await binding.ensure(execution)
         embedder = (
-            FixtureEmbedder(config)
+            None
+            if args.command == "gc"
+            else FixtureEmbedder(config)
             if config.embedding_provider == "fixture"
             else GeminiEmbedder(config)
         )
-        service = RagService(config, Manifest(database), embedder)
+        service = RagService(config, manifest, embedder)
         if args.command == "gc":
             await service.cleanup(execution, include_staging=True)
             return {"garbage_collected": True}
@@ -99,16 +116,24 @@ async def maintenance(args):
         database.close()
 
 
-def main():
-    for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")
+def build_parser():
     parser = argparse.ArgumentParser(description="Module 04 knowledge management and evaluation")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("init", help="Add module-04 schema to the initialized backend database")
-    for name in ("gc", "reindex"):
+    for name in ("init", "config", "bind-store", "gc", "reindex"):
         command = sub.add_parser(name)
-        command.add_argument("--workers-stopped", action="store_true")
+        command.add_argument(
+            "--profile",
+            choices=["auto", "module04", "backend", "ingestion03", "team05"],
+            default="auto",
+        )
+        command.add_argument(
+            "--env-file",
+            action="append",
+            type=Path,
+            help="Repeat in precedence order; replaces default env files",
+        )
+        if name not in {"init", "config"}:
+            command.add_argument("--workers-stopped", action="store_true")
         if name == "reindex":
             command.add_argument("--video-id", required=True)
     demo = sub.add_parser("evaluate", help="Synthetic reference retrieval evaluation")
@@ -117,6 +142,14 @@ def main():
     demo.add_argument("--live", action="store_true", help="Explicitly call live Gemini embeddings")
     demo.add_argument("--dataset", type=Path)
     demo.add_argument("--output", type=Path)
+    return parser
+
+
+def main():
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
+    parser = build_parser()
     args = parser.parse_args()
     try:
         if args.command == "evaluate":
@@ -143,7 +176,7 @@ def main():
             file=sys.stderr,
         )
         sys.exit(1)
-    except (ValueError, RuntimeError, sa.exc.SQLAlchemyError):
+    except (ValueError, RuntimeError, OSError, sa.exc.SQLAlchemyError):
         print(
             "Operation failed; verify arguments, database initialization and configuration.",
             file=sys.stderr,

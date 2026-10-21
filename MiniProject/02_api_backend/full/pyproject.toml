@@ -1,0 +1,18 @@
+[project]
+name = "youtube-knowledge-full-backend"
+version = "0.1.0"
+requires-python = ">=3.11,<3.14"
+dependencies = ["youtube-knowledge-backend", "youtube-knowledge-answers[team]"]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+youtube-knowledge-backend = { path = "..", editable = true }
+youtube-knowledge-rag = { path = "../../04_rag_knowledge", editable = true }
+youtube-knowledge-ingestion = { path = "../../03_video_ingestion", editable = true }
+youtube-knowledge-answers = { path = "../../05_ai_answers_analysis", editable = true }
+youtube-knowledge-agent = { path = "../../06_research_learning_agent", editable = true }
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "httpx>=0.28,<1", "httpx2>=2.13.1", "ruff>=0.11,<1"]

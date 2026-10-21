@@ -1,5 +1,8 @@
 # Module 02 integration with 04 and 06
 
+For the full 03–06 composition, use [the full-system launcher](../full/README.md).
+This smaller environment remains an explicit 04/06-only offline/live sandbox.
+
 This is a backend-owned composition of the existing, unchanged `youtube_rag` and
 `youtube_agent` packages. All implementation/configuration changes in this delivery are
 inside `02_api_backend`. It supplies indexing, evidence lookup, inventory, deletion,

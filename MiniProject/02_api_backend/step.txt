@@ -60,3 +60,13 @@ D) Deletion, Cancellation and Recovery
 5. On lease expiry, recover retryable unfinished jobs within their existing attempt/deadline
    budgets. Old execution tokens cannot publish application results.
 6. Explicit eligible manual retry creates a new bounded job; repeated clicks reuse active work.
+
+Full-system startup workflow (implemented in 02)
+-----------------------------------------------
+1. Install the full locked environment and select one server-side env file.
+2. Inspect redacted resolved config; initialize a fresh SQLite/Chroma pair.
+3. Verify the binding and start API/worker through yk-full with the same config.
+4. Confirm all capabilities in health; import URLs and poll jobs until ready.
+5. Submit scoped chat/analysis requests and inspect persisted citations/history.
+6. Stop API/workers before explicit guarded maintenance; never adopt old demo data.
+See full/README.md for exact commands, limitations and module-07 handoff.
