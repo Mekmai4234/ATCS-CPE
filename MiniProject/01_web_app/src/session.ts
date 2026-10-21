@@ -19,10 +19,12 @@ export interface MemberSession {
   adminSections: AdminSection[];
 }
 export interface AdminSnapshot {
+  stats?: { users: number; jobs: Record<string, number> };
+  memberPage?: { offset: number; limit: number; hasMore: boolean };
   members: Member[];
-  videos: { id: string; title: string; status: string }[];
-  jobs: { id: string; kind: string; state: string }[];
-  audit: { id: string; action: string; target: string; timestamp: string }[];
+  videos?: { id: string; title: string; status: string }[];
+  jobs?: { id: string; kind: string; state: string }[];
+  audit?: { id: string; action: string; target: string; timestamp: string }[];
 }
 
 // This is a frontend port, not an assumed module-02 HTTP contract. A real adapter
@@ -30,12 +32,24 @@ export interface AdminSnapshot {
 export interface SessionPort {
   readonly ready: boolean;
   readonly demo: boolean;
+  challenge?(signal?: AbortSignal): Promise<LoginChallenge>;
   restore(signal?: AbortSignal): Promise<MemberSession | null>;
   exchangeGoogle(credential: string, signal?: AbortSignal): Promise<MemberSession>;
   logout(signal?: AbortSignal): Promise<void>;
   transport(session: MemberSession): Transport | undefined;
-  admin(session: MemberSession, signal?: AbortSignal): Promise<AdminSnapshot>;
+  admin(
+    session: MemberSession,
+    signal?: AbortSignal,
+    query?: string,
+    offset?: number,
+  ): Promise<AdminSnapshot>;
   setMemberStatus(session: MemberSession, id: string, status: Member['status']): Promise<void>;
+  setMemberRole?(session: MemberSession, id: string, role: Member['role']): Promise<void>;
+}
+
+export interface LoginChallenge {
+  nonce: string;
+  clientId: string;
 }
 
 export class PendingSessionPort implements SessionPort {
@@ -85,7 +99,7 @@ export class DemoSessionPort implements SessionPort {
   private active: MemberSession | null = null;
   private members = demoMembers.map((member) => ({ ...member }));
   private transports = new Map<string, Transport>();
-  private audit: AdminSnapshot['audit'] = [];
+  private audit: NonNullable<AdminSnapshot['audit']> = [];
   async restore(signal?: AbortSignal) {
     signal?.throwIfAborted();
     const id = sessionStorage.getItem(DEMO_ACCOUNT_KEY);

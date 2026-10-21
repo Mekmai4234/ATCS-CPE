@@ -191,7 +191,7 @@ export function demoTransport(): Transport {
     json({ error: { message, code, retryable: false, request_id: 'demo' } }, status);
   return async (input, init) => {
     init?.signal?.throwIfAborted();
-    const url = new URL(String(input));
+    const url = new URL(String(input), 'http://demo.test');
     const path = url.pathname;
     const method = init?.method || 'GET';
     const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};

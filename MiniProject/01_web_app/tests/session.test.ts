@@ -37,6 +37,12 @@ describe('session boundary', () => {
     await expect(port.exchangeGoogle('unused')).rejects.toMatchObject({ code: 'auth_unavailable' });
     await expect(port.admin()).rejects.toMatchObject({ code: 'forbidden' });
   });
+  it('supports relative same-origin API paths in explicit demo mode', async () => {
+    const port = new DemoSessionPort();
+    const session = await port.signInDemo('A');
+    const api = new Api('', port.transport(session));
+    expect((await api.videos()).total).toBe(2);
+  });
   it('rejects malformed roles, missing CSRF and suspended members', () => {
     expect(safeMemberSession(goodSession()).member.id).toBe('user-1');
     expect(() => safeMemberSession({ ...goodSession(), csrfToken: '' })).toThrow();

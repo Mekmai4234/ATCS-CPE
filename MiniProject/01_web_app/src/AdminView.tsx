@@ -28,15 +28,20 @@ export default function AdminView({
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [pending, setPending] = useState(false);
+  const [offset, setOffset] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
     void port
-      .admin(session, controller.signal)
+      .admin(session, controller.signal, query, offset)
       .then((value) => {
         if (!controller.signal.aborted) setData(value);
       })
       .catch((error) => {
-        if (!controller.signal.aborted && error instanceof ApiError && error.status === 401) {
+        if (
+          !controller.signal.aborted &&
+          error instanceof ApiError &&
+          [401, 403].includes(error.status || 0)
+        ) {
           setData(null);
           onSessionExpired();
           return;
@@ -45,15 +50,19 @@ export default function AdminView({
           setError(error instanceof Error ? error.message : 'โหลดข้อมูลไม่สำเร็จ');
       });
     return () => controller.abort();
-  }, [port, session, onSessionExpired]);
-  async function changeStatus(id: string, status: 'active' | 'suspended') {
+  }, [port, session, onSessionExpired, query, offset]);
+  async function changeStatus(
+    id: string,
+    change: { status?: 'active' | 'suspended'; role?: 'user' | 'admin' },
+  ) {
     setPending(true);
     setError('');
     try {
-      await port.setMemberStatus(session, id, status);
-      setData(await port.admin(session));
+      if (change.status) await port.setMemberStatus(session, id, change.status);
+      if (change.role) await port.setMemberRole?.(session, id, change.role);
+      setData(await port.admin(session, undefined, query, offset));
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
+      if (error instanceof ApiError && [401, 403].includes(error.status || 0)) {
         setData(null);
         onSessionExpired();
         return;
@@ -110,16 +119,21 @@ export default function AdminView({
               {section === 'overview' && (
                 <div className="admin-stats">
                   <article>
-                    <strong>{data.members.length}</strong>
+                    <strong>{data.stats?.users ?? data.members.length}</strong>
                     <span>สมาชิก</span>
                   </article>
-                  <article>
-                    <strong>{data.videos.length}</strong>
-                    <span>วิดีโอในระบบ</span>
-                  </article>
+                  {!data.stats && data.videos && (
+                    <article>
+                      <strong>{data.videos.length}</strong>
+                      <span>วิดีโอในระบบ</span>
+                    </article>
+                  )}
                   <article>
                     <strong>
-                      {data.jobs.filter((job) => ['queued', 'running'].includes(job.state)).length}
+                      {data.stats
+                        ? (data.stats.jobs.queued || 0) + (data.stats.jobs.running || 0)
+                        : data.jobs?.filter((job) => ['queued', 'running'].includes(job.state))
+                            .length || 0}
                     </strong>
                     <span>งานที่กำลังทำ</span>
                   </article>
@@ -132,7 +146,10 @@ export default function AdminView({
                     <input
                       type="search"
                       value={query}
-                      onChange={(event) => setQuery(event.target.value)}
+                      onChange={(event) => {
+                        setQuery(event.target.value);
+                        setOffset(0);
+                      }}
                       placeholder="ค้นหาชื่อหรืออีเมล"
                     />
                   </label>
@@ -171,18 +188,32 @@ export default function AdminView({
                                 </span>
                               </td>
                               <td>
-                                {member.role !== 'admin' && (
+                                {(member.role !== 'admin' || port.setMemberRole) && (
                                   <button
                                     className="secondary"
                                     disabled={pending}
                                     onClick={() =>
-                                      void changeStatus(
-                                        member.id,
-                                        member.status === 'active' ? 'suspended' : 'active',
-                                      )
+                                      void changeStatus(member.id, {
+                                        status: member.status === 'active' ? 'suspended' : 'active',
+                                      })
                                     }
                                   >
                                     {member.status === 'active' ? 'ระงับบัญชี' : 'เปิดใช้บัญชี'}
+                                  </button>
+                                )}
+                                {port.setMemberRole && (
+                                  <button
+                                    className="secondary"
+                                    disabled={pending}
+                                    onClick={() =>
+                                      void changeStatus(member.id, {
+                                        role: member.role === 'admin' ? 'user' : 'admin',
+                                      })
+                                    }
+                                  >
+                                    {member.role === 'admin'
+                                      ? 'เปลี่ยนเป็นสมาชิก'
+                                      : 'ตั้งเป็นผู้ดูแล'}
                                   </button>
                                 )}
                               </td>
@@ -191,9 +222,28 @@ export default function AdminView({
                       </tbody>
                     </table>
                   </div>
+                  {data.memberPage && (
+                    <div className="member-pagination">
+                      <button
+                        className="secondary"
+                        disabled={!offset || pending}
+                        onClick={() => setOffset(Math.max(0, offset - data.memberPage!.limit))}
+                      >
+                        หน้าก่อนหน้า
+                      </button>
+                      <span>หน้า {Math.floor(offset / data.memberPage.limit) + 1}</span>
+                      <button
+                        className="secondary"
+                        disabled={!data.memberPage.hasMore || pending}
+                        onClick={() => setOffset(offset + data.memberPage!.limit)}
+                      >
+                        หน้าถัดไป
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
-              {section === 'videos' && (
+              {section === 'videos' && data.videos && (
                 <div className="admin-records">
                   {data.videos.length ? (
                     data.videos.map((video) => (
@@ -207,7 +257,7 @@ export default function AdminView({
                   )}
                 </div>
               )}
-              {section === 'jobs' && (
+              {section === 'jobs' && data.jobs && (
                 <div className="admin-records">
                   {data.jobs.length ? (
                     data.jobs.map((job) => (
@@ -221,7 +271,7 @@ export default function AdminView({
                   )}
                 </div>
               )}
-              {section === 'audit' && (
+              {section === 'audit' && data.audit && (
                 <div className="admin-records">
                   {data.audit.length ? (
                     data.audit.map((event) => (
