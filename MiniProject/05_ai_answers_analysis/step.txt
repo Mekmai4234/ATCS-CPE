@@ -43,5 +43,10 @@ D) Verification
 1. Run locked offline unit, SDK HTTP-mock and real 02/04/06 integration tests.
 2. Run Ruff lint and format checks.
 3. Inspect synthetic reference cases for semantic review requirements.
-4. Only when deliberately configured, run scripts/live_check.py --live for paid synthetic
-   generation checks. Real YouTube/embedding/team verification is a separate live exercise.
+4. Only when deliberately configured, run scripts/live_check.py --live --env-file PATH for
+   model lookup and paid synthetic generation. Catalog access does not prove generation access.
+5. Use 02's yk-full selected configuration consistently for runtime and reindex/GC.
+6. Complete the real acceptance plan and run yk-answers-acceptance --live against the live
+   API/worker. Follow-up cases reuse conversation IDs; 200/202 are both supported.
+7. Manually review every claim candidate against its transcript excerpts and original clip.
+   Record semantic decisions separately from automatic structural checks and fixture results.

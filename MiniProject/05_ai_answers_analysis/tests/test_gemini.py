@@ -184,3 +184,32 @@ def test_missing_key_fails_without_creating_client(monkeypatch):
     with pytest.raises(AppError) as caught:
         GeminiModel(AnswerSettings(_env_file=None))
     assert caught.value.code == "generation_unavailable"
+
+
+async def test_account_model_lookup_records_catalog_without_claiming_generation(make_model):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "name": "models/catalog-model",
+                "supportedGenerationMethods": ["generateContent"],
+            },
+        )
+
+    result = await make_model(handler).check_access(5)
+    assert result["requested_model"] == "gemini-3.5-flash"
+    assert result["catalog_name"] == "models/catalog-model"
+    assert result["generation_verified"] is False
+    assert len(calls) == 1 and calls[0].method == "GET"
+
+
+async def test_account_model_lookup_errors_never_echo_provider_details(make_model):
+    def handler(request):
+        return httpx.Response(403, json={"error": {"code": 403, "message": "secret LEAK"}})
+
+    with pytest.raises(AppError) as caught:
+        await make_model(handler).check_access(5)
+    assert caught.value.code == "model_check_failed" and "LEAK" not in str(caught.value)

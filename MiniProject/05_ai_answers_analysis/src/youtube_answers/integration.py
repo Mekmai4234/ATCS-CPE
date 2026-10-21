@@ -4,6 +4,7 @@ from youtube_rag.integration import RagAdapters
 from youtube_rag.manifest import BackendExecution
 
 from .config import AnswerSettings
+from .configuration import resolved_service
 from .gemini import GeminiModel
 from .service import AnswerService
 
@@ -68,11 +69,18 @@ class AnswerAdapters(RagAdapters):
 
 
 async def create_adapters(*, settings, repository):
-    config = AnswerSettings()
+    from youtube_rag.config import RagSettings
+
+    config = resolved_service(settings, AnswerSettings)
+    rag_config = resolved_service(settings, RagSettings)
     gateway = GeminiModel(config)
     try:
         return AnswerAdapters(
-            settings=settings, repository=repository, answer_settings=config, model=gateway
+            settings=settings,
+            repository=repository,
+            answer_settings=config,
+            model=gateway,
+            rag_settings=rag_config,
         )
     except BaseException:
         await gateway.close()
