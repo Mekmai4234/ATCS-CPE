@@ -43,5 +43,18 @@ export default defineConfig({
       },
       // Auth tests use a test-only SessionPort, not an assumed backend contract.
     },
+    ...(process.env.WEB_IDENTITY_TEST === 'true'
+      ? [
+          {
+            command: 'node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 3004',
+            url: 'http://127.0.0.1:3004',
+            reuseExistingServer: false,
+            env: {
+              VITE_DEMO_MODE: 'false',
+              NEXT_PUBLIC_API_BASE_URL: process.env.WEB_IDENTITY_API_URL!,
+            },
+          },
+        ]
+      : []),
   ],
 });

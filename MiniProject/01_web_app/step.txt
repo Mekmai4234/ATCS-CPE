@@ -5,17 +5,19 @@ A) Install, Start and Verify
 From MiniProject/01_web_app with Node.js 22.12+ and pnpm 11.25.0:
 1. pnpm install --frozen-lockfile
 2. pnpm dev -> http://127.0.0.1:3000
-3. Default startup shows an unavailable login while the real auth contract is pending.
+3. Run an auth-enabled module-02 PR18 backend. Set its Google Client ID and trusted origin.
+   Default relative /api uses the Vite proxy target NEXT_PUBLIC_API_BASE_URL.
 4. For explicit synthetic data only, set VITE_DEMO_MODE=true before startup, then select A/B/admin.
 5. pnpm typecheck; pnpm test; pnpm test:browser; pnpm build
 6. Browser tests need installed Google Chrome and free ports 3001/3002/3003.
 7. For real module-02 HTTP with fixture adapters, use a Python environment containing
    its dependencies: python tests/backend_smoke.py --ref develop
 8. Read README.md and TEST_REPORT.md for limits and observed verification.
-9. Read RAGBUDDY_UI_REPORT.md for current UI checks and AUTH_INTEGRATION.md for pending work.
-10. Agree module-02 auth/admin/ownership contracts before implementing a production adapter.
-    Configure exact allowed origins and cookie/CSRF policy; a public Google Client ID alone
-    does not enable sign-in. Run real Google and cross-account server tests before deployment.
+9. For auth-enabled HTTP + worker with an external-verifier fixture, run:
+   python tests/identity_smoke.py --ref origin/codex/02-google-auth-ownership
+   This uses a disposable archive/database and normal frontend entry on port 3004.
+10. Read AUTH_REVIEW_REPORT.md and AUTH_INTEGRATION.md. Keep Draft until real Google and
+    combined release acceptance pass. Production needs HTTPS, Secure cookies and /api proxy.
 
 B) Video Import and Library
 ---------------------------

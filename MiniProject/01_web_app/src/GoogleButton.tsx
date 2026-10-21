@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import type { LoginChallenge } from './session';
 
 interface GoogleIdentity {
   initialize(options: {
     client_id: string;
+    nonce?: string;
     callback: (response: { credential: string }) => void;
     auto_select: boolean;
     ux_mode: 'popup';
@@ -41,6 +43,12 @@ function loadGoogleIdentity() {
       }, 15000);
       script.onload = () => {
         window.clearTimeout(timer);
+        if (!window.google?.accounts.id) {
+          script.remove();
+          scriptPromise = undefined;
+          reject(new Error('Google Sign-In ไม่พร้อม กรุณาลองอีกครั้ง'));
+          return;
+        }
         resolve();
       };
       script.onerror = () => {
@@ -57,28 +65,56 @@ function loadGoogleIdentity() {
 export default function GoogleButton({
   clientId,
   onCredential,
+  prepareChallenge,
 }: {
   clientId: string;
   onCredential: (credential: string) => Promise<void>;
+  prepareChallenge?: (signal: AbortSignal) => Promise<LoginChallenge>;
 }) {
   const target = useRef<HTMLDivElement>(null);
   const callback = useRef(onCredential);
   callback.current = onCredential;
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     let active = true;
-    void loadGoogleIdentity()
-      .then(() => {
+    let delivered = false;
+    const started = Date.now();
+    const controller = new AbortController();
+    let refresh: ReturnType<typeof setTimeout> | undefined;
+    setLoading(true);
+    const prepare = async () => {
+      const challenge = await prepareChallenge?.(controller.signal);
+      if (!active) return;
+      await loadGoogleIdentity();
+      return challenge;
+    };
+    void prepare()
+      .then((challenge) => {
         if (!active || !target.current || !window.google?.accounts.id) return;
+        setLoading(false);
         window.google.accounts.id.initialize({
-          client_id: clientId,
+          client_id: challenge?.clientId || clientId,
+          ...(challenge ? { nonce: challenge.nonce } : {}),
           auto_select: false,
           ux_mode: 'popup',
           callback: (response) => {
-            if (active && response.credential) void callback.current(response.credential);
+            if (active && !delivered && response.credential) {
+              delivered = true;
+              void callback.current(response.credential);
+            }
           },
         });
+        if (challenge)
+          refresh = setTimeout(
+            () => {
+              active = false;
+              target.current?.replaceChildren();
+              setAttempt((value) => value + 1);
+            },
+            Math.max(0, 230000 - (Date.now() - started)),
+          );
         window.google.accounts.id.renderButton(target.current, {
           type: 'standard',
           theme: 'outline',
@@ -90,15 +126,21 @@ export default function GoogleButton({
         });
       })
       .catch((error) => {
-        if (active) setError(error instanceof Error ? error.message : 'เชื่อมต่อ Google ไม่ได้');
+        if (active) {
+          setLoading(false);
+          setError(error instanceof Error ? error.message : 'เชื่อมต่อ Google ไม่ได้');
+        }
       });
     return () => {
       active = false;
+      controller.abort();
+      clearTimeout(refresh);
       target.current?.replaceChildren();
     };
-  }, [clientId, attempt]);
+  }, [clientId, attempt, prepareChallenge]);
   return (
     <div className="google-sign-in">
+      {loading && <p role="status">กำลังเตรียม Google Sign-In…</p>}
       <div ref={target} className="google-button-host" />
       {error && (
         <div role="alert">

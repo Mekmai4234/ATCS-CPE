@@ -86,8 +86,8 @@ function DeleteDialog({ cancel, confirm }: { cancel: () => void; confirm: () => 
     <dialog ref={ref} className="modal" aria-labelledby="delete-title" onCancel={cancel}>
       <h2 id="delete-title">ลบคลิปออกจากคลัง?</h2>
       <p>
-        ระบบจะนำคลิปออกจากแหล่งข้อมูลและเริ่มล้างข้อมูลที่เกี่ยวข้อง
-        ประวัติคำตอบเดิมอาจยังคงอยู่แต่หลักฐานจะใช้ไม่ได้
+        คลิปนี้จะไม่ถูกใช้เป็นแหล่งข้อมูลในคลังของคุณอีก ประวัติคำตอบเดิมยังอยู่
+        แต่หลักฐานของคลิปนี้จะใช้ไม่ได้
       </p>
       <div>
         <button autoFocus className="secondary" onClick={cancel}>
@@ -177,6 +177,7 @@ export default function App({
     completeInventory: false,
   });
   const retiredSources = useRef(new Set<string>());
+  const libraryRevisions = useRef(new Map<string, number>());
   const [sourceCheckError, setSourceCheckError] = useState('');
   function updateTurns(update: (previous: Turn[]) => Turn[]) {
     turnsRef.current = update(turnsRef.current);
@@ -499,7 +500,7 @@ export default function App({
         payload,
         label: text || taskNames[type],
         type,
-        sources: snapshotSources(videos, scope),
+        sources: snapshotSources(videos, scope, libraryRevisions.current),
       });
     } catch (error) {
       setTaskError(errorText(error));
@@ -550,6 +551,7 @@ export default function App({
         ...(operationRef.current?.sources || []),
       ].filter((source) => source.video_id === id);
       affected.forEach((source) => retiredSources.current.add(sourceKey(source)));
+      libraryRevisions.current.set(id, (libraryRevisions.current.get(id) || 0) + 1);
       inventory.current = {
         ...inventory.current,
         videos: inventory.current.videos.filter((video) => video.video_id !== id),
@@ -1152,10 +1154,10 @@ export default function App({
             </p>
           )}
           {Object.values(jobs)
-            .filter((job) => job.kind === 'delete')
+            .filter((job) => job.kind === 'delete' || job.kind === 'detach')
             .map((job) => (
               <div className="notice" key={job.job_id}>
-                การลบคลิป: {statusLabels[job.state]}
+                {job.kind === 'detach' ? 'นำออกจากคลัง' : 'การลบคลิป'}: {statusLabels[job.state]}
                 {job.error_code && ` · ${job.error_code}`}
                 {job.state === 'failed' && job.retryable && (
                   <button onClick={() => void jobAction(job.job_id, 'retry')}>ลองลบใหม่</button>

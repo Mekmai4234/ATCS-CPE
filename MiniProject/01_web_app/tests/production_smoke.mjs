@@ -25,22 +25,39 @@ try {
   browser = await chromium.launch({ channel: 'chrome', headless: true });
   const page = await browser.newPage();
   const privateRequests = [];
+  const authRequests = [];
+  await page.route('**/api/auth/me', (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'authentication_required' } }),
+    }),
+  );
+  await page.route('**/api/auth/challenge', (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: { code: 'auth_not_configured', message: 'Google login is not configured' },
+      }),
+    }),
+  );
   page.on('request', (request) => {
-    if (/\/api\/|accounts\.google\.com/.test(request.url())) privateRequests.push(request.url());
+    if (request.url().includes('/api/auth/')) authRequests.push(request.url());
+    else if (/\/api\/|accounts\.google\.com/.test(request.url()))
+      privateRequests.push(request.url());
   });
   for (const path of ['/', '/admin', '/chat']) {
     await page.goto(`http://127.0.0.1:3010${path}`);
-    await page.getByText('กำลังเตรียมการเข้าสู่ระบบ', { exact: true }).waitFor();
-    assert.equal(
-      await page.getByRole('button', { name: 'เข้าสู่ระบบด้วย Google', exact: true }).isDisabled(),
-      true,
-    );
+    await page.getByText('Google login is not configured', { exact: true }).waitFor();
     assert.equal(await page.getByRole('checkbox').count(), 0);
     assert.equal(await page.getByRole('button', { name: 'ทดลองด้วยบัญชี A' }).count(), 0);
   }
   assert.deepEqual(privateRequests, []);
+  assert.equal(authRequests.filter((url) => url.includes('/me')).length, 3);
+  assert.equal(authRequests.filter((url) => url.includes('/challenge')).length, 3);
   console.log(
-    'Production preview: private routes gated; no demo account selector, GIS or API requests.',
+    'Production preview: HttpSessionPort calls me/challenge; unconfigured auth gates private routes without demo, GIS or workspace requests.',
   );
 } finally {
   await browser?.close();

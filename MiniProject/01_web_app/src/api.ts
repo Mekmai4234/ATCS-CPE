@@ -60,7 +60,7 @@ export class Api {
     try {
       const response = await this.transport(`${this.base}${path}`, {
         ...init,
-        credentials: this.security ? 'include' : 'same-origin',
+        credentials: this.security ? 'include' : init.credentials || 'same-origin',
         signal: controller.signal,
         headers: {
           Accept: 'application/json',
@@ -73,7 +73,14 @@ export class Api {
       if (mode) this.onMode?.(mode);
       if (response.status === 401) this.security?.onSessionExpired();
       const data = await response.json().catch(() => {
-        throw new ApiError('เซิร์ฟเวอร์ส่งข้อมูลที่อ่านไม่ได้', 'invalid_response', false);
+        throw new ApiError(
+          'เซิร์ฟเวอร์ส่งข้อมูลที่อ่านไม่ได้',
+          'invalid_response',
+          false,
+          undefined,
+          undefined,
+          response.status,
+        );
       });
       if (!response.ok) {
         const e = data?.error;

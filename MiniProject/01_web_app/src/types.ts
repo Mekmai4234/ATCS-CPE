@@ -70,6 +70,7 @@ export interface Answer {
   mode?: string;
 }
 export interface SourceSnapshot {
+  accessRevision?: number; // Client-only library membership epoch, never an authorization claim.
   video_id: string;
   generation?: number;
   indexed_version?: string | null;

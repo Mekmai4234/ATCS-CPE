@@ -207,7 +207,7 @@ test('admin sections come from session capabilities and omit private conversatio
   await expect(page.getByRole('cell', { name: /สมาชิก B/ })).toBeVisible();
   await expect(page.getByRole('cell', { name: /สมาชิก A/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /บทสนทนา|ตั้งค่า/ })).toHaveCount(0);
-  expect(server.adminReads()).toBe(1);
+  await expect.poll(() => server.adminReads()).toBe(2); // Initial load + server-side search.
 });
 test('logout clears old answers and history cannot reveal A after B signs in', async ({ page }) => {
   await fixture(page, 'A');

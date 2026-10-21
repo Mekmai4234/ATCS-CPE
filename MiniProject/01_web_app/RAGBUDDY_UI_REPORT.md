@@ -1,5 +1,7 @@
 # RAG Buddy UI review — 21 October 2026
 
+Historical UI-scaffold report. For the 22 October real HTTP adapter and review fixes, see [AUTH_REVIEW_REPORT.md](AUTH_REVIEW_REPORT.md).
+
 Branch: `feature/01_ragbuddy_google_ui`; base: `origin/develop@69f5347` (PR #15 merged). Scope: module 01 only. No database migration or backend endpoint changes.
 
 ## Implemented
