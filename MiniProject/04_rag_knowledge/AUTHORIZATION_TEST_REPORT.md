@@ -1,5 +1,10 @@
 # Module 04 account authorization verification
 
+For the 2026-10-22 consumer lock fix and actual locked installation/container
+validation against backend `b047e809`, see
+[LOCK_HANDOFF_TEST_REPORT.md](LOCK_HANDOFF_TEST_REPORT.md). The source-overlay
+results below are historical and do not establish consumer-lock validity.
+
 Verified on 2026-10-21 (Asia/Bangkok). The implementation and all tracked changes
 are confined to `MiniProject/04_rag_knowledge`. The base checkout is
 `develop@69f5347`. Authenticated integration uses the unchanged 02 PR #18 source

@@ -1,7 +1,8 @@
 # Account-aware RAG contract (04)
 
 Contract version: 1. This module consumes the account-aware backend contract in
-02 PR #18, tested at `f406d326a8545d1f2468a7ea3c074c5144a80a9b`. Merge/deploy the
+02 PR #18, with the locked integration target now
+`b047e809f983ffb2e4f3f9d3e3f074b8976cd6da` (2026-10-22). Merge/deploy the
 02 ownership/session migration before enabling this 04 release for members. This
 PR contains only 04 files; it does not implement Google login or backend ownership.
 
@@ -84,6 +85,9 @@ expose `MaintenanceExecution` or Python context constructors as LLM/browser tool
 2. Use the same runtime profile/env files for every 04 operator command. Inspect
    `yk-rag config`, then run stopped `yk-rag init` to add `rag04_security` and its
    persistent cursor signing key. Initialization is additive and repeatable.
+   For the full launcher, prefer `yk-full rag-init --workers-stopped` after the
+   ownership migration; PR #18 now verifies the existing pair and retains the same
+   selected full settings. Repeating `yk-full init` alone is not the additive upgrade.
 3. If the store is not already paired, perform the existing verified
    `yk-rag bind-store --workers-stopped` procedure. Existing pair IDs are retained.
 4. Restart with authenticated 02, then verify two-account search, evidence, cursor
@@ -103,18 +107,36 @@ fails closed. This compatibility mode is not multi-user authorization.
 
 ## Repeatable integration checks
 
-After 02 merges, normal `pytest tests` runs all account cases automatically. Before
-merge, the following runner exports only a pinned 02 `src` snapshot into ignored
-04 runtime storage and sets a child process's `PYTHONPATH`; it never edits 02's
-checkout, imports its changes into this branch, or migrates existing app data:
+The committed 04 consumer lock now includes 02's `google-auth`/`requests` metadata.
+It intentionally requires the account-aware backend manifest: do not run it against
+pre-auth develop and bypass the mismatch with `--frozen`. After 02 merges, normal
+locked installation and `pytest tests` run all account cases automatically.
+
+Before merge, use the stdlib-only runner below through `uv run --no-project` (not
+an outer `uv run --locked` against the old checkout). It exports the complete pinned
+backend package, including `pyproject.toml`, alongside this module's working source
+and committed consumer lock. It checks that lock offline, performs an actual
+`uv sync --locked`, and tests the installed package in a fresh isolated environment.
+No `PYTHONPATH` replacement or lock repair is used. Virtualenvs remain in the ignored
+candidate directory at shorter paths suitable for Windows dependency imports.
 
 ```powershell
-uv run --locked python scripts/check_account_contract.py --backend-ref f406d326a8545d1f2468a7ea3c074c5144a80a9b
-docker compose -f compose.test.yaml -p yk04-authorized build tests persistence
-uv run --locked python scripts/check_account_contract.py --backend-ref f406d326a8545d1f2468a7ea3c074c5144a80a9b --docker-image yk04-authorized-tests
+uv run --no-project --python 3.11 python scripts/check_account_contract.py --backend-ref b047e809f983ffb2e4f3f9d3e3f074b8976cd6da --full-integration --docker-image yk04-locked-auth
 ```
 
-The Docker dependency snapshot is read-only, network access is disabled and keys
-are empty. Fixtures use real backend repositories/migrations and real Chroma with
-labelled deterministic embeddings. They seed trusted test principals; they do not
-claim to exercise Google browser login or real Gemini semantic quality.
+`--docker-image` builds the named image from that same candidate before testing it;
+it does not mount a new backend over an image built from old metadata. Package
+installation/build may fetch locked wheels; test containers have networking disabled
+and empty provider keys. `--full-integration` also validates the 02 full lock and
+tests the native full-factory backend path, with refs for 03/05/06 recorded in the
+candidate report. It does not run or certify those modules' independent suites.
+
+The selected production path is `youtube_answers.team:create_adapters` plus native
+02 Repository/ExecutionContext and 03 IngestionService. The separate proposed
+`member_ingestion_backend` wrapper is not activated or claimed by this release.
+Source admission/detach and the deleting tombstone belong to native 02; 04 consumes
+its leased actor/source/fence contract. See 02's AUTH_INTEGRATION.md and
+[LOCK_HANDOFF_TEST_REPORT.md](LOCK_HANDOFF_TEST_REPORT.md) for the exact inputs.
+Fixtures use actual SQLite/Chroma and labelled external-call doubles, not real
+Google browser login or live Gemini semantic quality. No user dotenv or existing
+application data is copied or migrated; all test state stays in the isolated copy.

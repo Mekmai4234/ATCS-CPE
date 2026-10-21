@@ -2476,7 +2476,9 @@ source = { editable = "../02_api_backend" }
 dependencies = [
     { name = "alembic" },
     { name = "fastapi" },
+    { name = "google-auth" },
     { name = "pydantic-settings" },
+    { name = "requests" },
     { name = "sqlalchemy" },
     { name = "uvicorn" },
 ]
@@ -2485,7 +2487,9 @@ dependencies = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.14,<2" },
     { name = "fastapi", specifier = ">=0.115,<1" },
+    { name = "google-auth", specifier = ">=2.40,<3" },
     { name = "pydantic-settings", specifier = ">=2.7,<3" },
+    { name = "requests", specifier = ">=2.32,<3" },
     { name = "sqlalchemy", specifier = ">=2.0,<2.1" },
     { name = "uvicorn", specifier = ">=0.34,<1" },
 ]
