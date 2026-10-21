@@ -26,6 +26,8 @@ class IntegrationCheck(DockerCheck):
         ]
         self.environment = dict(
             os.environ,
+            APP_ENV="test",
+            AUTH_ENABLED="false",
             BACKEND_INTEGRATION_PORT=str(self.port),
             BACKEND_INTEGRATION_PROFILE="offline",
             GEMINI_API_KEY="",

@@ -8,6 +8,7 @@ import sqlalchemy as sa
 
 from . import database as db
 from .errors import AppError, LeaseLost
+from .ownership import Ownership
 from .schemas import Scope, Source, TranscriptResult
 from .telemetry import request_id
 from .urls import canonical_url, normalize_url
@@ -35,7 +36,7 @@ def iso(value):
     return datetime.fromtimestamp(value, UTC).isoformat() if value is not None else None
 
 
-class Repository:
+class Repository(Ownership):
     def __init__(self, database, settings):
         self.db = database
         self.settings = settings
@@ -102,11 +103,14 @@ class Repository:
             created_at=now,
             updated_at=now,
         )
+        data["owner_id"] = self._actor(connection)
         data.update(extra)
         connection.execute(db.jobs.insert().values(**data))
         return row(connection, db.jobs, db.jobs.c.job_id == data["job_id"])
 
     def import_urls(self, urls):
+        if self.settings.auth_enabled:
+            return self._import_private(urls)
         if len(urls) > self.settings.import_max_urls:
             raise AppError("import_limit", "Too many URLs in one request", 422)
         items = []
@@ -201,6 +205,7 @@ class Repository:
         by_id = {v["video_id"]: v for v in found}
         selected = []
         for video_id in scope.video_ids:
+            self._require_video(connection, video_id)
             video = by_id.get(video_id)
             if not video or video["status"] in {"deleted", "deleting"}:
                 raise AppError("video_not_found", "A selected video is unavailable", 404)
@@ -224,8 +229,9 @@ class Repository:
             raise AppError("empty_scope", "No selected ready videos match the filters", 422)
         return selected
 
-    def _check_sources(self, connection, sources):
+    def _check_sources(self, connection, sources, owner=None):
         for source in sources:
+            self._require_video(connection, source["video_id"], owner)
             video = row(connection, db.videos, db.videos.c.video_id == source["video_id"])
             if (
                 not video
@@ -241,8 +247,12 @@ class Repository:
 
     def enqueue(self, kind, request, idempotency_key=None):
         request_hash = digest(request)
-        key = f"{kind}:{idempotency_key}" if idempotency_key else None
+        from .auth import actor_id
+
+        namespace = actor_id.get() if self.settings.auth_enabled else "legacy"
+        key = digest([namespace, kind, idempotency_key]) if idempotency_key else None
         with self.db.write() as connection:
+            owner = self._actor(connection)
             if key:
                 previous = row(connection, db.jobs, db.jobs.c.idempotency_key == key)
                 if previous:
@@ -250,6 +260,7 @@ class Repository:
                         raise AppError(
                             "idempotency_conflict", "Key already used with different input", 409
                         )
+                    self._private(connection, previous)
                     return previous
             sources = self._sources(connection, request["scope"])
             if kind == "analysis" and request["type"] == "compare" and len(sources) < 2:
@@ -265,6 +276,14 @@ class Repository:
                         db.conversations.c.conversation_id == conversation_id,
                     ):
                         raise AppError("conversation_not_found", "Conversation not found", 404)
+                    self._private(
+                        connection,
+                        row(
+                            connection,
+                            db.conversations,
+                            db.conversations.c.conversation_id == conversation_id,
+                        ),
+                    )
                     active = row(
                         connection,
                         db.jobs,
@@ -281,7 +300,7 @@ class Repository:
                     conversation_id = uid()
                     connection.execute(
                         db.conversations.insert().values(
-                            conversation_id=conversation_id, created_at=time.time()
+                            conversation_id=conversation_id, created_at=time.time(), owner_id=owner
                         )
                     )
                 history = (
@@ -326,9 +345,11 @@ class Repository:
                 )
             return job
 
-    def get_job(self, job_id):
+    def get_job(self, job_id, *, internal=False):
         with self.db.read() as connection:
             job = row(connection, db.jobs, db.jobs.c.job_id == job_id)
+            if not internal:
+                self._private(connection, job)
         if not job:
             raise AppError("job_not_found", "Job not found", 404)
         return job
@@ -351,8 +372,18 @@ class Repository:
 
     def sources_available(self, job):
         with self.db.read() as connection:
+            if self.settings.auth_enabled and job["kind"] in {"attach", "detach"}:
+                video = row(connection, db.videos, db.videos.c.video_id == job["video_id"])
+                return bool(
+                    job["kind"] == "attach"
+                    and video
+                    and video["status"] == "ready"
+                    and self._has_video(connection, job["owner_id"], job["video_id"])
+                )
             try:
-                self._check_sources(connection, job["payload"].get("sources", []))
+                self._check_sources(
+                    connection, job["payload"].get("sources", []), owner=job["owner_id"]
+                )
                 return True
             except AppError:
                 return False
@@ -430,6 +461,8 @@ class Repository:
             conditions = [db.jobs.c.state == "queued", db.jobs.c.available_at <= now]
             if job_id:
                 conditions.append(db.jobs.c.job_id == job_id)
+            if self.settings.auth_enabled:
+                conditions.append(db.jobs.c.owner_id.is_not(None))
             candidates = (
                 connection.execute(
                     sa.select(db.jobs).where(*conditions).order_by(db.jobs.c.created_at)
@@ -438,6 +471,57 @@ class Repository:
                 .all()
             )
             for candidate in candidates:
+                if self.settings.auth_enabled:
+                    try:
+                        self._check_job_authorization(connection, candidate)
+                    except AppError:
+                        connection.execute(
+                            db.jobs.update()
+                            .where(db.jobs.c.job_id == candidate["job_id"])
+                            .values(state="cancelled", stage="cancelled", error_code="cancelled")
+                        )
+                        continue
+                if candidate["kind"] == "attach":
+                    video = row(
+                        connection, db.videos, db.videos.c.video_id == candidate["video_id"]
+                    )
+                    if video["status"] not in {
+                        "ready",
+                        "failed",
+                        "no_transcript",
+                        "deleted",
+                        "deleting",
+                    }:
+                        pending_import = connection.scalar(
+                            sa.select(db.jobs.c.job_id)
+                            .where(
+                                db.jobs.c.video_id == candidate["video_id"],
+                                db.jobs.c.kind == "import",
+                                db.jobs.c.state.in_(ACTIVE),
+                            )
+                            .limit(1)
+                        )
+                        if pending_import:
+                            continue
+                if self.settings.auth_enabled and candidate["kind"] == "delete":
+                    active_jobs = (
+                        connection.execute(
+                            sa.select(db.jobs).where(
+                                db.jobs.c.state.in_(ACTIVE), db.jobs.c.job_id != candidate["job_id"]
+                            )
+                        )
+                        .mappings()
+                        .all()
+                    )
+                    if any(
+                        j["video_id"] == candidate["video_id"]
+                        or any(
+                            x["video_id"] == candidate["video_id"]
+                            for x in j["payload"].get("sources", [])
+                        )
+                        for j in active_jobs
+                    ):
+                        continue
                 if candidate["video_id"]:
                     busy = row(
                         connection,
@@ -484,12 +568,14 @@ class Repository:
             raise LeaseLost
         if job["cancel_requested"] and not allow_cancel:
             raise AppError("cancelled", "Task cancelled", 409)
+        if not allow_cancel:
+            self._check_job_authorization(connection, job)
         return job
 
     def check_execution(self, job_id, token):
         with self.db.read() as connection:
             job = self._owned(connection, job_id, token)
-            if job["kind"] in {"import", "delete"}:
+            if job["kind"] in {"import", "delete", "attach"}:
                 video = row(connection, db.videos, db.videos.c.video_id == job["video_id"])
                 expected = "deleting" if job["kind"] == "delete" else None
                 if (
@@ -499,7 +585,7 @@ class Repository:
                 ):
                     raise AppError("cancelled", "Video is being deleted", 409)
             else:
-                self._check_sources(connection, job["payload"]["sources"])
+                self._check_sources(connection, job["payload"]["sources"], owner=job["owner_id"])
             return job
 
     def heartbeat(self, job_id, token):
@@ -632,8 +718,14 @@ class Repository:
         with self.db.write() as connection:
             job = self._owned(connection, job_id, token)
             kind = job["kind"]
-            if kind not in {"import", "delete"}:
-                self._check_sources(connection, job["payload"]["sources"])
+            if kind not in {"import", "delete", "attach"}:
+                self._check_sources(connection, job["payload"]["sources"], owner=job["owner_id"])
+            if kind == "attach":
+                video = row(connection, db.videos, db.videos.c.video_id == job["video_id"])
+                if video["status"] != "ready":
+                    raise AppError(
+                        "source_unavailable", "Shared source import did not complete", 409
+                    )
             if kind == "import":
                 video = row(connection, db.videos, db.videos.c.video_id == job["video_id"])
                 if video["status"] in {"deleting", "deleted"}:
@@ -706,6 +798,7 @@ class Repository:
                     connection.execute(
                         db.artifacts.insert().values(
                             artifact_id=artifact_id,
+                            owner_id=job["owner_id"],
                             job_id=job_id,
                             scope=job["payload"]["sources"],
                             data=output,
@@ -718,7 +811,7 @@ class Repository:
                 .where(db.jobs.c.job_id == job_id)
                 .values(
                     state=state,
-                    stage="ready" if kind == "import" else state,
+                    stage="ready" if kind in {"import", "attach"} else state,
                     result=result,
                     error_code=None,
                     retryable=False,
@@ -729,6 +822,8 @@ class Repository:
             )
 
     def delete_video(self, video_id):
+        if self.settings.auth_enabled:
+            return self._delete_private(video_id)
         with self.db.write() as connection:
             video = row(connection, db.videos, db.videos.c.video_id == video_id)
             if not video or video["status"] == "deleted":
@@ -772,8 +867,19 @@ class Repository:
     def cancel(self, job_id):
         with self.db.write() as connection:
             job = row(connection, db.jobs, db.jobs.c.job_id == job_id)
+            self._private(connection, job)
             if not job:
                 raise AppError("job_not_found", "Job not found", 404)
+            if self.settings.auth_enabled and job["kind"] == "import":
+                count = connection.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(db.user_videos)
+                    .where(db.user_videos.c.video_id == job["video_id"])
+                )
+                if count > 1:
+                    raise AppError(
+                        "shared_import_required", "Remove from your library instead", 409
+                    )
             if job["kind"] == "delete":
                 raise AppError("deletion_committed", "Deletion cannot be cancelled", 409)
             if job["state"] in ACTIVE:
@@ -787,8 +893,16 @@ class Repository:
         return self.get_job(job_id)
 
     def retry(self, job_id):
+        if self.settings.auth_enabled:
+            old = self.get_job(job_id)
+            if old["kind"] == "attach" and old["state"] == "failed":
+                imported = self._import_private([canonical_url(old["video_id"])])
+                if not imported[0].get("job_id"):
+                    raise AppError("retry_not_allowed", "Source is not available", 409)
+                return self.get_job(imported[0]["job_id"])
         with self.db.write() as connection:
             job = row(connection, db.jobs, db.jobs.c.job_id == job_id)
+            self._private(connection, job)
             if not job:
                 raise AppError("job_not_found", "Job not found", 404)
             if job["kind"] not in {"import", "delete"} or job["state"] != "failed":
@@ -810,6 +924,14 @@ class Repository:
                 sa.and_(db.jobs.c.video_id == job["video_id"], db.jobs.c.state.in_(ACTIVE)),
             )
             if active:
+                if self.settings.auth_enabled and active["owner_id"] != self._actor(connection):
+                    return self._new_job(
+                        connection,
+                        "attach",
+                        {},
+                        video_id=job["video_id"],
+                        generation=job["generation"],
+                    )
                 return active
             if job["kind"] == "import":
                 connection.execute(
@@ -843,6 +965,7 @@ class Repository:
             )
 
     def list_events(self, job_id, after=0, limit=100):
+        self.get_job(job_id)
         with self.db.read() as connection:
             return [
                 dict(event_id=e.event_id, **e.data, timestamp=iso(e.created_at))
@@ -856,6 +979,16 @@ class Repository:
 
     def list_videos(self, limit, offset, channel_id=None, date_from=None, date_to=None):
         conditions = [db.videos.c.status.not_in(["deleted", "deleting"])]
+        if self.settings.auth_enabled:
+            from .auth import actor_id
+
+            conditions.append(
+                db.videos.c.video_id.in_(
+                    sa.select(db.user_videos.c.video_id).where(
+                        db.user_videos.c.user_id == actor_id.get()
+                    )
+                )
+            )
         if channel_id:
             conditions.append(db.videos.c.channel_id == channel_id)
         if date_from:
@@ -887,6 +1020,7 @@ class Repository:
 
     def transcript(self, video_id, limit, offset):
         with self.db.read() as connection:
+            self._require_video(connection, video_id)
             video = row(connection, db.videos, db.videos.c.video_id == video_id)
             if not video or video["status"] in {"deleting", "deleted"}:
                 raise AppError("video_not_found", "Video not found", 404)
@@ -930,6 +1064,14 @@ class Repository:
 
     def conversation(self, conversation_id, limit, offset):
         with self.db.read() as connection:
+            self._private(
+                connection,
+                row(
+                    connection,
+                    db.conversations,
+                    db.conversations.c.conversation_id == conversation_id,
+                ),
+            )
             if not row(
                 connection, db.conversations, db.conversations.c.conversation_id == conversation_id
             ):
@@ -954,7 +1096,13 @@ class Repository:
                 ).mappings():
                     video = row(connection, db.videos, db.videos.c.video_id == citation["video_id"])
                     available = bool(
-                        video
+                        (
+                            not self.settings.auth_enabled
+                            or self._has_video(
+                                connection, self._actor(connection), citation["video_id"]
+                            )
+                        )
+                        and video
                         and video["status"] == "ready"
                         and any(
                             s["video_id"] == video["video_id"]
@@ -975,6 +1123,7 @@ class Repository:
     def artifact(self, artifact_id):
         with self.db.read() as connection:
             artifact = row(connection, db.artifacts, db.artifacts.c.artifact_id == artifact_id)
+            self._private(connection, artifact)
             if not artifact:
                 raise AppError("artifact_not_found", "Artifact not found", 404)
             try:

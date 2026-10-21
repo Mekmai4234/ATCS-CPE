@@ -1,5 +1,10 @@
 # Full-system backend launcher (owned by 02)
 
+The default API now requires Google login. Read [AUTH.md](../AUTH.md) before starting,
+including migration from 0001, GOOGLE_CLIENT_ID, cookie/origin settings and CSRF.
+Operator commands `migrate`, `bootstrap-admin`, and `claim-legacy` use this launcher's
+selected configuration too. Old anonymous flow examples below require authentication.
+
 This environment installs the unchanged 03–06 packages and uses the existing
 `youtube_answers.team:create_adapters` factory. It supports import, indexing,
 question answering, analysis, research and artifacts. The older `integration/`

@@ -1,5 +1,10 @@
 # Module 02: API / Backend
 
+Authentication is now required by default. See [AUTH.md](AUTH.md) for Google login,
+CSRF, ownership/admin APIs, explicit legacy migration and frontend/deployment handoff.
+The historical single-user demo commands below require the explicit development/test
+opt-out `AUTH_ENABLED=false`; they are not the authenticated deployment procedure.
+
 Runnable single-user backend for YouTube Knowledge. It implements HTTP contracts,
 SQLite persistence/migrations, import coordination, a separate durable worker,
 chat history, analysis/research jobs, learning artifacts, cancellation and deletion.
