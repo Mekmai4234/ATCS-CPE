@@ -55,3 +55,12 @@ consumer Docker images without copying an extra repository fixtures directory.
 The evaluation runner accepts explicit transcript exports in a NEW isolated store and records
 outputs/latency/usage plus pending human-review criteria. Live services require --live.
 No other module's source, global Compose, shared env template or database migrations are changed.
+
+Member execution flow
+1. Resolve the durable job owner and frozen sources from 02; never from model arguments.
+2. Reserve a slot in the module-owned agent06_permits table or an injected distributed quota authority.
+3. Recheck identity, active account and current source membership before and after every bounded call.
+4. Forward the guarded context through retrieval, comparison and artifact generation; spend operation budget before calls.
+5. On revocation or suspension, abort without final/partial/artifact content; preserve existing cancellation fences.
+6. Recheck before events/output; 02 must check ownership and permissions again when persisting or serving results.
+7. Cookie expiry alone does not invalidate background ownership; current sessions still gate API reads.

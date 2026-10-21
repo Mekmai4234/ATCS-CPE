@@ -2,9 +2,12 @@
 
 import asyncio
 
+import pytest
 from conftest import VIDEO_A, VIDEO_B, ScriptedModel, metadata
 from test_integration import integrated as shared_integrated
+from test_member_authorization import Authority
 
+from youtube_agent.authorization import MemberAgentService
 from youtube_agent.models import ModelReply
 
 integrated = shared_integrated  # Register the existing core pytest fixture in this module.
@@ -126,3 +129,47 @@ async def test_cancellation_inside_actual_05_analysis_prevents_output(integrated
     await task
     result = env.repo.get_job(job["job_id"])
     assert result["state"] == "cancelled" and result["result"] is None
+
+
+@pytest.mark.parametrize("revoke", [False, True])
+async def test_member_guard_inside_real_05_comparison(integrated, revoke):
+    from youtube_answers.config import AnswerSettings
+    from youtube_answers.service import AnswerService
+
+    env = integrated
+    authority = Authority()
+    analysis_model = AnalysisModel()
+    original = analysis_model.generate
+
+    async def generate(data, timeout):
+        result = await original(data, timeout)
+        if revoke:
+            authority.grants["b"].remove(VIDEO_B)
+        return result
+
+    analysis_model.generate = generate
+    agent = env.adapters.agent
+    agent.model = ComparisonModel()
+    answers = AnswerService(AnswerSettings(_env_file=None), analysis_model, agent.knowledge)
+    agent.analyzer = answers.analyze
+    job = env.repo.enqueue(
+        "research", {"goal": "Compare", "scope": {"video_ids": [VIDEO_A, VIDEO_B]}}
+    )
+    authority.owners[job["job_id"]] = "b"
+
+    # Simulate 02's durable owner binding; this legacy backend has no member HTTP API yet.
+    class WorkerAuthority:
+        def open(self, context, sources, kind):
+            context.request_actor = "b"
+            return authority.open(context, sources, kind)
+
+    env.adapters.agent = MemberAgentService(agent, WorkerAuthority())
+    await env.worker.run_once(job["job_id"])
+    stored = env.repo.get_job(job["job_id"])
+    assert analysis_model.payloads
+    assert not authority.active
+    if revoke:
+        assert stored["state"] == "failed" and stored["result"] is None
+        assert len(analysis_model.payloads) == 1  # No subsequent paid generation.
+    else:
+        assert stored["state"] == "completed", stored
