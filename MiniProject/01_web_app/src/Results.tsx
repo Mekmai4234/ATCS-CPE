@@ -11,7 +11,7 @@ export function Citations({
   return (
     <div className="citations">
       {citations.map((citation, i) => {
-        const url = available ? citationUrl(citation) : null;
+        const url = (citation.source_available ?? available) ? citationUrl(citation) : null;
         return (
           <div className="citation" key={`${citation.citation_id}-${i}`}>
             <span className="source-number">{i + 1}</span>

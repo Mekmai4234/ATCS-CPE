@@ -42,7 +42,14 @@ Errors: { error: { code, message, retryable, request_id, job_id? } }.
 Observe X-Adapter-Mode and body mode to label fixture responses. In normal mode an
 unavailable API remains an error. Demo transport is a build-time explicit opt-in.
 Output text is escaped; citation links use validated IDs and floored source times.
-sources_available=false disables all source links, including nested artifacts.
+An aggregate sources_available=false disables links when individual source identity
+cannot be established. Explicit per-citation source_available flags preserve unchanged
+sources when another video is deleted. The UI snapshots each resolved video's
+generation/indexed_version, retains the result job_id, and checks job availability
+on library refresh. Missing items on an incomplete library page are not deletions.
+Successful deletion immediately invalidates matching citations in existing results
+and nested artifacts, including pending answers. Invalidated historical references
+are never re-enabled by a reimport of the same video ID.
 
 Server progress and final outputs are authoritative. Client polling has bounded
 transient retries and can pause observation without relabelling the server job.
