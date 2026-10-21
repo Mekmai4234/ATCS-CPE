@@ -1,8 +1,10 @@
 # Backend verification report
 
-The following is the original 2026-10-17 baseline. For the latest full-system
-verification, see [FULL_TEST_REPORT.md](FULL_TEST_REPORT.md). The earlier 04/06-only
-delivery is recorded in [INTEGRATION_TEST_REPORT.md](INTEGRATION_TEST_REPORT.md).
+The following is the original 2026-10-17 baseline. For the 2026-10-20 review fixes
+and pending 05/06 compatibility, see [REVIEW_FIX_REPORT.md](REVIEW_FIX_REPORT.md).
+For the original full-system verification, see [FULL_TEST_REPORT.md](FULL_TEST_REPORT.md).
+The earlier 04/06-only delivery is recorded in
+[INTEGRATION_TEST_REPORT.md](INTEGRATION_TEST_REPORT.md).
 
 Date: 2026-10-17 (Asia/Bangkok)
 
