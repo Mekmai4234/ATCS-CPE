@@ -214,3 +214,12 @@ Module 04 owns maintenance/storage-pair safeguards. Follow its current README fo
 
 Implementation references: [Gemini function calling](https://ai.google.dev/gemini-api/docs/function-calling)
 and [official Python SDK](https://github.com/googleapis/python-genai).
+
+## Member research and learning
+
+Authenticated backend contexts now bind a durable member identity and source scope to
+research/artifact execution, including direct AgentService composition in module 05.
+See [MEMBER_AUTHORIZATION.md](MEMBER_AUTHORIZATION.md) for the account-aware backend
+contract, quota/revocation policy, deployment dependencies and commands. Test evidence
+is recorded in [MEMBER_TEST_REPORT.md](MEMBER_TEST_REPORT.md). This module does not add
+Google login or replace backend ownership checks on HTTP results/events/artifacts.
