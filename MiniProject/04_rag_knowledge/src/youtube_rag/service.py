@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from youtube_backend.schemas import IndexReceipt, Source, TranscriptResult
 
+from .binding import StoreBinding
 from .chunking import Chunker
 from .embeddings import validate_vectors
 from .errors import error
@@ -15,12 +16,13 @@ from .vectors import ChromaStore
 
 class RagService:
     def __init__(self, settings, manifest, embedder, vectors=None):
-        if embedder.settings.fingerprint != settings.fingerprint:
+        if embedder is not None and embedder.settings.fingerprint != settings.fingerprint:
             raise error("index_configuration_mismatch", "Embedder configuration does not match")
         self.settings = settings
         self.manifest = manifest
         self.embedder = embedder
         self.chunker = Chunker(settings)
+        self.binding = StoreBinding(manifest, settings.chroma_persist_dir)
         self.vectors = vectors or ChromaStore(settings.chroma_persist_dir, settings.collection_name)
 
     def timeout(self, execution):
@@ -67,6 +69,7 @@ class RagService:
         if actual_version != source.transcript_version:
             raise error("invalid_transcript", "Transcript content does not match its version")
         execution.authorize([source])
+        await self.binding.ensure(execution, create=True)
         try:
             current, _ = self.manifest.current([source], self.settings.fingerprint)
         except Exception as exc:
@@ -118,6 +121,7 @@ class RagService:
         expected_ids = {f"{run_id}:{chunk.chunk_id}" for chunk in records}
         if set(stored["ids"]) != expected_ids:
             raise error("incomplete_index", "Not all chunk vectors were persisted", status=502)
+        await self.binding.ensure(execution)
         # No await between the atomic backend lease/lifecycle fence and publication.
         self.manifest.publish(run_id, source, records, execution)
         await self.cleanup(execution, source=source)
@@ -125,6 +129,7 @@ class RagService:
 
     async def inventory(self, sources, execution):
         sources, rows, _ = self._snapshot(sources, execution)
+        await self.binding.ensure(execution)
         count = 0
         for row in rows:
             stored = await self.vectors.call(
@@ -142,6 +147,7 @@ class RagService:
         if len(chunk_ids) > 1000:
             raise error("invalid_limit", "At most 1000 evidence IDs per request", status=422)
         sources, rows, _ = self._snapshot(sources, execution)
+        await self.binding.ensure(execution)
         records = self.manifest.by_ids([row["run_id"] for row in rows], chunk_ids)
         self._recheck(sources, rows, execution)
         return [record.evidence() for record in records]
@@ -162,6 +168,7 @@ class RagService:
         ):
             raise error("invalid_limit", "min_score must be a finite cosine score", status=422)
         sources, rows, _ = self._snapshot(sources, execution)
+        await self.binding.ensure(execution)
         query = (await self._embed([question], execution, purpose="query"))[0]
         run_ids = [r["run_id"] for r in rows]
         total = sum(r["chunk_count"] for r in rows)
@@ -205,6 +212,7 @@ class RagService:
         if type(limit) is not int or not 1 <= limit <= 200:
             raise error("invalid_limit", "Chunk page limit must be 1-200", status=422)
         sources, rows, missing = self._snapshot(sources, execution, require=False)
+        await self.binding.ensure(execution)
         snapshot = digest([s.model_dump() for s in sources] + [r["run_id"] for r in rows])
         offset = 0
         if cursor is not None:
@@ -242,19 +250,30 @@ class RagService:
         )
 
     async def _remove_run(self, row, execution):
+        await self.binding.ensure(execution)
         store = self.vectors
         own = row["collection"] != self.settings.collection_name
         if own:
             store = ChromaStore(self.settings.chroma_persist_dir, row["collection"])
         try:
             await store.call("delete", self.timeout(execution), where={"run_id": row["run_id"]})
-            execution.check()
+            remaining = await store.call(
+                "get", self.timeout(execution), where={"run_id": row["run_id"]}, include=[]
+            )
+            if remaining["ids"]:
+                raise error(
+                    "incomplete_cleanup",
+                    "Vectors remain; cleanup metadata retained",
+                    retryable=True,
+                )
+            await self.binding.ensure(execution)
             self.manifest.forget(row["run_id"])
         finally:
             if own:
                 await store.close()
 
     async def cleanup(self, execution, *, source=None, include_staging=False):
+        await self.binding.ensure(execution)
         # include_staging is only for explicit maintenance with all workers stopped.
         for row in self.manifest.garbage(include_staging=include_staging):
             if source is not None and (
@@ -265,9 +284,11 @@ class RagService:
 
     async def delete(self, video_id, generation, execution):
         execution.check()
+        await self.binding.ensure(execution, create=not self.manifest.all_runs())
         for row in self.manifest.begin_delete(video_id, generation, execution):
             await self._remove_run(row, execution)
 
     async def close(self):
         await self.vectors.close()
-        await self.embedder.close()
+        if self.embedder is not None:
+            await self.embedder.close()

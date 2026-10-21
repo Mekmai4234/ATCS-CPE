@@ -4,9 +4,10 @@ Runnable single-user backend for YouTube Knowledge. It implements HTTP contracts
 SQLite persistence/migrations, import coordination, a separate durable worker,
 chat history, analysis/research jobs, learning artifacts, cancellation and deletion.
 
-Modules 04/06 are connected through the optional **02-owned integration environment**
-described in [integration/README.md](integration/README.md). Modules 03/05 remain
-unavailable. The lightweight default `unavailable` mode reports missing adapters
+For the full 03–06 system, use the **02-owned full launcher** and configuration/pair
+checks in [full/README.md](full/README.md). It delegates to the existing 05 team factory.
+The older [integration environment](integration/README.md) connects only 04/06;
+03/05 are unavailable in that smaller environment. The default `unavailable` mode reports missing adapters
 explicitly. `fixture` mode is a deterministic integration sandbox:
 it does not fetch YouTube, create embeddings, use ChromaDB, call Gemini, or run an
 autonomous agent. Every fixture answer/title is labelled and HTTP responses carry
