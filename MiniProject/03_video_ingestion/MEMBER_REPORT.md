@@ -1,77 +1,92 @@
-# Module 03 member ingestion report — 2026-10-21
+# Module 03 review fixes — 2026-10-22
 
-Status: **03's optional integration boundary and tests are implemented locally. The
-multi-account service is not enabled and is not complete until 02/04 supply their
-member contract.** At validation time, no commit, push or pull request had been made;
-publication was subsequently authorized by the user.
+Read all four supplied review documents: 00_summary.md, 03_review_and_fixes.md,
+08_verification.md and 09_system_progress.md. Changes are restricted to module 03.
+This report supersedes the 2026-10-21 proposal report. No PR was merged by this work.
 
-Branch: `feature/03_member_video_ingestion`, based on `develop@69f5347`.
-Both supplied documents were reviewed: `00_overview.md` and `03_video_ingestion.md`
-from the user's Downloads folder. They assign authentication, membership storage and
-private jobs to 02 and explicitly require agreement on that contract before wiring 03.
-The inspected baseline still has a single-user Repository/ExecutionContext and no
-users/session/user_videos migration. Existing 04 generation/lease guards do not supply
-the new membership and reference fence. This change does not invent a second auth DB.
+## Review findings and fixes
 
-## Changes made
-
-| Area | Local change |
+| Review item | Change / result |
 |---|---|
-| Member orchestration | Added `members.py`: strict import validation, URL normalization/deduplication, original input positions, member-private response DTOs and job/transcript/remove operations delegated to a trusted backend. Request bodies cannot choose user_id, owner_id or role. |
-| Dependency gate | Missing or incompatible member backends fail with `member_contract_unavailable`; the old single-user Repository cannot silently activate the member factory. |
-| Source operations | Added `member_adapters.py`: exact source/generation/version grants, checks before and after async work, shared-worker authorization and separate read versus physical-GC commands. The underlying 02/04 transaction must still enforce the live fence. |
-| Library removal | Member removal delegates reference accounting and reports GC scheduling. It never directly calls physical source deletion. |
-| Limits | Added separate MEMBER_IMPORT_MAX_URLS, MEMBER_PENDING_IMPORT_LIMIT and MEMBER_RUNNING_IMPORT_LIMIT configuration. Batch size is checked in 03; durable per-account admission, worker limits and fairness must be implemented by 02. |
-| Documentation | Added MEMBER_CONTRACT.md and this report; updated README, .env.example, env.txt, process.txt and step.txt with activation requirements and limitations. |
+| Seven failures with authenticated 02 | Legacy lifecycle tests explicitly set auth_enabled=False on their own fixture. Acceptance now logs in through real challenge/session/CSRF using an explicitly labelled offline Google verifier. All seven affected tests pass against native 02/04. |
+| Factory requires nonexistent member_ingestion_backend | Removed the second MemberIngestion/SourceGrant protocol and fake backend. The retained member factory validates native 02/04 support, then delegates to the existing IngestionAdapters composition. Real 02 Repository needs no monkey-patched membership contract. |
+| No member path integration | Replaced 29 proposal simulations with 29 native integration cases using two authenticated HTTP clients, real migrations/SQLite, Worker and persistent Chroma. External identity/caption/metadata/embedding values are doubles. |
+| Stale consumer lock | Refreshed only 03 uv.lock with native 02 metadata: google-auth and requests dependencies. No package versions were upgraded. --check --offline and --locked pass on the dependency candidate. |
+| Misleading quota configuration | Removed MemberSettings and MEMBER_* environment values. Native IMPORT_MAX_URLS admission is tested. Durable per-member pending/running quotas and fair claim scheduling remain upstream work; this PR does not claim them. |
+| Container using the same lock | Added a 03-specific Dockerfile consuming 03 uv.lock with --locked and a context allowlist. Build/run could not be executed because Docker CLI/Engine are unavailable locally. This remains an unverified acceptance gate. |
 
-The existing caption pipeline, timestamps, classified errors and bounded subprocess
-cleanup are reused. No dependencies, lockfiles, 02/04 application code or database
-migrations were changed. Existing single-user factories and endpoints retain their
-current behavior; they must not be exposed as a protected member API.
+README, .env.example, MEMBER_CONTRACT.md and the English env.txt/step.txt/process.txt
+now describe one native flow, actual dependency requirements and remaining limits.
+The live-caption acceptance CLI requires --fixture-identity --fixture-embeddings;
+its report labels both doubles and real_google_login_evaluated=false. Its isolated
+state directory refuses existing data. No test verifier is installed by production
+factories, and no global AUTH_ENABLED=false fixture was added.
 
-## Validation
+## Exact validation candidate
 
-All commands ran from the MiniProject root against the checked-out local packages.
-JUnit evidence is stored under `runtime/member-ingestion/` (local, ignored artifacts).
+- Base: develop 69f534730669f59051a453d9833a0be88695f263.
+- 02 PR18: b047e809f983ffb2e4f3f9d3e3f074b8976cd6da (newer than the review's f406d32).
+- 04 PR20: d4aa52d137b44f9217923bd18afc77b6a00881ef.
+- 03: the source and lock in this PR.
 
-| Suite | Result | Evidence |
+The candidate was assembled from git archives under the ignored local directory
+runtime/review03-candidate/MiniProject. Current 03 files were copied there without
+.venv/caches; only 03 files are staged in the actual checkout. No checkout, commit or
+merge of dependency-module changes was performed. 03's package uses the candidate's
+editable 02/04 paths, not the old develop packages in the normal workspace venv.
+
+During final checks, PR20 advanced to 1c1c536de3d2a316cc239b8f21b186cd8169aff8.
+Its runtime src/ and pyproject.toml are unchanged from the tested d4aa52d; differences
+are documentation, its consumer lock and its contract-check script. The results below
+refer to the exact d4aa52d candidate, not an untested claim about every future head.
+
+## Results
+
+| Check | Result | Local evidence |
 |---|---|---|
-| 03 ingestion, `pytest -q -W error` | **107 passed** in 34.18 s | ingestion-tests.xml |
-| 02 backend regression | **68 passed** | backend-regression.xml |
-| 04 RAG regression | **97 passed, 1 skipped** | rag-regression.xml |
-| 02 full launcher configuration | **23 passed** | full-config-regression.xml |
-| Ruff lint and formatting | Passed | `ruff check` and `ruff format --check` |
+| 03 full suite, --locked, -q -W error | **107 passed**, 80.88 s | runtime/review03-final.xml |
+| 02 native backend regression | **96 passed**, 28.50 s | runtime/review03-backend.xml |
+| 04 native RAG, -m "not live" | **126 passed, 1 deselected**, 209.17 s | runtime/review03-rag.xml |
+| uv lock --check --offline, candidate 03 | Passed, 113 packages | command output |
+| uv sync --locked, candidate 03 | Passed | command output |
+| Ruff check / format --check, git diff --check | Passed | command output |
+| Docker build/run | **Not run: Docker unavailable** | docker version: command not found |
 
-The skipped 04 case requires explicit opt-in for live Gemini embeddings
-(`RUN_LIVE_EMBEDDING_TESTS=1`); it was not enabled in this run. `git diff --check`
-also passed, and all changed/new source and documentation files are under 03.
+After strengthening the factory case to run the worker with the factory's returned
+adapter, that targeted case passed again (1 passed, 4.33 s); lint/format also passed.
 
-The 03 suite includes the 78 existing tests and 29 new member cases. New cases cover
-two accounts sharing one source while retaining private jobs, foreign/admin access
-denial, ready reuse, removal while another member reads, cancellation isolation,
-concurrent duplicate admission, quota inputs, spoofed ownership/context, malformed
-backend output, source generation/version checks, grant revocation and caption task
-cleanup after revocation. Existing tests exercise the local API/worker, temporary
-SQLite/Chroma and real subprocess lifecycle with provider doubles.
+03 retains all 78 existing pipeline/SDK/process/lifecycle tests. The removed 29 tests
+exercised the abandoned fake membership contract; their replacement 29 cases exercise
+native HTTP sessions, CSRF/Origin, private jobs/library denial including admin, forged
+ownership rejection, concurrent shared admission, ready reuse with one caption fetch,
+private retry/cancel, no-transcript classification and native batch-limit rollback.
 
-**Member tests use a lock-protected in-memory contract simulation in
-`tests/member_backend_double.py`.** They do not demonstrate Google verification,
-real member HTTP routes, distributed transactions, durable quotas or worker fairness.
-No live YouTube/Gemini calls or real member data migrations were performed for this
-change. Historical live-check reports describe earlier work, not this member release.
+The lifecycle cases prove A can detach while B imports/reads, B's private attach can
+be cancelled without cancelling A, a final GC waits for an active durable reader,
+a revoked reader cannot obtain inventory, and final deletion clears actual Chroma
+vectors before a new import uses generation 2. For the reader case, admission uses the
+HTTP analysis route and the test manually claims the durable job; answer generation
+is not evaluated. The production factory composition test supplies real fixture-backed
+03/04 components to avoid paid provider requests, using the real native Repository.
 
-## Remaining integration requirements
+Representative commands from MiniProject (after assembling the stated dependency trees):
 
-1. 02 must agree on the contract and implement server-owned sessions/Google identity,
-   protected routes, private jobs, user_videos, atomic shared-source admission,
-   reference accounting, quotas/fair worker claims and explicit legacy-data ownership.
-2. 02/04 must enforce membership, active dependencies and generation/version fences
-   inside publication/deletion transactions. Pre/post checks alone cannot prevent a
-   concurrent GC/publication race. Other 04 read/search paths also need authorization.
-3. After wiring, run real two-account HTTP and multi-process database tests, including
-   removal/reimport/GC races, foreign retry/cancel and 05/06 scope isolation.
+```powershell
+uv lock --check --offline --project runtime/review03-candidate/MiniProject/03_video_ingestion
+uv sync --locked --project runtime/review03-candidate/MiniProject/03_video_ingestion
+uv run --locked --project runtime/review03-candidate/MiniProject/03_video_ingestion pytest 03_video_ingestion/tests -q -W error --junitxml=runtime/review03-final.xml
+```
 
-The member factory intentionally refuses activation until its trusted backend is
-available. Passing these tests is evidence for the 03 boundary and regressions, not
-approval to deploy a multi-account service. See MEMBER_CONTRACT.md for the proposed
-operation payloads, DTOs and release gates.
+The XML files and test databases are ignored local evidence, not committed member data.
+No live Google, YouTube or Gemini requests, real account migration, public deployment
+or browser login smoke was performed. The live embedding test was deliberately
+excluded; it is not counted as passed.
+
+## Remaining release gates
+
+02/04 dependency PRs must be coordinated with consumer locks before merging into a
+usable combined system. Do not regenerate this lock against old single-user develop
+and treat that as member acceptance. Quotas/fair claims, real Google/browser login,
+05/06 isolation, Docker build/run, production configuration and migration/restore
+remain separate release work. This PR fixes the module-03 integration regressions;
+it does not certify the entire multi-account product as production ready.

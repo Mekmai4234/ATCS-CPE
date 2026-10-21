@@ -1,140 +1,83 @@
-# Proposed member ingestion boundary — 02 / 03 / 04
+# Native member ingestion handoff — 02 / 03 / 04
 
-Status: **implemented 03 boundary; awaiting the 02/04 contract and real adapters**.
-This is a proposal, not an agreed database/API migration or a working Google Login
-release. Read [MEMBER_REPORT.md](MEMBER_REPORT.md) for exact validation and gaps.
+Updated 2026-10-22 after review of 00_summary.md, 03_review_and_fixes.md,
+08_verification.md and 09_system_progress.md. This replaces the earlier proposal.
+There is one runtime flow; no repository.member_ingestion_backend, SourceGrant,
+MemberIngestion or second membership store is required.
 
-The 2026-10-21 input documents request shared source storage with private libraries/jobs.
-At the inspected `develop@69f5347`, 02 still provides the single-user Repository and
-ExecutionContext. There are no users/sessions/user_videos migrations or member job
-ownership methods. 04 fences generations/leases but does not yet check member refs.
-03 must not create an independent authentication or membership database to bypass this.
+## Dependency candidate
 
-## Ownership of the implementation
+- Base develop: 69f534730669f59051a453d9833a0be88695f263.
+- 02: PR18, origin/codex/02-google-auth-ownership at b047e80 (current reviewed handoff;
+  later than the review snapshot f406d32).
+- 04: PR20, origin/codex/04-authorized-rag-sources at d4aa52d.
+- 03: this branch; only module 03 files changed in this PR.
 
-| Owner | Required implementation |
-|---|---|
-| 02 | Google verification, session/CSRF/disabled-account checks, member identity, private jobs and routes, migration/legacy-owner assignment, atomic library admission and reference accounting, quotas/fair claims |
-| 03 | Validate/normalize URL batches, call the trusted member backend, restrict response DTOs, retain timestamped ingestion, guard source delegation and reuse existing bounded subprocess cleanup |
-| 04 with 02 | Member-authorized search/read/evidence/inventory plus transactional generation/version/lease/reference fences at index publication and physical GC |
-| 01 | Agree on public statuses/DTOs and polling after 02 chooses API routes |
+02/04 are not merged here. Verification uses a disposable archive candidate with these
+exact source trees and the current 03 tree. Do not expect the new 03 lock or member
+suite to work against the single-user develop dependency trees. This is a dependent
+integration PR, not a self-contained release on old develop.
 
-Admin status must not bypass private job/transcript access. No member is selected from
-an HTTP user_id/owner_id/role field. Neither a first login nor a deployment migration
-automatically grants legacy data or admin rights. This change creates no users and
-does not adopt or migrate existing data.
+## Native runtime path
 
-## Injection from trusted server composition
+1. 02 authenticates HTTP through challenge/Google exchange, server-owned session,
+   Origin and CSRF checks. Never use client user_id/owner_id/role as authority.
+2. POST /api/videos/import calls Repository.import_urls. The transaction validates URLs,
+   assigns user_videos and returns the requester's private import/attach job ID. A
+   second member joins existing work; a ready source completes attach without caption
+   or vector requests. Status/outcome DTOs are 02's public schemas, not new 03 schemas.
+3. 02 Worker claims the durable job and supplies ExecutionContext to 03 IngestionService.
+   The service checks it while fetching, observes deadlines and retains bounded child
+   cleanup. The native repository rechecks owner/status, source references and lease.
+4. 02 persists the TranscriptResult/version, then calls 04 RagAdapters. BackendExecution
+   uses the same repository's transaction-level _owned fence for index publication and
+   deletion; 04 checks generation, references and active readers at its storage boundary.
+5. GET job/transcript, retry and cancel stay behind 02's session/ownership middleware.
+   Admin does not bypass private jobs/library access. Read/search consumers use 04's
+   authorized context. 03 does not add routes or an alternate DTO/session layer.
+6. DELETE /api/videos/id detaches only the caller. With other references it returns a
+   completed detach job; with zero references it creates a durable delete job. GC waits
+   for active dependencies. Shared import cancel returns shared_import_required (409);
+   detach is the native supported way to withdraw without breaking other members.
 
-`members.MemberBackend` proposes three synchronous, short backend operations:
+The existing integration:create_adapters implements ingestion/RAG composition.
+member_adapters:create_member_adapters retains the old configuration name as a guard
+for native authenticated 02, then calls that same factory. It checks auth_enabled,
+users/user_videos, authorize_sources, 04 permission_scope and repository authorization support before
+constructing provider clients. These shape checks are compatibility checks, not proof
+of correct authorization; real integration tests supply that evidence.
 
-1. `require_member(context)`: verify a server-issued session/request context, account
-   status and CSRF as applicable. Context is opaque to 03; no attribute named user_id
-   or role is accepted as authentication. The principal must be resolved by 02.
-2. `execute_member(context, operation, payload, limits)`: recheck authorization inside
-   the transaction that performs the operation. Return the DTOs below, never a raw
-   application row, session, shared worker job, or another member's result.
-3. `authorize_source(context, command)`: return `SourceGrant(command, execution)` for
-   the exact shared worker/read/GC operation. A grant is an internal object, never a
-   Pydantic model parsed from a client JSON body.
+## Limits and ownership
 
-An implementation must declare the exact `CONTRACT_VERSION` and required guarantees
-in `members.py`. These declarations detect incomplete wiring; they are **not** a proof
-of authorization correctness. Real 02/04 database integration tests remain mandatory.
-The test backend under `tests/` is a lock-protected simulation and must not be deployed.
+02 owns Google verification, sessions/CSRF, account state, private jobs, membership
+transactions, import batch admission, migrations and legacy-data ownership. 04 owns
+transactional publication, authorized reads and physical GC. 03 owns provider fetch,
+normalization, classified failures and bounded subprocess cleanup.
 
-`MemberIngestion(backend, settings)` offers these control-plane calls:
+02 IMPORT_MAX_URLS is enforced at native admission and tested through HTTP. The removed
+MEMBER_PENDING_IMPORT_LIMIT/MEMBER_RUNNING_IMPORT_LIMIT settings never implemented
+quotas. Durable per-member pending/running limits and fair claim scheduling are not
+implemented by 03 and are not claimed as complete in this dependency candidate.
+Those remain upstream release requirements. No user/migration/auth data is changed by
+03 and no global fixture disables production authentication.
 
-| Call | Backend operation / payload | Output |
-|---|---|---|
-| `add({"urls": [...]}, context)` | add / normalized distinct video_ids | MemberImports, one result per original input index |
-| `job(id, context)` | job / private job_id | MemberJob |
-| `job(id, context, operation="retry")` | retry / private job_id | MemberJob, possibly a new private ID |
-| `job(id, context, operation="cancel")` | cancel / private job_id | MemberJob |
-| `transcript(id, context, limit=100, offset=0)` | transcript / video_id, limit, offset | MemberTranscript |
-| `remove(id, context)` | remove / video_id | LibraryRemoval, not physical deletion |
+## Tests and release gates
 
-Input import bodies reuse 02's strict ImportRequest, rejecting unknown ownership fields.
-Invalid individual URLs are rejected per input index; normalized duplicates are admitted
-only once by the backend and expanded to their original positions. Authentication is
-required even for a batch containing only invalid URLs. No URL is fetched by these calls.
+- Legacy lifecycle tests set auth_enabled=False on that fixture only, preserving old
+  pipeline/delete/cancel regressions with explicit test/development behavior.
+- test_native_members.py enables auth, logs in two principals through challenge and
+  Google exchange, sends cookies/CSRF and uses real HTTP/SQLite/worker/Chroma. Only
+  external Google, captions/metadata and vector values are doubles.
+- acceptance_check.py explicitly requires --fixture-identity --fixture-embeddings and
+  a new empty state directory. Its verifier exists only inside that isolated test app;
+  the report labels fixture identity and does not claim real Google/browser login.
+- 03 uv.lock is refreshed against the dependency candidate. Run uv lock --check --offline,
+  uv sync --locked and pytest -q -W error there. Do not regenerate against old develop
+  and hide the dependency mismatch.
+- 03 Dockerfile consumes this same lock with --locked, packages the three modules and
+  defaults to native authentication. Its Dockerfile-specific allowlist excludes .env,
+  databases and unrelated files. Actual Docker build/run remains unverified locally.
 
-MemberAdmission returns video_id, a member-private job_id, outcome (added/existing/rejected),
-status (importing/ready/no_transcript/failed/rejected), and a classified error_code when
-applicable. Rejected admissions have no job. Existing ready sources issue/reuse only
-private result records and must not invoke caption/embedding operations. The backend
-must return exactly one admission for every unique valid input ID; extra fields/IDs or
-missing entries fail with member_contract_invalid_output. DTOs never include raw shared
-job IDs, tokens, Google subjects, cookies or free-form provider exceptions.
-
-The proposed vocabulary and routes still need agreement with 01/02; no HTTP router
-or existing endpoint shape is changed here. Unknown/foreign private resources should
-produce the same generic 404. A backend must not special-case admin to expose contents.
-
-## Atomic shared lifecycle and quotas (02 responsibilities)
-
-Admission is one database transaction per agreed batch policy: authorize, apply quotas,
-attach user_videos, select/create the current shared source, and create/reuse a private
-job. Concurrent A/B imports must join the same durable source claim, with distinct
-member job IDs. Never return the original shared owner's private job to a joiner.
-
-Membership and active job references are separate. Cancel A's job/interest without
-cancelling work B still needs. Remove A's library membership without deleting B's
-source. GC can be scheduled only after zero member refs **and** zero active dependent
-jobs; retain/revalidate generation tombstones for reimport. A still-running cancelled
-worker must be fenced and drained before GC can run. 02 decides any retention policy.
-
-`MemberSettings` is separate from existing `IngestionSettings` so 02's FullSettings
-field enumeration remains compatible. Defaults (configurable via MEMBER_ variables):
-
-- MEMBER_IMPORT_MAX_URLS=50: 03's per-request URL bound, also passed to 02.
-- MEMBER_PENDING_IMPORT_LIMIT=20: durable pending-job admission limit per member.
-- MEMBER_RUNNING_IMPORT_LIMIT=2: durable worker-claim limit per member.
-
-The latter two are forwarded to the backend; 03 does not claim to enforce them with
-an in-process semaphore. 02 must enforce them across API/worker processes, account for
-shared work once according to the agreed policy, and select claims fairly. It must
-also resolve the settings once and pass the same configuration to every process.
-
-## Worker/read/GC delegation
-
-`MemberSourceAdapters(inner, backend)` delegates existing ingestion/index/evidence/
-inventory/deletion through an exact SourceCommand and a server-issued SourceGrant:
-
-- ingest/index require a shared source worker claim, not A's private member job lease.
-- read requires current membership for every explicit video/generation/version;
-  knowing a chunk ID never grants scope. Scope is not silently widened.
-- delete is explicitly GC, requiring zero refs/dependencies and an exact generation.
-  A member remove request never invokes this method directly.
-
-The grant execution checks authorization before delegation and before results return.
-IngestionService also calls its check while waiting for captions, preserving cancellation
-and the existing no-caption/timeout/cleanup behavior. Generation/scope drift is rejected.
-
-Most importantly, execution.repository._owned() must enforce the same shared-claim,
-membership/ref and generation checks **inside** the transaction used by 04's fence.
-Checks before/after an async call alone do not close the GC/publication race. All 04
-entrypoints, including search/read_video_chunks used by 05/06, need the agreed context.
-Wrapping only 03's evidence/inventory methods does not secure those other call paths.
-
-## Activation and release gates
-
-The optional `member_adapters.create_member_adapters` looks for a trusted
-repository.member_ingestion_backend. The current Repository does not provide it, so
-startup fails with a non-retryable 503 member_contract_unavailable before constructing
-RAG/provider clients. There is no silent legacy or fixture fallback.
-
-Do not expose the current single-user API as a member service by changing only an
-ADAPTER_FACTORY string. The legacy GET job/transcript/history routes are not protected
-by this wrapper. The existing single-user factories remain unchanged for local use.
-
-Before enabling member traffic, 02/04 must agree/implement the contract, protect every
-route, implement real user_videos/private jobs/quotas/fair claims, migrate data with an
-explicit owner, and integrate the atomic source fence. Then run two-account HTTP and
-multi-process DB/Chroma tests for import, ready reuse, foreign reads/retry/cancel,
-remove while B reads, active-worker/GC races, generation changes and reimport. Verify
-05/06 scope isolation before rollout. Google verification is owned and tested by 02.
-
-No auth secrets, accounts or real member data are created by this proposal. 03 emits
-no member/session logs; 02's logs should use minimal internal references and redact
-credentials. Privacy is not established by passing the simulation tests alone.
+Before production: merge/coordinate dependency and consumer locks, verify durable
+quotas/fair claims, browser-to-backend real Google login, all 05/06 read scopes,
+production container behavior and migration/restore. No PR is merged by this work.
