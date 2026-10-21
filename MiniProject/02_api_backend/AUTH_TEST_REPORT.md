@@ -1,4 +1,59 @@
-# Google identity / ownership verification — 2026-10-21 (Asia/Bangkok)
+# Google identity / ownership verification
+
+## Latest review follow-up — 2026-10-22 (Asia/Bangkok)
+
+The auth-phase review found no new module-02 authorization blocker. This follow-up
+adds stopped RAG initialization through the full launcher, concrete consumer lock
+handoff patches and a reproducible pinned-candidate checker. It also extends the
+real-factory authenticated tests to research and learning artifacts. All tracked
+changes remain in 02; no other branch is merged or consumer lock applied in place.
+
+Candidate refs and the selected native-ingestion contract are in AUTH_INTEGRATION.md.
+The initial candidate reproduced the prior **137 passed** on Windows (90.24s) and
+network-disabled Linux Docker (107.67s). The final tests additionally establish:
+
+- A completed research result and its status/events/retry/cancel remain private;
+  a second account cannot select the owner's library as its research scope.
+- Removing a source while the real 06 research controller awaits its model prevents
+  publication; the durable job becomes cancelled and retains no result.
+- A real 06 quiz uses 04's authorized chunk reader, publishes a private artifact,
+  denies another account's read and marks saved sources unavailable after detach.
+- `yk-full rag-init` requires `--workers-stopped`, retains the resolved full
+  configuration and verified store pairing, adds missing PR #20 cursor state and
+  preserves the signing key on repeat. It makes no provider calls. Existing
+  full-launcher/ownership migration behavior remains covered.
+
+Final Windows core/integration/full: **141 passed**, warnings as errors, 107.47s.
+The full suite alone passed **36 tests** after the new authenticated fixtures were
+corrected to poll jobs through the authenticated HTTP client rather than making an
+unscoped repository read.
+
+The candidate's three 02 locks pass offline checks. All six original consumer
+locks still fail against the new backend metadata. Proposed patches generated in
+the disposable copy make each consumer lock pass offline checks; apply/reverse
+checks also pass for all six and package versions remain unchanged. Patches retain
+LF on Windows (including a handoff .gitattributes rule). The checker intentionally
+returns exit code 1 while original locks fail; prepared patches do not certify
+the actual consumer branches or whole-system CI.
+
+Final candidate evidence is under ignored
+`02_api_backend/runtime/auth-candidate-58c4509671/`; its report records refs and
+hashes of exported 02 files. The later patch-output LF correction was independently
+verified with git apply/reverse checks; it changes no application/image source.
+Final rebuilt Linux Docker: **141 passed**, networking disabled, 109.51s.
+Project `yk02-check-3dd68c0e4a` also passed non-root real-factory API/worker startup,
+pair/schema validation, wrong-directory rejection and anonymous 401 checks before
+and after container recreation. Its own containers/network/volume were removed
+successfully; images and ignored reports remain locally. Ruff check/format pass
+for all 52 module-02 Python files, as do whitespace checks.
+
+No real Google browser login, provider requests, live-data migration/restore or
+deployment was performed. The original independent 03/05/06 acceptance issues in
+the supplied review remain their owners' work. The 04 fixture failures documented
+below describe the **older develop-only** dependency run, not this PR #20 candidate.
+Only 02's suites were rerun here; this is not a claim that all consumer suites pass.
+
+## Previous verification — 2026-10-21 (Asia/Bangkok)
 
 Base: `develop@69f5347`. Changes are restricted to `02_api_backend` on
 `codex/02-google-auth-ownership`. Existing user dotenv files, application databases,
