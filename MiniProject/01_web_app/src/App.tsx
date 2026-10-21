@@ -4,6 +4,8 @@ import { Api, ApiError, pollJob } from './api';
 import { buildScope, jobWarning, statusLabels, terminal, videoIdFromUrl } from './domain';
 import { demoTransport } from './demo';
 import { ResultView } from './Results';
+import { reconcileSources, snapshotSources, sourceKey } from './sources';
+import type { SourceSnapshot } from './types';
 import type { ImportItem, Job, ProgressEvent, TaskResult, TaskType, Video } from './types';
 
 const demo = import.meta.env.VITE_DEMO_MODE === 'true';
@@ -23,12 +25,15 @@ interface Operation {
   label: string;
   type: TaskType;
   jobId?: string;
+  sources: SourceSnapshot[];
 }
 interface Turn {
   id: string;
   label: string;
   result: TaskResult;
   partial: boolean;
+  jobId?: string;
+  sources: SourceSnapshot[];
 }
 const errorText = (error: unknown) =>
   error instanceof Error ? error.message : 'เกิดข้อผิดพลาด กรุณาลองอีกครั้ง';
@@ -137,6 +142,17 @@ export default function App() {
   const [level, setLevel] = useState('beginner');
   const [conversation, setConversation] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
+  const turnsRef = useRef<Turn[]>([]);
+  const inventory = useRef<{ videos: Video[]; completeInventory: boolean }>({
+    videos: [],
+    completeInventory: false,
+  });
+  const retiredSources = useRef(new Set<string>());
+  const [sourceCheckError, setSourceCheckError] = useState('');
+  function updateTurns(update: (previous: Turn[]) => Turn[]) {
+    turnsRef.current = update(turnsRef.current);
+    setTurns(turnsRef.current);
+  }
   const [operation, setOperation] = useState<Operation | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -178,6 +194,33 @@ export default function App() {
       pageCount.current = pages;
       setSelected((ids) =>
         ids.filter((id) => all.some((v) => v.video_id === id && v.status === 'ready')),
+      );
+      inventory.current = { videos: all, completeInventory: all.length >= count };
+      // Revalidate stored job identity, not merely the presence of a video ID.
+      const historical = turnsRef.current.filter((turn) => turn.jobId);
+      const checks = await Promise.allSettled(
+        historical.map((turn) => api.job(turn.jobId!, controller.signal)),
+      );
+      if (sequence !== refreshSequence.current || !alive.current) return;
+      const availability = new Map<string, boolean | undefined>();
+      checks.forEach((check, index) => {
+        if (check.status === 'fulfilled')
+          availability.set(historical[index].id, check.value.sources_available);
+      });
+      setSourceCheckError(
+        checks.some((check) => check.status === 'rejected')
+          ? 'ตรวจสอบสถานะแหล่งข้อมูลของผลเก่าไม่ครบ กรุณารีเฟรชอีกครั้ง'
+          : '',
+      );
+      updateTurns((previous) =>
+        previous.map((turn) => ({
+          ...turn,
+          result: reconcileSources(turn.result, turn.sources, {
+            ...inventory.current,
+            retired: retiredSources.current,
+            serverAvailable: availability.get(turn.id),
+          }),
+        })),
       );
     } catch (error) {
       if (!aborted(error) && sequence === refreshSequence.current && alive.current)
@@ -269,7 +312,7 @@ export default function App() {
     const displayResult = ['quiz', 'flashcards', 'study_plan'].includes(op.type)
       ? { coverage: result.coverage }
       : result;
-    setTurns((previous) =>
+    updateTurns((previous) =>
       previous.some((turn) => turn.id === op.key)
         ? previous
         : [
@@ -277,15 +320,21 @@ export default function App() {
             {
               id: op.key,
               label: op.label,
-              result: {
-                ...displayResult,
-                sources_available: sourcesAvailable,
-                artifacts: artifacts.map((artifact) => ({
-                  ...artifact,
-                  sources_available:
-                    sourcesAvailable === false ? false : artifact.sources_available,
-                })),
-              },
+              sources: op.sources,
+              jobId: op.jobId || result.job_id || job?.job_id,
+              result: reconcileSources(
+                {
+                  ...displayResult,
+                  sources_available: sourcesAvailable,
+                  artifacts: artifacts.map((artifact) => ({
+                    ...artifact,
+                    sources_available:
+                      sourcesAvailable === false ? false : artifact.sources_available,
+                  })),
+                },
+                op.sources,
+                { ...inventory.current, retired: retiredSources.current },
+              ),
               partial: job?.state === 'partial',
             },
           ],
@@ -421,6 +470,7 @@ export default function App() {
         payload,
         label: text || taskNames[type],
         type,
+        sources: snapshotSources(videos, scope),
       });
     } catch (error) {
       setTaskError(errorText(error));
@@ -465,6 +515,25 @@ export default function App() {
     setActionError('');
     try {
       const job = await api.deleteVideo(id);
+      const affected = [
+        ...inventory.current.videos,
+        ...turnsRef.current.flatMap((turn) => turn.sources),
+        ...(operationRef.current?.sources || []),
+      ].filter((source) => source.video_id === id);
+      affected.forEach((source) => retiredSources.current.add(sourceKey(source)));
+      inventory.current = {
+        ...inventory.current,
+        videos: inventory.current.videos.filter((video) => video.video_id !== id),
+      };
+      updateTurns((previous) =>
+        previous.map((turn) => ({
+          ...turn,
+          result: reconcileSources(turn.result, turn.sources, {
+            unavailableVideoIds: new Set([id]),
+            retired: retiredSources.current,
+          }),
+        })),
+      );
       setSelected((previous) => previous.filter((value) => value !== id));
       await refresh();
       void watchImport(job.job_id);
@@ -837,7 +906,7 @@ export default function App() {
                     disabled={taskLocked}
                     onClick={() => {
                       setConversation(null);
-                      setTurns([]);
+                      updateTurns(() => []);
                       setQuestion('');
                     }}
                   >
@@ -986,6 +1055,11 @@ export default function App() {
                 <div ref={resultsEnd} />
               </div>
             </section>
+          )}
+          {sourceCheckError && (
+            <p className="notice warning" role="status">
+              {sourceCheckError}
+            </p>
           )}
           {actionError && (
             <p className="notice error" role="alert">

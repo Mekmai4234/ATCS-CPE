@@ -13,6 +13,9 @@ Architecture
 - api.ts is the typed HTTP boundary, classified errors and sequential job observer.
 - domain.ts validates supported URLs, source constraints, timestamps and terminal states.
 - Results.tsx renders safe answer text, citations, coverage and typed learning content.
+- sources.ts retains source generation/index identity and invalidates stale citations
+  independently across answers and nested artifacts. Library refresh rechecks stored
+  result jobs; a partial library page alone is never interpreted as deletion.
 - demo.ts is explicitly enabled synthetic transport for development and acceptance.
 - vite.config.ts loads only public API configuration and builds static assets.
 - API_CONTRACT.md maps frontend operations to module 02 behavior.

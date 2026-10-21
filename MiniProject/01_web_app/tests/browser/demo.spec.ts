@@ -100,3 +100,21 @@ test('desktop visual and no browser exceptions', async ({ page }) => {
   await page.screenshot({ path: 'runtime/screenshots/desktop.png', fullPage: true });
   expect(errors).toEqual([]);
 });
+
+test('deleting a source updates already displayed learning artifact citations', async ({
+  page,
+}) => {
+  await page.getByRole('checkbox').nth(0).check();
+  await page.getByRole('checkbox').nth(1).check();
+  await page.getByRole('button', { name: 'วิเคราะห์และเรียนรู้', exact: true }).click();
+  await page.getByLabel('ประเภทงาน').selectOption('flashcards');
+  await page.getByRole('button', { name: 'เริ่มงาน', exact: true }).click();
+  await page.getByText('RAG คืออะไร?', { exact: true }).click();
+  await expect(page.locator('.artifact a')).toHaveCount(2);
+  await page.getByRole('button', { name: /^ลบ .*เริ่มต้นเข้าใจ/ }).click();
+  await page.getByRole('button', { name: 'ยืนยันลบคลิป', exact: true }).click();
+  await expect(page.locator('.artifact a')).toHaveCount(1);
+  await expect(
+    page.locator('.artifact').getByText('แหล่งข้อมูลใช้ไม่ได้', { exact: true }),
+  ).toBeVisible();
+});

@@ -35,6 +35,7 @@ pnpm dev
 - สร้าง URL citation ใหม่จาก video ID และเวลา เปิด YouTube ตรงช่วง ไม่ใช้ URL ที่ model ส่งมาทันที
 - Summary/compare, research พร้อม progress events, quiz, flashcards และ study plan; ดึง artifact ที่บันทึกไว้จาก ID
 - แสดงผลบางส่วน ข้อมูลไม่ครอบคลุม หลักฐานไม่เพียงพอ และแหล่งข้อมูลเดิมใช้ไม่ได้อย่างชัดเจน
+- เมื่อลบคลิป ปิดเฉพาะ citation ของคลิปนั้นในคำตอบและสื่อเรียนรู้ที่แสดงอยู่ เก็บ job ID และเวอร์ชันแหล่งข้อมูลเพื่อตรวจซ้ำเมื่อรีเฟรช การนำเข้า video ID เดิมไม่เปิดหลักฐานเก่ากลับมา
 - การส่งคำขอเดิมซ้ำใช้ payload และ Idempotency-Key เดิม งานใหม่ใช้ key ใหม่; import ใช้การ deduplicate ของ backend
 - ยกเลิกงานที่กำลังติดตาม ลบคลิปหลังยืนยัน และ retry งาน import/delete เฉพาะที่ backend อนุญาต
 - รองรับมือถือ คีย์บอร์ด reduced motion และแสดงข้อความที่ไม่เชื่อถือผ่าน React text โดยไม่เปิด raw HTML

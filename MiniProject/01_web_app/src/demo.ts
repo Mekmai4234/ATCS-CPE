@@ -1,23 +1,41 @@
-import type { Answer, Artifact, Job, ProgressEvent, Scope, Video } from './types';
+import type { Answer, Artifact, Job, ProgressEvent, Scope, SourceSnapshot, Video } from './types';
 import type { Transport } from './api';
 import { videoIdFromUrl, terminal } from './domain';
 
 // Explicit browser-only sandbox. Uses synthetic lessons unrelated to the video URLs.
 export function demoTransport(): Transport {
   const videos = new Map<string, Video>();
+  const generations = new Map<string, number>();
+  const jobSources = new Map<string, SourceSnapshot[]>();
+  const artifactSources = new Map<string, SourceSnapshot[]>();
+  const sourcesAvailable = (sources: SourceSnapshot[]) =>
+    sources.every((source) => {
+      const video = videos.get(source.video_id);
+      return (
+        video?.status === 'ready' &&
+        video.generation === source.generation &&
+        video.indexed_version === source.indexed_version
+      );
+    });
   const jobs = new Map<string, Job & { ticks: number; payload?: Record<string, unknown> }>();
   const artifacts = new Map<string, Artifact>();
   const keys = new Map<string, { input: string; job: string }>();
-  const makeVideo = (id: string, title: string, status: Video['status'] = 'ready'): Video => ({
-    video_id: id,
-    title: `[ตัวอย่าง] ${title}`,
-    status,
-    channel_id: 'demo-channel',
-    channel_title: 'Knowledge Studio · ข้อมูลจำลอง',
-    thumbnail_url: null,
-    published_at: '2026-10-01',
-    canonical_url: `https://www.youtube.com/watch?v=${id}`,
-  });
+  const makeVideo = (id: string, title: string, status: Video['status'] = 'ready'): Video => {
+    const generation = (generations.get(id) || 0) + 1;
+    generations.set(id, generation);
+    return {
+      generation,
+      indexed_version: `demo-${id}-${generation}`,
+      video_id: id,
+      title: `[ตัวอย่าง] ${title}`,
+      status,
+      channel_id: 'demo-channel',
+      channel_title: 'Knowledge Studio · ข้อมูลจำลอง',
+      thumbnail_url: null,
+      published_at: '2026-10-01',
+      canonical_url: `https://www.youtube.com/watch?v=${id}`,
+    };
+  };
   videos.set('dQw4w9WgXcQ', makeVideo('dQw4w9WgXcQ', 'เริ่มต้นเข้าใจ RAG และการค้นคืนความรู้'));
   videos.set('wD3NSzYtsMc', makeVideo('wD3NSzYtsMc', 'จากข้อมูลสู่คำตอบที่ตรวจสอบได้'));
   function answer(payload: Record<string, unknown>): Answer {
@@ -76,6 +94,15 @@ export function demoTransport(): Transport {
       payload,
     };
     jobs.set(job.job_id, job);
+    const scope = payload?.scope as Scope | undefined;
+    if (scope)
+      jobSources.set(
+        job.job_id,
+        scope.video_ids.map((id) => {
+          const { video_id, generation, indexed_version } = videos.get(id)!;
+          return { video_id, generation, indexed_version };
+        }),
+      );
     return job;
   };
   const advance = (job: ReturnType<typeof jobs.get>) => {
@@ -96,6 +123,7 @@ export function demoTransport(): Transport {
     } else if (job.kind === 'delete') videos.delete(job.video_id!);
     else {
       const result = answer(job.payload!);
+      result.job_id = job.job_id;
       if (job.kind === 'artifact') {
         const id = crypto.randomUUID();
         const type = job.payload!.type as Artifact['type'];
@@ -136,6 +164,7 @@ export function demoTransport(): Transport {
           citations: result.citations,
           coverage: result.coverage,
         });
+        artifactSources.set(id, jobSources.get(job.job_id) || []);
         job.result = { artifact_ids: [id] };
       } else if (job.kind === 'research') {
         job.state = 'partial';
@@ -221,7 +250,12 @@ export function demoTransport(): Transport {
       } else if (jobMatch[2] === 'retry')
         return error('งานนี้ไม่รองรับการลองใหม่', 'not_retryable', 409);
       else advance(job);
-      return json(job);
+      return json({
+        ...job,
+        ...(jobSources.has(job.job_id)
+          ? { sources_available: sourcesAvailable(jobSources.get(job.job_id)!) }
+          : {}),
+      });
     }
     if (path.startsWith('/api/videos/') && method === 'DELETE') {
       const id = path.split('/')[3];
@@ -249,7 +283,12 @@ export function demoTransport(): Transport {
     }
     if (path.startsWith('/api/learning-artifacts/') && method === 'GET') {
       const artifact = artifacts.get(path.split('/')[3]);
-      return artifact ? json(artifact) : error('ไม่พบสื่อเรียนรู้', 'not_found', 404);
+      return artifact
+        ? json({
+            ...artifact,
+            sources_available: sourcesAvailable(artifactSources.get(artifact.artifact_id!) || []),
+          })
+        : error('ไม่พบสื่อเรียนรู้', 'not_found', 404);
     }
     if (['/api/chat', '/api/analysis', '/api/research', '/api/learning-artifacts'].includes(path)) {
       const scope = body.scope as Scope;
@@ -282,6 +321,7 @@ export function demoTransport(): Transport {
         job.state = 'completed';
         job.stage = 'completed';
         job.result = answer(body);
+        job.result.job_id = job.job_id;
         return json(job.result);
       }
       return json(

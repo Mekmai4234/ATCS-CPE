@@ -9,6 +9,8 @@ export type VideoStatus =
   | 'deleting'
   | 'deleted';
 export interface Video {
+  generation?: number;
+  indexed_version?: string | null;
   video_id: string;
   title: string | null;
   channel_id: string | null;
@@ -57,6 +59,7 @@ export interface Coverage {
   notes: string[];
 }
 export interface Answer {
+  job_id?: string;
   status: 'answered' | 'insufficient_evidence';
   answer: string;
   citations: Citation[];
@@ -65,6 +68,11 @@ export interface Answer {
   sources_available?: boolean;
   provider_metadata?: { provider: string; requested_model: string; returned_model?: string | null };
   mode?: string;
+}
+export interface SourceSnapshot {
+  video_id: string;
+  generation?: number;
+  indexed_version?: string | null;
 }
 export interface Artifact {
   artifact_id?: string;

@@ -1,5 +1,8 @@
 # Module 01 — Local verification report
 
+Follow-up source-lifecycle correction and verification (21 October 2026):
+see [FOLLOWUP_REPORT.md](FOLLOWUP_REPORT.md). Counts below describe the initial implementation.
+
 Date: 20 October 2026 (Asia/Bangkok).
 Frontend working branch: `feature/01_web_app`, based on `bba68bf`.
 Backend reference: local `develop@25427feff1d93fc515c53fe1adac881ef8d2567e`.
