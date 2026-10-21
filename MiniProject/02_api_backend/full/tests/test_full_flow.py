@@ -9,11 +9,13 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from pydantic_settings import DotEnvSettingsSource
 from youtube_agent.models import ModelReply
 from youtube_answers.models import Generated, GeneratedAnswer
 from youtube_ingestion.models import CaptionTrack, Metadata, RawSegment
 from youtube_rag.embeddings import FixtureEmbedder
 
+from youtube_backend.config import Settings
 from youtube_backend.database import Database
 from youtube_backend.full import FullSettings
 from youtube_backend.full_pair import check_pair, initialize_pair
@@ -24,6 +26,41 @@ from youtube_backend.schemas import ProviderMetadata
 from youtube_backend.worker import Worker
 
 VIDEO_A, VIDEO_B = "dQw4w9WgXcQ", "jNQXAC9IVRw"
+
+
+def assert_resolved_settings(adapters, settings):
+    actual = {
+        "answer": adapters.answers.answers.settings,
+        "rag": adapters.answers.rag.settings,
+        "ingestion": adapters.ingestion.settings,
+        "agent": adapters.agent.settings,
+    }
+    for name, expected in settings.services().items():
+        assert actual[name].model_dump() == expected.model_dump(), name
+
+
+def hostile_module_dotenv(monkeypatch, settings, file):
+    """Exercise each service's settings sources without touching a private 05 constant.
+
+    Preserve explicit `_env_file=None`. When dotenv is enabled (older 05), replace
+    its files with the hostile temporary file, never reading a user's real dotenv.
+    The new resolved-settings loader must also pass the actual-value assertions.
+    """
+    for service in settings.services().values():
+        cls = type(service)
+        monkeypatch.setitem(cls.model_config, "env_file", (file,))
+
+        def sources(
+            settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
+        ):
+            dotenv = DotEnvSettingsSource(
+                settings_cls,
+                env_file=None if dotenv_settings.env_file is None else file,
+                env_file_encoding="utf-8",
+            )
+            return init_settings, env_settings, dotenv, file_secret_settings
+
+        monkeypatch.setattr(cls, "settings_customise_sources", staticmethod(sources))
 
 
 def metadata():
@@ -127,33 +164,53 @@ async def full(tmp_path, monkeypatch):
         gemini_api_key="test-only-not-a-real-key",
         job_retry_base_seconds=0,
         job_lease_seconds=120,
+        transcript_languages="en,th",
+        metadata_provider="none",
+        ingest_timeout_seconds=25,
+        answer_read_page_size=75,
+        answer_max_history_bytes=4321,
+        agent_max_steps=7,
+        retrieval_top_k=5,
     )
     initialize_pair(settings)
     for key, value in settings.child_environment({}).items():
         monkeypatch.setenv(key, value)
-    # Deliberately hostile module dotenv files must lose to the exported snapshot.
-    from youtube_answers import team
-
     file = tmp_path / "module.env"
-    file.write_text("CHROMA_PERSIST_DIR=wrong\nLLM_MODEL=wrong\nGEMINI_API_KEY=wrong\n")
-    monkeypatch.setattr(team, "ENV_FILES", (file,))
+    file.write_text(
+        "CHROMA_PERSIST_DIR=wrong\nLLM_MODEL=wrong\nGEMINI_API_KEY=wrong\n"
+        "TRANSCRIPT_LANGUAGES=fr\nMETADATA_PROVIDER=oembed\nINGEST_TIMEOUT_SECONDS=99\n"
+        "ANSWER_READ_PAGE_SIZE=10\nANSWER_MAX_HISTORY_BYTES=100\nAGENT_MAX_STEPS=2\n"
+        "RETRIEVAL_TOP_K=1\n",
+        encoding="utf-8",
+    )
+    hostile_module_dotenv(monkeypatch, settings, file)
     install_doubles(monkeypatch)
+    # Match the real child entrypoints: only shared backend fields are on Settings;
+    # 03/05-specific fields must survive through the launcher's exported environment.
+    runtime_settings = Settings(_env_file=None)
     database = Database(settings.database_url)
-    repo = Repository(database, settings)
-    runtime = ManagedAdapters(settings, repo)
-    await runtime.start()
-    app = create_app(settings, database, runtime.adapter)
+    repo = Repository(database, runtime_settings)
+    runtime = ManagedAdapters(runtime_settings, repo)
+    try:
+        await runtime.start()
+        assert_resolved_settings(runtime.adapter, settings)
+    except BaseException:
+        await runtime.close()
+        database.close()
+        raise
+    app = create_app(runtime_settings, database, runtime.adapter)
     try:
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app), base_url="http://test"
         ) as c:
             yield SimpleNamespace(
                 settings=settings,
+                runtime_settings=runtime_settings,
                 db=database,
                 repo=repo,
                 runtime=runtime,
                 client=c,
-                worker=Worker(repo, runtime, settings),
+                worker=Worker(repo, runtime, runtime_settings),
             )
     finally:
         await runtime.close()
@@ -207,9 +264,10 @@ async def test_full_factory_import_chat_analysis_research_and_reopen(full):
     await env.worker.run_once(research.json()["job_id"])
     assert env.repo.get_job(research.json()["job_id"])["state"] == "completed"
     await env.runtime.close()
-    restarted = ManagedAdapters(env.settings, env.repo)
+    restarted = ManagedAdapters(env.runtime_settings, env.repo)
     try:
         await restarted.start()
+        assert_resolved_settings(restarted.adapter, env.settings)
         assert env.repo.get_job(job_id)["result"] == job["result"]
         assert check_pair(env.settings)
         deletion = await env.client.delete(f"/api/videos/{VIDEO_A}")
