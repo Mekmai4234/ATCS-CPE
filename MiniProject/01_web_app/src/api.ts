@@ -17,37 +17,61 @@ export class ApiError extends Error {
     public retryable = true,
     public requestId?: string,
     public jobId?: string,
+    public status?: number,
   ) {
     super(message);
   }
 }
 export type Transport = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 export type TaskResponse = { status: 200; data: Answer } | { status: 202; data: Accepted };
+export interface ApiSecurity {
+  csrf: () => { header: string; token: string };
+  onSessionExpired: () => void;
+}
 export class Api {
   onMode?: (mode: string) => void;
+  private controllers = new Set<AbortController>();
+  private disposed = false;
   constructor(
     private base: string,
     private transport: Transport = (input, init) => fetch(input, init),
     private timeoutMs = 75000,
+    private security?: ApiSecurity,
   ) {}
+  dispose() {
+    this.disposed = true;
+    this.controllers.forEach((controller) => controller.abort());
+    this.controllers.clear();
+  }
   async request<T>(path: string, init: RequestInit = {}): Promise<{ status: number; data: T }> {
-    const controller = new AbortController();
-    const cancel = () => controller.abort();
+    if (this.disposed) throw new DOMException('Session ended', 'AbortError');
     init.signal?.throwIfAborted();
+    const controller = new AbortController();
+    this.controllers.add(controller);
+    const mutating = !['GET', 'HEAD', 'OPTIONS'].includes((init.method || 'GET').toUpperCase());
+    const csrf = mutating ? this.security?.csrf() : undefined;
+    if (this.security && mutating && (!csrf?.token || !csrf.header)) {
+      this.controllers.delete(controller);
+      throw new ApiError('กรุณาเข้าสู่ระบบอีกครั้ง', 'csrf_missing', false);
+    }
+    const cancel = () => controller.abort();
     init.signal?.addEventListener('abort', cancel, { once: true });
     const timer = setTimeout(cancel, this.timeoutMs);
     try {
       const response = await this.transport(`${this.base}${path}`, {
         ...init,
+        credentials: this.security ? 'include' : 'same-origin',
         signal: controller.signal,
         headers: {
           Accept: 'application/json',
           ...(init.body ? { 'Content-Type': 'application/json' } : {}),
           ...init.headers,
+          ...(csrf ? { [csrf.header]: csrf.token } : {}),
         },
       });
       const mode = response.headers.get('X-Adapter-Mode');
       if (mode) this.onMode?.(mode);
+      if (response.status === 401) this.security?.onSessionExpired();
       const data = await response.json().catch(() => {
         throw new ApiError('เซิร์ฟเวอร์ส่งข้อมูลที่อ่านไม่ได้', 'invalid_response', false);
       });
@@ -56,9 +80,10 @@ export class Api {
         throw new ApiError(
           e?.message || `คำขอไม่สำเร็จ (HTTP ${response.status})`,
           e?.code || 'http_error',
-          e?.retryable ?? response.status >= 500,
+          [401, 403].includes(response.status) ? false : (e?.retryable ?? response.status >= 500),
           e?.request_id || response.headers.get('X-Request-ID') || undefined,
           e?.job_id,
+          response.status,
         );
       }
       if (!data || typeof data !== 'object')
@@ -66,7 +91,7 @@ export class Api {
       if (typeof data.mode === 'string') this.onMode?.(data.mode);
       return { status: response.status, data: data as T };
     } catch (error) {
-      if (init.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+      if (init.signal?.aborted || this.disposed) throw new DOMException('Aborted', 'AbortError');
       if (error instanceof ApiError) throw error;
       throw new ApiError(
         controller.signal.aborted
@@ -75,6 +100,7 @@ export class Api {
       );
     } finally {
       clearTimeout(timer);
+      this.controllers.delete(controller);
       init.signal?.removeEventListener('abort', cancel);
     }
   }
