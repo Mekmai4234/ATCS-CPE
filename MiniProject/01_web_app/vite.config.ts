@@ -9,6 +9,9 @@ export default defineConfig(({ mode, command }) => {
   const local = loadEnv(mode, '.', ['NEXT_PUBLIC_API_BASE_URL', 'VITE_']);
   const apiUrl =
     local.NEXT_PUBLIC_API_BASE_URL || shared.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+  // Same-origin /api also preserves readable 401/403 responses and host-only cookies.
+  // Production must provide the equivalent reverse proxy; Vite's proxy is dev-only.
+  const sameOrigin = local.VITE_API_SAME_ORIGIN !== 'false';
   const parsed = new URL(apiUrl);
   if (
     !['http:', 'https:'].includes(parsed.protocol) ||
@@ -45,8 +48,13 @@ export default defineConfig(({ mode, command }) => {
       },
     ],
     define: {
-      'import.meta.env.NEXT_PUBLIC_API_BASE_URL': JSON.stringify(apiUrl.replace(/\/$/, '')),
+      'import.meta.env.NEXT_PUBLIC_API_BASE_URL': JSON.stringify(
+        sameOrigin ? '' : apiUrl.replace(/\/$/, ''),
+      ),
     },
-    server: { strictPort: true },
+    server: {
+      strictPort: true,
+      ...(sameOrigin ? { proxy: { '/api': { target: parsed.origin, changeOrigin: false } } } : {}),
+    },
   };
 });

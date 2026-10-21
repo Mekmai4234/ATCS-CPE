@@ -1,10 +1,10 @@
 # 01 · YouTube Knowledge Web
 
-## RAG Buddy UI — 21 October 2026
+## RAG Buddy UI / auth integration — 22 October 2026
 
 ปรับหน้าตามภาพอ้างอิง `D:\Web` เป็นธีมป่า พร้อมหน้า login, home, library, chat/learning และ admin ตาม capability ดู [รายงานรอบนี้](RAGBUDDY_UI_REPORT.md) และ [ภาพตัวอย่าง](docs/screenshots/ragbuddy-home-1440.png)
 
-**รอเชื่อม auth ทีม 02 ตามที่ผู้ใช้ขอ:** production/default จะแสดงหน้า login ที่ยังไม่เปิดให้ใช้งาน และไม่เรียก workspace API การตั้ง Client ID เพียงอย่างเดียวไม่เปิดระบบสมาชิก ต้องตกลงและทำ adapter ตาม [AUTH_INTEGRATION.md](AUTH_INTEGRATION.md) ก่อน ส่วนหน้า admin และการสลับบัญชีทดลองได้เฉพาะ DEMO/fixture ซึ่งไม่ใช่การยืนยันสิทธิ์จริงของ backend
+**เชื่อม HttpSessionPort กับทีม 02 PR18 แล้ว:** ใช้ challenge nonce, Google exchange, session/CSRF และ Admin API จริง ดู [AUTH_INTEGRATION.md](AUTH_INTEGRATION.md) และ [ผลแก้ review](AUTH_REVIEW_REPORT.md) ต้องใช้ backend ที่เปิด auth จาก PR18; backend เดิมบน develop ไม่รองรับ flow นี้ การทดสอบอัตโนมัติใช้ verifier fixture ยังไม่ใช่บัญชี Google จริง จึงคง Draft จนผ่าน release acceptance
 
 หน้าเว็บ React + TypeScript สำหรับนำเข้าคลิป เลือกแหล่งข้อมูล ถามพร้อม citation วิเคราะห์ และแสดงสื่อเรียนรู้ ใช้ Vite เพราะเป็นเว็บฝั่ง client ที่เชื่อม FastAPI อยู่แล้ว ไม่ต้องมี Node server อีกชุดตอนนำ build ไปใช้งาน
 
@@ -19,9 +19,11 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-เปิด `http://127.0.0.1:3000` โหมดเริ่มต้นหยุดที่หน้า login ระหว่างรอ auth adapter ไม่มีการเปลี่ยนไปใช้คำตอบจำลองอัตโนมัติ ค่า API สำหรับเชื่อมในอนาคตเริ่มที่ `http://localhost:8000`
+เปิด `http://127.0.0.1:3000` เว็บจะตรวจ `/api/auth/me` และขอ challenge ก่อนแสดงปุ่ม GIS ไม่เปลี่ยนไปใช้ demo อัตโนมัติเมื่อ backend ไม่พร้อม โดยปริยาย Vite proxy `/api` ไป `NEXT_PUBLIC_API_BASE_URL` (เริ่มที่ `http://localhost:8000`) ส่วน production ต้องตั้ง reverse proxy `/api` เอง
 
 Vite อ่านเฉพาะ `NEXT_PUBLIC_API_BASE_URL` จาก shared `.env` ที่ MiniProject และให้ค่าของ `01_web_app/.env` หรือ process environment มีลำดับเหนือกว่า โหลดค่าอื่นฝั่ง server เข้าหน้าเว็บไม่ได้ ต้องให้ backend ตั้ง `WEB_ORIGIN=http://127.0.0.1:3000` ตรงกับ origin ที่เปิดจริง หากเปิดผ่าน `localhost` ให้ตั้งค่า origin ให้ตรงกัน
+
+ให้ทีม 02 ตั้ง `GOOGLE_CLIENT_ID` และ trusted origin ของเว็บ ค่า Client ID/nonce ที่ใช้กับ Google มาจาก challenge ของ server ค่า `VITE_API_SAME_ORIGIN=true` เป็นค่าเริ่มต้น; หากเลือก `false` ต้องตรวจ cookie/CORS ทุกสถานะ รวมถึง 401/403 ดูรายละเอียดในคู่มือ auth
 
 ทดลองโดยไม่ใช้ backend:
 
@@ -67,11 +69,19 @@ Browser tests ใช้ Google Chrome ที่ติดตั้งอยู่
 
 พอร์ต 3001/3002 ใช้ standalone workspace harness เพื่อรักษา regression เดิม พอร์ต 3003 ใช้ SessionShell กับ test adapter `/__test__/` และ mock GIS โดยเฉพาะ ไม่ใช่ contract ทีม 02 และไม่ใช่การทดสอบ Google จริง โหมด harness ทั้งสองห้าม build สำหรับ deploy
 
-Browser suite ปกติทดสอบ demo และ mock HTTP contract โดยข้ามหนึ่งกรณี backend จริง ทดสอบ backend จริงแยกได้ด้วย Python 3.11+ ที่ติดตั้ง dependencies ของ module 02 แล้ว:
+Browser suite ปกติทดสอบ demo และ mock HTTP contract โดยข้าม 7 integration cases ซึ่งรันแยกผ่านสองคำสั่งด้านล่าง ทดสอบ backend จริงแยกได้ด้วย Python 3.11+ ที่ติดตั้ง dependencies ของ module 02 แล้ว:
 
 ```powershell
 python tests/backend_smoke.py --ref develop
 ```
+
+ทดสอบ session/nonce/Admin/ownership ด้วย HTTP backend ที่เปิด auth และ verifier fixture (ต้องมี dependencies ของ module 02) ใช้พอร์ต 3001–3004:
+
+```powershell
+python tests/identity_smoke.py --ref origin/codex/02-google-auth-ownership
+```
+
+คำสั่งนี้ใช้หน้า entry ตามปกติและฐานข้อมูลแยก ไม่แก้ backend checkout หรือฐานข้อมูลเดิม ไม่ใช่การทดสอบบัญชี Google จริง
 
 สคริปต์อ่าน source module 02 จาก local Git ref ไปยังโฟลเดอร์ใหม่ใน `runtime/` เปิด API/worker บนพอร์ตว่าง ใช้ฐานข้อมูล fixture ใหม่ แล้วเรียก browser test โดยไม่ได้ mock HTTP ปิด API/worker เมื่อเสร็จ ไม่แก้ branch หรือฐานข้อมูลเดิม ต้องมี Node.js, Git, Chrome และ dependencies ของ module 02 อยู่บนเครื่อง
 

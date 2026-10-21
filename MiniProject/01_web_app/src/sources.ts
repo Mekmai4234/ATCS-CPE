@@ -1,9 +1,18 @@
 import type { Citation, Scope, SourceSnapshot, TaskResult, Video } from './types';
 
 export const sourceKey = (source: SourceSnapshot) =>
-  JSON.stringify([source.video_id, source.generation ?? null, source.indexed_version ?? null]);
+  JSON.stringify([
+    source.video_id,
+    source.generation ?? null,
+    source.indexed_version ?? null,
+    source.accessRevision ?? null,
+  ]);
 
-export function snapshotSources(videos: Video[], scope: Scope): SourceSnapshot[] {
+export function snapshotSources(
+  videos: Video[],
+  scope: Scope,
+  revisions?: ReadonlyMap<string, number>,
+): SourceSnapshot[] {
   return videos
     .filter(
       (video) =>
@@ -19,6 +28,7 @@ export function snapshotSources(videos: Video[], scope: Scope): SourceSnapshot[]
       video_id,
       generation,
       indexed_version,
+      ...(revisions ? { accessRevision: revisions.get(video_id) || 0 } : {}),
     }));
 }
 

@@ -4,16 +4,14 @@ import AdminView from './AdminView';
 import { Api, ApiError } from './api';
 import { BuddyLogo, ForestBackdrop, Mascot } from './Forest';
 import GoogleButton from './GoogleButton';
-import {
-  DemoSessionPort,
-  PendingSessionPort,
-  safeMemberSession,
-  safeWorkspacePath,
-} from './session';
+import { HttpSessionPort } from './httpSession';
+import { DemoSessionPort, safeMemberSession, safeWorkspacePath } from './session';
 import type { MemberSession, SessionPort } from './session';
 
 const defaultPort: SessionPort =
-  import.meta.env.VITE_DEMO_MODE === 'true' ? new DemoSessionPort() : new PendingSessionPort();
+  import.meta.env.VITE_DEMO_MODE === 'true'
+    ? new DemoSessionPort()
+    : new HttpSessionPort(import.meta.env.NEXT_PUBLIC_API_BASE_URL);
 const routeView = (path: string) =>
   path === '/chat'
     ? 'chat'
@@ -84,6 +82,10 @@ function MemberArea({
 }
 
 export default function SessionShell({ port = defaultPort }: { port?: SessionPort }) {
+  const prepareChallenge = useMemo(
+    () => (port.challenge ? (signal: AbortSignal) => port.challenge!(signal) : undefined),
+    [port],
+  );
   const [phase, setPhase] = useState<
     'checking' | 'guest' | 'member' | 'exchanging' | 'logging-out'
   >('checking');
@@ -266,15 +268,16 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
               ))}
             </div>
           )}
-          {phase === 'guest' && !port.demo && port.ready && clientId && (
+          {phase === 'guest' && !port.demo && port.ready && (clientId || prepareChallenge) && (
             <GoogleButton
               clientId={clientId}
+              prepareChallenge={prepareChallenge}
               onCredential={(credential) =>
                 accept((signal) => port.exchangeGoogle(credential, signal))
               }
             />
           )}
-          {phase === 'guest' && !port.demo && (!port.ready || !clientId) && (
+          {phase === 'guest' && !port.demo && (!port.ready || (!clientId && !prepareChallenge)) && (
             <div className="login-unavailable" role="status">
               <span aria-hidden="true">◷</span>
               <strong>กำลังเตรียมการเข้าสู่ระบบ</strong>

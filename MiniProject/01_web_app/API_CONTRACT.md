@@ -1,5 +1,7 @@
 # Frontend integration mapping
 
+Auth/member update (2026-10-22): [AUTH_INTEGRATION.md](AUTH_INTEGRATION.md) records the PR18 contract now used by HttpSessionPort. Browser API paths default to same-origin `/api`; real member deletion may return a completed `detach` job while shared physical data stays available to other members. The mapping below originally described the legacy workspace endpoints.
+
 Reference: local Git `develop@25427fe`, `MiniProject/docs/backend_api_contract.md`
 and `MiniProject/02_api_backend/src/youtube_backend/schemas.py`. This file records
 the frontend's integration assumptions; it does not replace the backend contract.

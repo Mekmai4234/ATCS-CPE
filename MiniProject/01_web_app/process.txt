@@ -10,11 +10,14 @@ through Git. The branch was synchronized with develop before publishing the PR.
 Architecture
 ------------
 - SessionShell.tsx restores membership, gates routes, keys private state by account/session
-  revision, and unmounts the workspace before logout. Default PendingSessionPort stays closed.
+  revision, and unmounts the workspace before logout. HttpSessionPort is the default.
 - session.ts defines an internal frontend port, not an HTTP contract. DemoSessionPort uses
-  isolated synthetic account stores. Real module-02 integration is waiting as requested.
+  isolated synthetic account stores. httpSession.ts maps the inspected module-02 PR18
+  challenge, Google exchange, session/CSRF, logout, stats and member update endpoints.
 - GoogleButton.tsx renders the official GIS button; credentials are passed to the adapter
   and are not written to localStorage or sessionStorage. No password forms are included.
+  Server nonce/client_id initialize GIS. Challenges refresh before expiry and after failed
+  exchange. Old callbacks are ignored and credentials are never automatically resubmitted.
 - Forest.tsx, HomeHero.tsx and theme.css implement responsive forest/mint surfaces with
   separate WebP assets. AdminView.tsx renders only advertised session capabilities.
 - App.tsx coordinates library, import, selection, task forms and lifecycle state.
@@ -29,8 +32,9 @@ Architecture
 - demo.ts is explicitly enabled synthetic transport for development and acceptance.
 - vite.config.ts loads only public API configuration and builds static assets.
 - API_CONTRACT.md maps frontend operations to module 02 behavior.
-- AUTH_INTEGRATION.md records the unresolved auth/admin contracts. Existing HTTP fixture
-  regression tests do not establish backend ownership or production authentication.
+- AUTH_INTEGRATION.md records auth/admin mappings and same-origin deployment. The new
+  identity_smoke.py runs real auth-enabled backend routes with an external Google verifier
+  fixture. This verifies cookie/CSRF/ownership mechanics, not real Google authentication.
 
 Techniques and Contract
 -----------------------
