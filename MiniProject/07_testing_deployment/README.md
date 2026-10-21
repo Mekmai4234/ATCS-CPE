@@ -1,0 +1,138 @@
+# 07 — System verification and deployment
+
+This folder owns repeatable checks, release acceptance, packaging and recovery. Changes
+are confined to 07. Modules 02–06 already contain implementations; 01 has no runnable web
+application in this checkout. The repository-root README and environment example are
+outdated: current 04 uses Gemini embeddings, not the root OpenAI example.
+
+## Install and verify
+
+From **MiniProject**, with Python 3.11–3.13 and uv:
+
+```powershell
+uv sync --project 07_testing_deployment --locked
+uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/check.py
+```
+
+The 07 lockfile installs 02–06, including 05's `team` extra, pytest and Ruff. Existing
+suites run in separate processes, avoiding repeated filenames and `conftest` collisions.
+The runner clears provider keys/live opt-ins, deselects live tests, treats warnings as
+errors, checks lint/format without modifying other modules, and saves logs/JUnit/JSON
+under ignored `07_testing_deployment/runtime/<UTC-run>/`. Suite timeouts terminate their
+owned process tree. Local offline execution is not a network sandbox; the Docker test
+service additionally disables networking. Existing tests use synthetic provider doubles.
+
+Append `--group baseline` for existing suites, `--group acceptance` for 07 integration/
+recovery/tooling, `--group regressions` for upstream blockers, or `--group lint` for Ruff.
+`--timeout 900` sets maximum seconds per command (default 900).
+
+Baseline includes `02_api_backend/full/tests` as a separate process. Pytest state uses
+fresh short OS temporary paths to avoid deep Windows workspace/Chroma path failures.
+Override with `--temp-root C:\t` or `YK07_TEMP_ROOT`; logs/JUnit/JSON stay in 07/runtime.
+The report records the temporary-state path, which is retained for failure diagnosis.
+
+Regression gates now check the repaired 03/04 safeguards through supported interfaces,
+including exact `index_store_mismatch` errors and unchanged manifests for wrong-store
+reindex AND garbage collection. No xfail/skips hide setup failures. See
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md) and [REVIEW_FIX_REPORT.md](REVIEW_FIX_REPORT.md) for current
+results; [TEST_REPORT.md](TEST_REPORT.md) preserves the historical 19 October baseline.
+
+## CI template
+
+`ci/offline.yml` contains Windows/Linux jobs, locked installation and report upload.
+GitHub activates workflows only under repository-root `.github/workflows/`; this template
+stays here to honor the 07-only boundary. It is **not active CI**. A maintainer can later
+install it at `.github/workflows/miniproject-offline.yml`. This template does not activate remote CI.
+
+## Full team containers
+
+`Dockerfile` packages all five Python modules using the 07 lockfile. `compose.yaml` runs
+initialization, API and worker against one SQLite/Chroma volume through the existing
+`youtube_answers.team:create_adapters` factory. No frontend is added before 01 is ready.
+
+Export `GEMINI_API_KEY` securely in your local terminal and choose an account-accessible
+`LLM_MODEL`. No credentials are stored here. From MiniProject:
+
+```powershell
+docker compose -f 07_testing_deployment/compose.yaml config --quiet
+docker compose -f 07_testing_deployment/compose.yaml build
+docker compose -f 07_testing_deployment/compose.yaml up -d
+docker compose -f 07_testing_deployment/compose.yaml ps
+```
+
+API docs: `http://127.0.0.1:8007/docs`, bound to localhost. Initialization, API and worker
+all resolve `FullSettings` once and export every service field. New 05 uses its resolved
+loader; develop's legacy loader is checked under the identical exported snapshot. The
+removed `youtube_answers.team.ENV_FILES` constant is never imported. Preflight compares
+runtime and maintenance database/vector/fingerprint/model values before initialization.
+
+02's initializer creates/verifies a guarded SQLite/Chroma pair and refuses old unbound
+state. All service children receive the same snapshot and verify this pair before startup.
+No .env files, keys, data or Windows environments are included in Docker build inputs.
+`/health` checks schema/capabilities, not provider access or useful worker completion.
+This remains a localhost single-user prototype; public HTTPS/authentication is separate.
+
+For local commands, select one full-system environment file explicitly:
+
+```powershell
+uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/preflight.py --env-file YOUR_FULL_ENV
+uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/preflight.py --env-file YOUR_FULL_ENV --initialize
+```
+
+`--run api` and `--run worker` use that selected file, require a key and export the same
+snapshot. The test image includes 02 full tests and all allowed 06 test/fixtures inputs.
+Latest 06 packages its dataset in `youtube_agent/data` inside the wheel; copying the
+whole allowlisted 06 directory also supports a fixtures/ directory when present.
+
+Offline container checks mount no application volume and disable networking:
+
+```powershell
+docker compose -f 07_testing_deployment/compose.yaml --profile test build tests
+docker compose -f 07_testing_deployment/compose.yaml --profile test run --rm --no-deps tests
+```
+
+Compose syntax validation alone is not successful image build or deployment. See the
+report for actual Docker Engine availability and executed results.
+
+After building the runtime, an isolated startup drill can be repeated with:
+
+```powershell
+uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/docker_startup.py
+```
+
+It uses `compose.startup-test.yaml`, a synthetic key and an internal Docker network.
+It verifies initialization, API/worker startup and HTTP health from the worker container
+to the API. It does not test the host-published port or make import/model requests.
+The helper removes only its randomly named project's containers/network/state volume
+and keeps its report under 07/runtime. Test images/build caches are retained for reuse.
+
+## Live acceptance
+
+Use separate live state. Requests persist imports and can incur provider charges, so they
+are excluded from default verification. Once the stack is ready:
+
+```powershell
+uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/live_smoke.py --allow-live --url "https://youtu.be/YOUR_VIDEO_ID" --question "RAG คืออะไร"
+```
+
+The script checks live capabilities, imports until ready, asks within scope and validates
+citations/intervals/timestamp URLs. On timeout it leaves the existing/shared server job
+alone; inspect/cancel it through the API. It does not prove semantic support or click a
+player. Perform the manual review in [ACCEPTANCE.md](ACCEPTANCE.md). A configured model
+name does not establish access. Existing 03/04 live reports remain historical module
+evidence, not a new complete-system acceptance result.
+
+## Recovery and responsibilities
+
+Follow [RECOVERY.md](RECOVERY.md) for cold paired backups with checksums and new restore
+destinations. Retain compatible image/schema/embedding/chunk configuration.
+
+- 07: central runner/reports, integration and acceptance, packaging, recovery drill.
+- 02/04/05: retain shared configuration and physical-store safeguards as interfaces evolve.
+- 03: retain bounded subprocess cleanup; 07 keeps the regression gate.
+- 05/06 with 07: human review of supported claims and educational quality.
+- 01: runnable UI, citation seek/error states and browser acceptance.
+
+Root documentation corrections and active workflow changes remain outside this edit
+scope. Tests do not patch production files. Updated env/step/process describe the actual
+07 workflow; report missing frontend/live/container evidence as pending.

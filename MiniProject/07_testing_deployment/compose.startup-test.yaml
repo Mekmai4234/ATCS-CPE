@@ -1,0 +1,18 @@
+# Only for the isolated startup drill: synthetic key, blocked external networking.
+# No imports/generation are submitted; this does not prove provider access.
+services:
+  initialize:
+    environment:
+      APP_ENV: test
+      GEMINI_API_KEY: fixture07-no-provider-requests
+  api:
+    environment:
+      APP_ENV: test
+      GEMINI_API_KEY: fixture07-no-provider-requests
+  worker:
+    environment:
+      APP_ENV: test
+      GEMINI_API_KEY: fixture07-no-provider-requests
+networks:
+  default:
+    internal: true
