@@ -258,3 +258,107 @@ async def test_failed_jobs_and_poll_deadlines_are_classified():
         with pytest.raises(AppError) as caught:
             await AcceptanceRunner(client, poll_timeout=0)._result({"job_id": "job"})
         assert caught.value.code == "acceptance_poll_timeout"
+
+
+@pytest.mark.parametrize(
+    "arguments,request_timeout,poll_timeout",
+    [
+        ([], 210, 300),
+        (["--request-timeout", "95", "--poll-timeout", "140"], 95, 140),
+    ],
+)
+def test_cli_uses_configured_http_and_polling_budgets(
+    tmp_path, monkeypatch, arguments, request_timeout, poll_timeout
+):
+    from youtube_answers import acceptance
+
+    plan_file, output = tmp_path / "plan.json", tmp_path / "result.json"
+    plan_file.write_text(plan().model_dump_json(), encoding="utf-8")
+    client_type = httpx.AsyncClient
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200, json={"ok": True})
+
+    def client(**kwargs):
+        return client_type(**kwargs, transport=httpx.MockTransport(handler))
+
+    async def run(self, _plan):
+        assert self.poll_timeout == poll_timeout
+        await self._request("POST", "/api/chat", json={})
+        return {"structural_checks_passed": True, "semantic_acceptance": "pending_human_review"}
+
+    monkeypatch.setattr(acceptance.httpx, "AsyncClient", client)
+    monkeypatch.setattr(acceptance.AcceptanceRunner, "run", run)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "yk-answers-acceptance",
+            "--live",
+            "--plan",
+            str(plan_file),
+            "--output",
+            str(output),
+            *arguments,
+        ],
+    )
+    assert acceptance.main() == 0
+    assert requests[0].extensions["timeout"]["read"] == request_timeout
+    assert requests[0].extensions["timeout"]["write"] == request_timeout
+    assert requests[0].extensions["timeout"]["connect"] == 10
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "nan", "inf", "-inf", "invalid"])
+def test_cli_rejects_invalid_timeout_before_any_network(value):
+    import argparse
+
+    from youtube_answers.acceptance import positive_seconds
+
+    with pytest.raises(argparse.ArgumentTypeError):
+        positive_seconds(value)
+
+
+@pytest.mark.parametrize("timeout,passes", [(0.01, False), (1.0, True)])
+async def test_real_http_read_budget_allows_slow_response_within_configured_limit(timeout, passes):
+    import asyncio
+    from contextlib import suppress
+
+    tasks = set()
+
+    async def respond(reader, writer):
+        task = asyncio.current_task()
+        tasks.add(task)
+        try:
+            await reader.readuntil(b"\r\n\r\n")
+            await asyncio.sleep(0.1)
+            writer.write(
+                b'HTTP/1.1 200 OK\r\nContent-Length: 11\r\nConnection: close\r\n\r\n{"ok":true}'
+            )
+            await writer.drain()
+        except ConnectionError:
+            pass
+        finally:
+            writer.close()
+            with suppress(ConnectionError):
+                await writer.wait_closed()
+            tasks.discard(task)
+
+    server = await asyncio.start_server(respond, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    try:
+        async with httpx.AsyncClient(
+            base_url=f"http://127.0.0.1:{port}", timeout=timeout
+        ) as client:
+            runner = AcceptanceRunner(client)
+            if passes:
+                assert await runner._request("GET", "/slow-chat") == {"ok": True}
+            else:
+                with pytest.raises(AppError) as caught:
+                    await runner._request("GET", "/slow-chat")
+                assert caught.value.code == "acceptance_request_timeout"
+    finally:
+        server.close()
+        await server.wait_closed()
+        if tasks:
+            await asyncio.gather(*tasks)

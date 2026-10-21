@@ -7,6 +7,7 @@ review; a model must never certify its own claims as correct.
 import argparse
 import asyncio
 import json
+import math
 import re
 import time
 from datetime import UTC, datetime
@@ -30,6 +31,19 @@ REQUIRED_CATEGORIES = {
     "long_summary",
     "multi_summary",
 }
+
+# Backend's default whole-job budget is 180s; allow a 30s HTTP delivery margin.
+DEFAULT_REQUEST_TIMEOUT = 210.0
+
+
+def positive_seconds(value):
+    try:
+        seconds = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("Timeout must be a positive finite number") from None
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise argparse.ArgumentTypeError("Timeout must be a positive finite number")
+    return seconds
 
 
 class AcceptanceCase(Schema):
@@ -90,6 +104,11 @@ class AcceptanceRunner:
             response = await self.client.request(method, path, **kwargs)
             response.raise_for_status()
             return response.json()
+        except httpx.TimeoutException:
+            raise error(
+                "acceptance_request_timeout",
+                "HTTP request exceeded its budget; inspect existing jobs before retrying",
+            ) from None
         except (httpx.HTTPError, ValueError):
             # Do not echo raw provider/server bodies, headers or request credentials.
             raise error("acceptance_http_error", "Acceptance HTTP request failed") from None
@@ -333,6 +352,18 @@ def main():
         "--live", action="store_true", help="Allow imports and paid provider requests"
     )
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--request-timeout",
+        type=positive_seconds,
+        default=DEFAULT_REQUEST_TIMEOUT,
+        help="HTTP read/write timeout in seconds (default: 210; default backend job budget + 30)",
+    )
+    parser.add_argument(
+        "--poll-timeout",
+        type=positive_seconds,
+        default=300,
+        help="Maximum polling time per asynchronous job in seconds (default: 300)",
+    )
     args = parser.parse_args()
     if not args.live:
         parser.error("Pass --live to allow importing videos and paid generation/embedding requests")
@@ -349,8 +380,9 @@ def main():
 
     async def run():
         plan = AcceptancePlan.model_validate_json(args.plan.read_text("utf-8"))
-        async with httpx.AsyncClient(base_url=args.base_url, timeout=30) as client:
-            return await AcceptanceRunner(client).run(plan)
+        timeout = httpx.Timeout(args.request_timeout, connect=min(10, args.request_timeout))
+        async with httpx.AsyncClient(base_url=args.base_url, timeout=timeout) as client:
+            return await AcceptanceRunner(client, poll_timeout=args.poll_timeout).run(plan)
 
     try:
         report = asyncio.run(run())
@@ -361,6 +393,11 @@ def main():
             "error_code": getattr(exc, "code", "acceptance_configuration_error"),
             "semantic_acceptance": "not_run",
         }
+    report["client_budgets"] = {
+        "request_timeout_seconds": args.request_timeout,
+        "connect_timeout_seconds": min(10, args.request_timeout),
+        "poll_timeout_seconds": args.poll_timeout,
+    }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Saved acceptance report to {args.output}; semantic review remains manual.")
