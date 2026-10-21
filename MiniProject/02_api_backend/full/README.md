@@ -150,6 +150,8 @@ own generated containers/volume, with reports under ignored `runtime/yk02-check-
 
 No existing application data or local credentials are used in verification.
 See [FULL_TEST_REPORT.md](../FULL_TEST_REPORT.md) for observed results and limits.
+See [REVIEW_FIX_REPORT.md](../REVIEW_FIX_REPORT.md) for the 2026-10-20 test-fixture
+repair and compatibility checks against the pending 05/06 configuration changes.
 
 ## Handoff to module 07 (not changed here)
 
