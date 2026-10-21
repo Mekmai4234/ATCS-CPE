@@ -7,6 +7,19 @@ import { ResultView } from './Results';
 import { reconcileSources, snapshotSources, sourceKey } from './sources';
 import type { SourceSnapshot } from './types';
 import type { ImportItem, Job, ProgressEvent, TaskResult, TaskType, Video } from './types';
+import type { Member } from './session';
+import { BuddyLogo, ForestBackdrop } from './Forest';
+import HomeHero from './HomeHero';
+
+type WorkspaceView = 'home' | 'library' | 'chat' | 'learn';
+interface WorkspaceProps {
+  api?: Api;
+  member?: Member;
+  initialView?: WorkspaceView;
+  onNavigate?: (path: string) => void;
+  onLogout?: () => void;
+  adminEnabled?: boolean;
+}
 
 const demo = import.meta.env.VITE_DEMO_MODE === 'true';
 const taskNames: Record<TaskType, string> = {
@@ -114,14 +127,30 @@ function Thumbnail({ url }: { url: string | null }) {
   );
 }
 
-export default function App() {
+export default function App({
+  api: suppliedApi,
+  member,
+  initialView = 'library',
+  onNavigate,
+  onLogout,
+  adminEnabled = false,
+}: WorkspaceProps = {}) {
   const api = useMemo(
-    () => new Api(import.meta.env.NEXT_PUBLIC_API_BASE_URL, demo ? demoTransport() : undefined),
-    [],
+    () =>
+      suppliedApi ||
+      new Api(import.meta.env.NEXT_PUBLIC_API_BASE_URL, demo ? demoTransport() : undefined),
+    [suppliedApi],
   );
   const [mode, setMode] = useState(demo ? 'fixture' : 'unknown');
   api.onMode = setMode;
-  const [tab, setTab] = useState<'library' | 'chat' | 'learn'>('library');
+  const [tab, setTab] = useState<WorkspaceView>(initialView);
+  useEffect(() => {
+    setTab(initialView);
+  }, [initialView]);
+  function navigateTab(view: WorkspaceView) {
+    setTab(view);
+    onNavigate?.(view === 'home' ? '/' : view === 'learn' ? '/learning' : `/${view}`);
+  }
   const [videos, setVideos] = useState<Video[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -561,7 +590,8 @@ export default function App() {
   const synthetic = demo || mode === 'fixture';
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell forest-workspace view-${tab}`}>
+      <ForestBackdrop />
       <a className="skip-link" href="#workspace">
         ข้ามไปเนื้อหา
       </a>
@@ -587,7 +617,7 @@ export default function App() {
             <button
               key={id}
               className={tab === id ? 'nav-item active' : 'nav-item'}
-              onClick={() => setTab(id)}
+              onClick={() => navigateTab(id)}
               aria-current={tab === id ? 'page' : undefined}
             >
               <Icon name={icon} />
@@ -609,6 +639,43 @@ export default function App() {
       </aside>
       <main id="workspace" className="workspace" tabIndex={-1}>
         <header className="topbar">
+          <BuddyLogo onClick={() => navigateTab('home')} />
+          <nav className="forest-nav" aria-label="เมนูพื้นที่เรียนรู้">
+            {(
+              [
+                ['home', 'หน้าแรก'],
+                ['library', 'คลังวิดีโอ'],
+                ['chat', 'ถามจากคลิป'],
+                ['learn', 'วิเคราะห์และเรียนรู้'],
+              ] as const
+            ).map(([view, label]) => (
+              <button
+                key={view}
+                className={tab === view ? 'active' : ''}
+                aria-current={tab === view ? 'page' : undefined}
+                onClick={() => navigateTab(view)}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+          <div className="profile-controls">
+            {adminEnabled && (
+              <button className="admin-link" onClick={() => onNavigate?.('/admin')}>
+                จัดการระบบ
+              </button>
+            )}
+            {member && (
+              <div className="profile-pill">
+                <span className="avatar" aria-hidden="true">
+                  {member.name.slice(0, 1)}
+                </span>
+                <span>{member.name}</span>
+                <span className="profile-separator" />
+                <button onClick={onLogout}>ออกจากระบบ</button>
+              </div>
+            )}
+          </div>
           <div className="breadcrumb">
             พื้นที่ทำงาน <span>/</span>{' '}
             <strong>
@@ -630,27 +697,43 @@ export default function App() {
           </div>
         )}
         <div className="page-body">
-          <div className="page-heading">
-            <div>
-              <span className="eyebrow">WATCH LESS. UNDERSTAND MORE.</span>
-              <h1>
-                {tab === 'library'
-                  ? 'คลังวิดีโอของคุณ'
-                  : tab === 'chat'
-                    ? 'ความรู้ เริ่มจากคำถาม'
-                    : 'ต่อยอดทุกการเรียนรู้'}
-                <span className="heading-dot">.</span>
-              </h1>
-              <p>
-                {tab === 'library'
-                  ? 'รวบรวมคลิปที่สนใจ แล้วค้นพบคำตอบจากสิ่งที่คุณเลือกดู'
-                  : 'คำตอบและการเรียนรู้ที่เชื่อมกลับไปยังหลักฐานในคลิปที่คุณเลือก'}
-              </p>
+          {tab === 'home' && (
+            <HomeHero
+              name={member?.name || 'ผู้เรียน'}
+              value={urls}
+              busy={importing}
+              change={setUrls}
+              submit={(event) => {
+                navigateTab('library');
+                void importUrls(event);
+              }}
+              openLibrary={() => navigateTab('library')}
+              openChat={() => navigateTab('chat')}
+            />
+          )}
+          {tab !== 'home' && (
+            <div className="page-heading">
+              <div>
+                <span className="eyebrow">WATCH LESS. UNDERSTAND MORE.</span>
+                <h1>
+                  {tab === 'library'
+                    ? 'คลังวิดีโอของคุณ'
+                    : tab === 'chat'
+                      ? 'ความรู้ เริ่มจากคำถาม'
+                      : 'ต่อยอดทุกการเรียนรู้'}
+                  <span className="heading-dot">.</span>
+                </h1>
+                <p>
+                  {tab === 'library'
+                    ? 'รวบรวมคลิปที่สนใจ แล้วค้นพบคำตอบจากสิ่งที่คุณเลือกดู'
+                    : 'คำตอบและการเรียนรู้ที่เชื่อมกลับไปยังหลักฐานในคลิปที่คุณเลือก'}
+                </p>
+              </div>
+              <span className="section-number" aria-hidden="true">
+                {tab === 'library' ? '01' : tab === 'chat' ? '02' : '03'}
+              </span>
             </div>
-            <span className="section-number">
-              {tab === 'library' ? '01' : tab === 'chat' ? '02' : '03'}
-            </span>
-          </div>
+          )}
           {tab === 'library' && (
             <section className="import-panel" aria-labelledby="import-title">
               <div className="import-description">
@@ -734,7 +817,9 @@ export default function App() {
             <div className="section-heading">
               <div>
                 <h2 id="library-title">
-                  {tab === 'library' ? 'วิดีโอทั้งหมด' : 'แหล่งข้อมูลสำหรับงานนี้'}{' '}
+                  {tab === 'library' || tab === 'home'
+                    ? 'วิดีโอทั้งหมด'
+                    : 'แหล่งข้อมูลสำหรับงานนี้'}{' '}
                   <span className="count">{total}</span>
                 </h2>
                 <p>
@@ -803,7 +888,7 @@ export default function App() {
                 </p>
               </div>
             )}
-            <div className={`video-grid ${tab !== 'library' ? 'compact' : ''}`}>
+            <div className={`video-grid ${tab === 'chat' || tab === 'learn' ? 'compact' : ''}`}>
               {filtered.map((video, i) => (
                 <article
                   className={`video-card ${selected.includes(video.video_id) ? 'selected' : ''}`}
@@ -884,14 +969,14 @@ export default function App() {
                   <strong>เลือกไว้ {selected.length} คลิป</strong>
                   <span>พร้อมเป็นแหล่งข้อมูลของคุณ</span>
                 </div>
-                <button className="primary" onClick={() => setTab('chat')}>
+                <button className="primary" onClick={() => navigateTab('chat')}>
                   ถามจากคลิปที่เลือก
                   <Icon name="arrow" />
                 </button>
               </div>
             )}
           </section>
-          {tab !== 'library' && (
+          {(tab === 'chat' || tab === 'learn') && (
             <section className="chat-panel" aria-labelledby="task-title">
               <div className="section-heading">
                 <div>
