@@ -8,6 +8,7 @@ class AgentSettings(BaseSettings):
         env_file=(PROJECT_ROOT / ".env", PROJECT_ROOT / "06_research_learning_agent" / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        allow_inf_nan=False,
     )
     gemini_api_key: SecretStr = SecretStr("")
     llm_model: str = Field(default="gemini-3.5-flash", min_length=1, max_length=200)
@@ -24,3 +25,8 @@ class AgentSettings(BaseSettings):
         if self.agent_finalize_reserve_seconds >= self.agent_timeout_seconds:
             raise ValueError("Finalization reserve must be smaller than the run deadline")
         return self
+
+    @classmethod
+    def from_backend(cls, settings):
+        """Consume already-resolved runtime settings instead of reloading module env files."""
+        return cls(_env_file=None, **{name: getattr(settings, name) for name in cls.model_fields})

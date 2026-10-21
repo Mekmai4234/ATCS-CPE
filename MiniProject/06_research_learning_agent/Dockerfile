@@ -19,3 +19,16 @@ RUN groupadd --gid 10001 agent \
     && useradd --uid 10001 --gid agent --no-create-home agent
 USER 10001:10001
 CMD ["pytest", "tests", "-q", "-o", "cache_dir=/tmp/pytest-cache"]
+
+# Optional test-only environment. Consumers that package just 02/04/06 use target tests.
+FROM tests AS acceptance
+USER 0:0
+COPY 05_ai_answers_analysis/pyproject.toml /app/05_ai_answers_analysis/pyproject.toml
+COPY 05_ai_answers_analysis/src /app/05_ai_answers_analysis/src
+WORKDIR /app/06_research_learning_agent/acceptance
+COPY 06_research_learning_agent/acceptance/pyproject.toml 06_research_learning_agent/acceptance/uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked
+COPY 06_research_learning_agent/acceptance/tests ./tests
+ENV PATH="/app/06_research_learning_agent/acceptance/.venv/bin:$PATH"
+USER 10001:10001
+CMD ["pytest", "-c", "pyproject.toml", "../tests", "tests", "-q", "-W", "error", "-o", "cache_dir=/tmp/pytest-cache"]

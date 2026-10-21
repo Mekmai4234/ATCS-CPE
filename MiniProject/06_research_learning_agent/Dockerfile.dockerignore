@@ -7,6 +7,10 @@
 !04_rag_knowledge/pyproject.toml
 !04_rag_knowledge/src/
 !04_rag_knowledge/src/**
+!05_ai_answers_analysis/
+!05_ai_answers_analysis/pyproject.toml
+!05_ai_answers_analysis/src/
+!05_ai_answers_analysis/src/**
 !06_research_learning_agent/
 !06_research_learning_agent/pyproject.toml
 !06_research_learning_agent/uv.lock
@@ -14,5 +18,10 @@
 !06_research_learning_agent/src/**
 !06_research_learning_agent/tests/
 !06_research_learning_agent/tests/**
+!06_research_learning_agent/acceptance/
+!06_research_learning_agent/acceptance/pyproject.toml
+!06_research_learning_agent/acceptance/uv.lock
+!06_research_learning_agent/acceptance/tests/
+!06_research_learning_agent/acceptance/tests/**
 **/__pycache__/
 **/*.pyc

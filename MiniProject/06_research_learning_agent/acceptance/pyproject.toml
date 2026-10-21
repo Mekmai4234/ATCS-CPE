@@ -1,0 +1,25 @@
+[project]
+name = "youtube-knowledge-agent-acceptance"
+version = "0.1.0"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "youtube-knowledge-agent",
+  "youtube-knowledge-answers",
+  "pytest>=8,<10",
+  "pytest-asyncio>=1,<2",
+  "httpx>=0.28,<1",
+  "ruff>=0.11,<1",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+youtube-knowledge-agent = { path = "..", editable = true }
+youtube-knowledge-answers = { path = "../../05_ai_answers_analysis", editable = true }
+youtube-knowledge-backend = { path = "../../02_api_backend", editable = true }
+youtube-knowledge-rag = { path = "../../04_rag_knowledge", editable = true }
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["../tests"]
