@@ -9,6 +9,7 @@ import pytest
 from conftest import VIDEO_A, VIDEO_B, ScriptedModel, metadata
 from google import genai
 from google.genai import types
+from identity_helpers import OwnedTestRepository, login
 from youtube_agent.config import AgentSettings
 from youtube_agent.models import ModelReply
 from youtube_agent.service import AgentService
@@ -83,6 +84,9 @@ async def integrated(tmp_path):
     settings = Settings(
         _env_file=None,
         app_env="test",
+        auth_enabled=True,
+        session_cookie_secure=False,
+        google_client_id="05-offline-client",
         adapter_mode="custom",
         adapter_factory="youtube_answers.integration:create_adapters",
         database_url=f"sqlite:///{(tmp_path / 'app.db').as_posix()}",
@@ -124,6 +128,7 @@ async def integrated(tmp_path):
         transport=httpx.ASGITransport(app=app),
         base_url="http://test",
     ) as client:
+        user = await login(client, app, "member-a")
         for video in (VIDEO_A, VIDEO_B):
             response = await client.post(
                 "/api/videos/import",
@@ -132,11 +137,15 @@ async def integrated(tmp_path):
             assert response.status_code == 202, response.text
             job_id = response.json()["jobs"][0]["job_id"]
             await worker.run_once(job_id)
-            assert repo.get_job(job_id)["stage"] == "ready", repo.get_job(job_id)
+            owned_repo = OwnedTestRepository(repo, user["user_id"])
+            assert owned_repo.get_job(job_id)["stage"] == "ready", owned_repo.get_job(job_id)
         yield SimpleNamespace(
             settings=settings,
             db=db,
-            repo=repo,
+            repo=owned_repo,
+            raw_repo=repo,
+            owner=user,
+            app=app,
             answers=answers,
             adapters=adapters,
             worker=worker,
@@ -176,7 +185,8 @@ async def test_http_chat_citations_history_and_database_reopen(integrated):
     assert history.status_code == 200 and len(history.json()["messages"]) == 2
     reopened = Database(env.settings.database_url)
     try:
-        assert Repository(reopened, env.settings).get_job(job_id)["result"] == result
+        restored = OwnedTestRepository(Repository(reopened, env.settings), env.owner["user_id"])
+        assert restored.get_job(job_id)["result"] == result
     finally:
         reopened.close()
 
