@@ -10,6 +10,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def check(settings, evidence=None):
     reasons = []
+    if getattr(settings, "app_env", None) != "production":
+        reasons.append("production_environment_required")
+    if (
+        getattr(settings, "adapter_mode", None) != "custom"
+        or getattr(settings, "adapter_factory", None) != "youtube_answers.team:create_adapters"
+        or getattr(settings, "backend_integration_profile", None) != "live"
+    ):
+        reasons.append("production_team_factory_required")
     if not getattr(settings, "auth_enabled", False):
         reasons.append("backend_auth_unavailable_or_disabled")
     if not getattr(settings, "google_client_id", ""):
