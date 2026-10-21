@@ -6,6 +6,12 @@ live AI provider in 04; a deterministic fixture adapter supports offline tests.
 02 owns jobs/transcripts/ready states; 05/06 own answer generation and research.
 Source changes are confined to this folder. See [TEST_REPORT.md](TEST_REPORT.md).
 
+The account-aware release requires 02's ownership/session contract (PR #18).
+See [AUTHORIZATION.md](AUTHORIZATION.md) for the trusted execution boundary,
+account-bound signed cursors, shared-source GC and the additive stopped upgrade.
+No embedding/vector metadata migration or bulk re-embedding is needed. Do not
+deploy this as a standalone Google login implementation.
+
 ## Install and test
 
 From `MiniProject`, with Python 3.11–3.13 and uv:
