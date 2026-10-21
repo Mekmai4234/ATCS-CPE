@@ -39,3 +39,17 @@ Scope / verification
   to check live captions, all stored timestamps, ready status and duplicate URL reuse.
 - Root documentation may still describe the older planned-only status.
 - Discovery/refresh/scheduling/authenticated access/ASR/container deployment remain separate work.
+
+Member boundary proposal
+- members.py defines strict private response DTOs and MemberIngestion control-plane calls.
+- Member identity is resolved only by the injected 02 backend from an opaque server context.
+- Client user_id/owner_id/role cannot authorize an import. Do not expose shared worker IDs.
+- Admission joins a shared source through 02's atomic membership/private-job transaction.
+- Removing membership is distinct from physical GC; cancellation must preserve B's interest.
+- member_adapters.py checks exact source grants before delegation and after async work.
+- 02/04 must enforce refs/leases/generations in the actual publication/deletion transaction.
+- MemberSettings is separate to preserve the existing full-launcher settings contract.
+- The optional member factory refuses legacy backends before constructing provider clients.
+- Reference-backend tests are simulations, not proof of deployed multi-account isolation.
+- No Google Login, member HTTP routes or ownership migrations are activated by this change.
+- MEMBER_CONTRACT.md records the proposal and release gates; MEMBER_REPORT.md records limits.

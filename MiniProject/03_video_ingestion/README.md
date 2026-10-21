@@ -5,6 +5,12 @@ Includes a 03-owned factory for `ingest -> 02 persistence -> 04 index`, offline 
 real SQLite/Chroma integration tests, and an explicit public YouTube read check.
 Existing 02/04/06 source and factories are unchanged.
 
+Member ingestion work for the 2026-10-21 plan is described in
+[MEMBER_CONTRACT.md](MEMBER_CONTRACT.md) and [MEMBER_REPORT.md](MEMBER_REPORT.md).
+It adds an optional fail-closed 03 boundary; it does **not** enable Google Login or
+make the existing single-user endpoints safe for multiple accounts. Real 02/04
+session/library/job/ref-count integration is still required before activation.
+
 ## Install and test
 
 From **MiniProject root**, with Python >=3.11,<3.14 and uv:

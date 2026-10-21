@@ -36,3 +36,20 @@ D) Verification
 6. Record the 2026-10-20 follow-up results separately in FOLLOWUP_REPORT.md.
 
 Future: channel/playlist discovery, ready-video refresh, scheduling and optional ASR.
+
+E) Proposed member flow (requires 02/04 integration before enabling)
+1. 02 authenticates the request and passes an opaque server-issued context to MemberIngestion.
+2. 03 validates the URL-only import body and normalizes/deduplicates valid video IDs.
+3. 02 reauthorizes and applies member quotas in the transaction that attaches library refs,
+   joins/creates shared work, and issues a private job ID for each requesting member.
+4. Reuse ready sources without another caption/index request; return only private DTOs.
+5. A shared source worker obtains an exact backend SourceGrant before 03/04 execution.
+6. Recheck live authorization while fetching and before returning evidence/results.
+7. Retry/cancel/job/transcript access always goes through 02's member ownership checks.
+8. Remove A's library ref without deleting B's source or cancelling B's required work.
+9. Only an authorized GC claim with zero refs/dependencies can physically delete a generation;
+   02/04 must recheck that condition inside their transaction, not only at preflight.
+10. Run real two-account HTTP and cross-process lifecycle tests after the backend contract exists.
+
+The current optional factory fails closed because the legacy Repository lacks that contract.
+Existing single-user routes are unchanged and must not be presented as member-protected.
