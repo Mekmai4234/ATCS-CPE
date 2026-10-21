@@ -21,6 +21,12 @@ Important details
 - Publication uses the existing 02 transaction-level lease guard and lifecycle checks.
 - Reindex is explicit when provider/model/dimensions/format/counting/chunk schema changes.
 - No distributed transaction with Chroma is claimed; offline GC removes abandoned staging.
+- SQLite and the Chroma marker share a persistent pair identity; every operation checks it.
+- Existing v1 databases add rag04_store_binding via init, then explicitly verify legacy IDs
+  with bind-store while stopped. Wrong stores fail before manifest changes.
+- Maintenance selects runtime factory profiles or explicit ordered env files. Config
+  diagnostics expose resolved paths/model identity, never keys. GC needs no provider key.
+- GC verifies vectors are gone before forgetting run metadata; failures remain retryable.
 
 Interfaces
 ----------
