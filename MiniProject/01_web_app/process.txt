@@ -9,8 +9,18 @@ through Git. The branch was synchronized with develop before publishing the PR.
 
 Architecture
 ------------
+- SessionShell.tsx restores membership, gates routes, keys private state by account/session
+  revision, and unmounts the workspace before logout. Default PendingSessionPort stays closed.
+- session.ts defines an internal frontend port, not an HTTP contract. DemoSessionPort uses
+  isolated synthetic account stores. Real module-02 integration is waiting as requested.
+- GoogleButton.tsx renders the official GIS button; credentials are passed to the adapter
+  and are not written to localStorage or sessionStorage. No password forms are included.
+- Forest.tsx, HomeHero.tsx and theme.css implement responsive forest/mint surfaces with
+  separate WebP assets. AdminView.tsx renders only advertised session capabilities.
 - App.tsx coordinates library, import, selection, task forms and lifecycle state.
 - api.ts is the typed HTTP boundary, classified errors and sequential job observer.
+  With session security it includes cookies/CSRF, expires on 401, refuses automatic 403
+  retries, and aborts outstanding requests on disposal.
 - domain.ts validates supported URLs, source constraints, timestamps and terminal states.
 - Results.tsx renders safe answer text, citations, coverage and typed learning content.
 - sources.ts retains source generation/index identity and invalidates stale citations
@@ -19,6 +29,8 @@ Architecture
 - demo.ts is explicitly enabled synthetic transport for development and acceptance.
 - vite.config.ts loads only public API configuration and builds static assets.
 - API_CONTRACT.md maps frontend operations to module 02 behavior.
+- AUTH_INTEGRATION.md records the unresolved auth/admin contracts. Existing HTTP fixture
+  regression tests do not establish backend ownership or production authentication.
 
 Techniques and Contract
 -----------------------

@@ -1,5 +1,11 @@
 # 01 · YouTube Knowledge Web
 
+## RAG Buddy UI — 21 October 2026
+
+ปรับหน้าตามภาพอ้างอิง `D:\Web` เป็นธีมป่า พร้อมหน้า login, home, library, chat/learning และ admin ตาม capability ดู [รายงานรอบนี้](RAGBUDDY_UI_REPORT.md) และ [ภาพตัวอย่าง](docs/screenshots/ragbuddy-home-1440.png)
+
+**รอเชื่อม auth ทีม 02 ตามที่ผู้ใช้ขอ:** production/default จะแสดงหน้า login ที่ยังไม่เปิดให้ใช้งาน และไม่เรียก workspace API การตั้ง Client ID เพียงอย่างเดียวไม่เปิดระบบสมาชิก ต้องตกลงและทำ adapter ตาม [AUTH_INTEGRATION.md](AUTH_INTEGRATION.md) ก่อน ส่วนหน้า admin และการสลับบัญชีทดลองได้เฉพาะ DEMO/fixture ซึ่งไม่ใช่การยืนยันสิทธิ์จริงของ backend
+
 หน้าเว็บ React + TypeScript สำหรับนำเข้าคลิป เลือกแหล่งข้อมูล ถามพร้อม citation วิเคราะห์ และแสดงสื่อเรียนรู้ ใช้ Vite เพราะเป็นเว็บฝั่ง client ที่เชื่อม FastAPI อยู่แล้ว ไม่ต้องมี Node server อีกชุดตอนนำ build ไปใช้งาน
 
 ## เริ่มใช้งาน
@@ -13,7 +19,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-เปิด `http://127.0.0.1:3000` โหมดเริ่มต้นเชื่อม API จริงที่ `http://localhost:8000` หาก backend ยังไม่เปิดจะแสดงข้อผิดพลาด ไม่มีการเปลี่ยนไปใช้คำตอบจำลองอัตโนมัติ
+เปิด `http://127.0.0.1:3000` โหมดเริ่มต้นหยุดที่หน้า login ระหว่างรอ auth adapter ไม่มีการเปลี่ยนไปใช้คำตอบจำลองอัตโนมัติ ค่า API สำหรับเชื่อมในอนาคตเริ่มที่ `http://localhost:8000`
 
 Vite อ่านเฉพาะ `NEXT_PUBLIC_API_BASE_URL` จาก shared `.env` ที่ MiniProject และให้ค่าของ `01_web_app/.env` หรือ process environment มีลำดับเหนือกว่า โหลดค่าอื่นฝั่ง server เข้าหน้าเว็บไม่ได้ ต้องให้ backend ตั้ง `WEB_ORIGIN=http://127.0.0.1:3000` ตรงกับ origin ที่เปิดจริง หากเปิดผ่าน `localhost` ให้ตั้งค่า origin ให้ตรงกัน
 
@@ -24,7 +30,7 @@ $env:VITE_DEMO_MODE = "true"
 pnpm dev
 ```
 
-โหมดนี้มีป้าย DEMO ตลอดเวลา ใช้บทเรียนและคำตอบสังเคราะห์ที่ไม่สัมพันธ์กับเนื้อหาคลิปจริง ไม่ดึง YouTube ไม่เรียก AI ไม่มีค่าใช้บริการภายนอก ปิด dev server แล้วใช้ `Remove-Item Env:VITE_DEMO_MODE` ก่อนกลับโหมด API จริง ค่านี้เป็น build-time configuration; เปลี่ยนแล้วต้องเริ่ม server/build ใหม่
+เลือกบัญชี A, B หรือผู้ดูแลบนหน้า login โหมดนี้มีป้าย DEMO ตลอดเวลา ใช้ข้อมูลและคำตอบสังเคราะห์ ไม่ดึง YouTube ไม่เรียก AI ไม่มีค่าใช้บริการภายนอก เก็บเฉพาะตัวเลือกบัญชี fixture ใน sessionStorage; ไม่เก็บ credential จริง ปิด dev server แล้วใช้ `Remove-Item Env:VITE_DEMO_MODE` ก่อนกลับโหมดเริ่มต้น ค่านี้เป็น build-time configuration; เปลี่ยนแล้วต้องเริ่ม server/build ใหม่
 
 ## Flow ที่รองรับ
 
@@ -54,9 +60,12 @@ pnpm format:check
 pnpm test
 pnpm test:browser
 pnpm build
+pnpm test:production
 ```
 
-Browser tests ใช้ Google Chrome ที่ติดตั้งอยู่ และเปิด test servers บน `127.0.0.1:3001` กับ `:3002` โดยอัตโนมัติ จึงต้องให้สองพอร์ตนี้ว่าง หากต้องใช้ Chromium ของ Playwright ให้ติดตั้งด้วย `pnpm exec playwright install chromium` และเปลี่ยน `channel` ใน config ตามสภาพแวดล้อมของทีม
+Browser tests ใช้ Google Chrome ที่ติดตั้งอยู่ และเปิด test servers บน `127.0.0.1:3001`, `:3002` และ `:3003` โดยอัตโนมัติ จึงต้องให้สามพอร์ตนี้ว่าง หากต้องใช้ Chromium ของ Playwright ให้ติดตั้งด้วย `pnpm exec playwright install chromium` และเปลี่ยน `channel` ใน config ตามสภาพแวดล้อมของทีม
+
+พอร์ต 3001/3002 ใช้ standalone workspace harness เพื่อรักษา regression เดิม พอร์ต 3003 ใช้ SessionShell กับ test adapter `/__test__/` และ mock GIS โดยเฉพาะ ไม่ใช่ contract ทีม 02 และไม่ใช่การทดสอบ Google จริง โหมด harness ทั้งสองห้าม build สำหรับ deploy
 
 Browser suite ปกติทดสอบ demo และ mock HTTP contract โดยข้ามหนึ่งกรณี backend จริง ทดสอบ backend จริงแยกได้ด้วย Python 3.11+ ที่ติดตั้ง dependencies ของ module 02 แล้ว:
 

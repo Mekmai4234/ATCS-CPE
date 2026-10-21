@@ -5,13 +5,17 @@ A) Install, Start and Verify
 From MiniProject/01_web_app with Node.js 22.12+ and pnpm 11.25.0:
 1. pnpm install --frozen-lockfile
 2. pnpm dev -> http://127.0.0.1:3000
-3. Set the backend WEB_ORIGIN to the exact browser origin.
-4. For explicit synthetic data only, set VITE_DEMO_MODE=true before startup.
+3. Default startup shows an unavailable login while the real auth contract is pending.
+4. For explicit synthetic data only, set VITE_DEMO_MODE=true before startup, then select A/B/admin.
 5. pnpm typecheck; pnpm test; pnpm test:browser; pnpm build
-6. Browser tests need installed Google Chrome and free ports 3001/3002.
+6. Browser tests need installed Google Chrome and free ports 3001/3002/3003.
 7. For real module-02 HTTP with fixture adapters, use a Python environment containing
    its dependencies: python tests/backend_smoke.py --ref develop
 8. Read README.md and TEST_REPORT.md for limits and observed verification.
+9. Read RAGBUDDY_UI_REPORT.md for current UI checks and AUTH_INTEGRATION.md for pending work.
+10. Agree module-02 auth/admin/ownership contracts before implementing a production adapter.
+    Configure exact allowed origins and cookie/CSRF policy; a public Google Client ID alone
+    does not enable sign-in. Run real Google and cross-account server tests before deployment.
 
 B) Video Import and Library
 ---------------------------

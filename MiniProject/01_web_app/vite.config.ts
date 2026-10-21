@@ -1,7 +1,9 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
+  if (command === 'build' && ['workspace-tests', 'session-tests'].includes(mode))
+    throw new Error('Test harness modes cannot produce a deployment build');
   // Read only these public names; never expose the shared server .env wholesale.
   const shared = loadEnv(mode, '..', 'NEXT_PUBLIC_API_BASE_URL');
   const local = loadEnv(mode, '.', ['NEXT_PUBLIC_API_BASE_URL', 'VITE_']);
@@ -20,7 +22,28 @@ export default defineConfig(({ mode }) => {
     );
   }
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      {
+        name: 'development-test-entry',
+        apply: 'serve',
+        configureServer(server) {
+          if (!['workspace-tests', 'session-tests'].includes(mode)) return;
+          server.middlewares.use((req, _res, next) => {
+            const path = req.url?.split('?')[0] || '';
+            if (
+              !path.includes('.') &&
+              !path.startsWith('/@') &&
+              !path.startsWith('/api/') &&
+              !path.startsWith('/__test__/')
+            )
+              req.url =
+                mode === 'workspace-tests' ? '/tests/workspace.html' : '/tests/session.html';
+            next();
+          });
+        },
+      },
+    ],
     define: {
       'import.meta.env.NEXT_PUBLIC_API_BASE_URL': JSON.stringify(apiUrl.replace(/\/$/, '')),
     },
