@@ -25,6 +25,7 @@ dev = [
 ]
 
 [project.scripts]
+yk-full = "youtube_backend.full:main"
 yk-api = "youtube_backend.cli:api"
 yk-worker = "youtube_backend.cli:worker"
 yk-db = "youtube_backend.cli:migrate"

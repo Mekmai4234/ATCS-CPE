@@ -1,5 +1,8 @@
 # Module 03 — Implementation and verification
 
+Historical initial implementation results. See [FOLLOWUP_REPORT.md](FOLLOWUP_REPORT.md)
+for the 2026-10-20 cleanup fix, new regressions and live acceptance checks.
+
 Verified on 2026-10-19 (Asia/Bangkok). All delivered source, configuration and
 documentation changes are confined to `03_video_ingestion`. Verification was completed
 before publication. No deployment was performed.

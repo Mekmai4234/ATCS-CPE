@@ -1,6 +1,7 @@
 import asyncio
 import json
 import sys
+import time
 
 import pytest
 from conftest import VIDEO_A, track
@@ -166,3 +167,197 @@ async def test_real_worker_invalid_id_never_fetches_network():
         await captions.fetch("not-valid", ["en"], 5)
     assert not captions.processes
     await captions.close()
+
+
+async def guarded_result(task, processes, seconds=4):
+    """A regression must fail without hanging pytest itself on the original bug."""
+    done, _ = await asyncio.wait({task}, timeout=seconds)
+    if not done:
+        for process in processes:
+            process._transport.close()
+        await asyncio.wait({task}, timeout=1)
+        if not task.done():
+            task.cancel()
+        pytest.fail("Caption fetch/cleanup exceeded its watchdog budget")
+    return await task
+
+
+async def wait_for_full_pipe(processes, count=1):
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        if len(processes) == count and all(p.stdout._paused for p in processes):
+            return
+        await asyncio.sleep(0.01)
+    pytest.fail("Child did not fill the actual asyncio stdout pipe")
+
+
+async def buffered_writer(monkeypatch):
+    """Leave the parent reader paused while a real 20 MiB child fills the pipe."""
+    original = asyncio.create_subprocess_exec
+    processes = []
+
+    async def create(*args, **kwargs):
+        process = await original(
+            sys.executable,
+            "-c",
+            "import sys,time; sys.stdout.buffer.write(b'x'*(20*1024*1024)); "
+            "sys.stdout.flush(); time.sleep(30)",
+            **kwargs,
+        )
+        read = process.stdout.read
+
+        async def pause_fetch_read(n=-1):
+            if n == 65536:
+                await asyncio.sleep(30)
+            return await read(n)
+
+        monkeypatch.setattr(process.stdout, "read", pause_fetch_read)
+        processes.append(process)
+        return process
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", create)
+    return processes
+
+
+async def test_real_20_mib_output_exceeds_production_limit_without_cleanup_deadlock(monkeypatch):
+    import youtube_ingestion.captions as module
+
+    assert module.MAX_RESPONSE_BYTES == 8 * 1024 * 1024
+    processes, _ = await spawn_double(
+        monkeypatch,
+        "import sys; sys.stdout.buffer.write(b'x'*(20*1024*1024)); sys.stdout.flush()",
+    )
+    captions = SubprocessCaptions()
+    started = time.monotonic()
+    task = asyncio.create_task(captions.fetch(VIDEO_A, ["en"], 0.5))
+    try:
+        with pytest.raises(AppError) as error:
+            await guarded_result(task, processes)
+        assert error.value.code == "invalid_transcript"
+        assert time.monotonic() - started < 3
+        assert processes[0].returncode is not None
+        assert not captions.processes and not captions.fetches and not captions.stopping
+    finally:
+        await captions.close()
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+async def test_timeout_or_cancel_with_actual_full_stdout_pipe(monkeypatch, cancel):
+    processes = await buffered_writer(monkeypatch)
+    captions = SubprocessCaptions()
+    task = asyncio.create_task(captions.fetch(VIDEO_A, ["en"], 10 if cancel else 0.5))
+    try:
+        await wait_for_full_pipe(processes)
+        if cancel:
+            task.cancel()
+        with pytest.raises(asyncio.CancelledError if cancel else AppError) as error:
+            await guarded_result(task, processes)
+        if not cancel:
+            assert error.value.code == "ingest_timeout"
+        assert processes[0].returncode is not None
+        assert not captions.processes and not captions.fetches and not captions.stopping
+    finally:
+        await captions.close()
+
+
+async def test_repeated_cancellation_still_joins_pipe_cleanup(monkeypatch):
+    processes = await buffered_writer(monkeypatch)
+    captions = SubprocessCaptions()
+    original = captions._cleanup
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def delayed(process):
+        entered.set()
+        await release.wait()
+        await original(process)
+
+    monkeypatch.setattr(captions, "_cleanup", delayed)
+    task = asyncio.create_task(captions.fetch(VIDEO_A, ["en"], 10))
+    try:
+        await wait_for_full_pipe(processes)
+        task.cancel()
+        await asyncio.wait_for(entered.wait(), 1)
+        task.cancel()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await guarded_result(task, processes)
+        assert processes[0].returncode is not None
+        assert not captions.processes and not captions.fetches and not captions.stopping
+    finally:
+        release.set()
+        await captions.close()
+
+
+async def test_cleanup_timeout_closes_pipe_transport_and_reaps(monkeypatch):
+    import youtube_ingestion.captions as module
+
+    processes = await buffered_writer(monkeypatch)
+    captions = SubprocessCaptions()
+    task = asyncio.create_task(captions.fetch(VIDEO_A, ["en"], 10))
+    try:
+        await wait_for_full_pipe(processes)
+
+        async def stalled_communicate(*args):
+            await asyncio.sleep(30)
+
+        monkeypatch.setattr(processes[0], "communicate", stalled_communicate)
+        monkeypatch.setattr(module, "CLEANUP_TIMEOUT_SECONDS", 0.05)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await guarded_result(task, processes)
+        assert processes[0].returncode is not None
+        assert processes[0]._transport.is_closing()
+        assert not captions.processes
+    finally:
+        await captions.close()
+
+
+async def test_service_close_joins_all_full_pipe_fetches(monkeypatch, config):
+    from conftest import Context
+
+    from youtube_ingestion.service import IngestionService
+
+    processes = await buffered_writer(monkeypatch)
+    service = IngestionService(config)
+    tasks = [asyncio.create_task(service.ingest(VIDEO_A, Context())) for _ in range(2)]
+    try:
+        await wait_for_full_pipe(processes, count=2)
+        closing = asyncio.create_task(service.close())
+        await guarded_result(closing, processes)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        assert all(isinstance(result, asyncio.CancelledError) for result in results)
+        assert all(process.returncode is not None for process in processes)
+        assert not service.captions.processes and not service.captions.fetches
+        assert service.metadata.client.is_closed
+        await service.close()
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await service.close()
+
+
+async def test_final_reap_has_a_hard_budget(monkeypatch):
+    import youtube_ingestion.captions as module
+
+    processes = await buffered_writer(monkeypatch)
+    captions = SubprocessCaptions()
+    task = asyncio.create_task(captions.fetch(VIDEO_A, ["en"], 10))
+    try:
+        await wait_for_full_pipe(processes)
+
+        async def stalled(*args):
+            await asyncio.sleep(30)
+
+        monkeypatch.setattr(processes[0], "communicate", stalled)
+        monkeypatch.setattr(processes[0], "wait", stalled)
+        monkeypatch.setattr(module, "CLEANUP_TIMEOUT_SECONDS", 0.05)
+        monkeypatch.setattr(module, "REAP_TIMEOUT_SECONDS", 0.05)
+        task.cancel()
+        with pytest.raises(AppError) as error:
+            await guarded_result(task, processes, seconds=1)
+        assert error.value.code == "ingest_cleanup_timeout"
+        assert captions.closed and processes[0].returncode is not None
+        assert processes[0]._transport.is_closing()
+    finally:
+        await captions.close()
