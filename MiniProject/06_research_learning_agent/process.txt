@@ -35,6 +35,9 @@ Techniques and Limits
 - Bound steps, total deadline and each await; reserve time for finalization.
 - Count a retrieved observation after a successful subsequent decision, or valid artifact generation.
 - Validate citation identity and source intervals; semantic support still requires evaluation.
+- Re-read output citations and inventory before returning, including partial outputs/artifacts.
+- Comparison observations retain 05 reference-label mapping and its coverage declaration.
+- Tests exercise actual 05 AnswerService using the same authorized RAG instance.
 - Ignore transcript instructions as authorization; operational events exclude private reasoning.
 - Detect repeated actions, missing evidence and pagination that makes no progress.
 - Use a local UTF-8 byte guard. Live preflight counts native contents with countTokens and
@@ -44,5 +47,11 @@ Techniques and Limits
 
 Verification and Operations
 README.md contains reproducible Windows/Linux Docker commands and integration notes.
-TEST_REPORT.md records actual results, synthetic/live distinctions and remaining integration work.
+DEPENDENCY_REVIEW_REPORT.md records current packaging/consumer results; prior reports are historical.
+Actual-05 tests have a separate acceptance environment; the public agent manifest keeps
+its original dependency metadata. Core and acceptance Docker targets both use --locked.
+The default evaluation dataset is a package resource, available in installed wheels and
+consumer Docker images without copying an extra repository fixtures directory.
+The evaluation runner accepts explicit transcript exports in a NEW isolated store and records
+outputs/latency/usage plus pending human-review criteria. Live services require --live.
 No other module's source, global Compose, shared env template or database migrations are changed.
