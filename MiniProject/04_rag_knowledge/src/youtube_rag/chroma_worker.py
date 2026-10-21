@@ -17,13 +17,31 @@ def main():
     for line in sys.stdin:
         try:
             request = json.loads(line)
-            collection = client.get_or_create_collection(
-                request["collection"],
-                embedding_function=None,
-                configuration={"hnsw": {"space": "cosine"}},
-            )
             operation = request["operation"]
             args = request.get("args", {})
+            if operation == "has_data":
+                result = any(item.count() for item in client.list_collections())
+                print(json.dumps({"ok": True, "result": result}), flush=True)
+                continue
+            if operation == "upsert":
+                collection = client.get_or_create_collection(
+                    request["collection"],
+                    embedding_function=None,
+                    configuration={"hnsw": {"space": "cosine"}},
+                )
+            else:
+                try:
+                    collection = client.get_collection(
+                        request["collection"], embedding_function=None
+                    )
+                except chromadb.errors.NotFoundError:
+                    if operation not in {"get", "count", "delete"}:
+                        raise
+                    result = (
+                        {"ids": []} if operation == "get" else (0 if operation == "count" else None)
+                    )
+                    print(json.dumps({"ok": True, "result": result}), flush=True)
+                    continue
             if operation == "upsert":
                 collection.upsert(**args)
                 result = None
