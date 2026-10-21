@@ -48,6 +48,10 @@ def test_auth_preflight_rejects_before_initializing_data(tmp_path, monkeypatch):
 def test_release_needs_all_acceptance_evidence_and_safe_cookie_origin():
     check = load("auth_readiness").check
     settings = SimpleNamespace(
+        app_env="production",
+        adapter_mode="custom",
+        adapter_factory="youtube_answers.team:create_adapters",
+        backend_integration_profile="live",
         auth_enabled=True,
         google_client_id="public-client-id",
         session_cookie_secure=True,
@@ -65,6 +69,9 @@ def test_release_needs_all_acceptance_evidence_and_safe_cookie_origin():
         tested_at_utc="2026-10-21",
     )
     assert check(settings, evidence)["auth_release_ready"]
+    settings.app_env = "test"
+    assert not check(settings, evidence)["auth_release_ready"]
+    settings.app_env = "production"
     evidence["browser_backend_flow"] = False
     assert not check(settings, evidence)["auth_release_ready"]
     evidence["browser_backend_flow"] = True
