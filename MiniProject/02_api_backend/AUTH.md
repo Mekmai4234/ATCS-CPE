@@ -183,3 +183,17 @@ authorized origins. 01 must implement the nonce/challenge flow, credentialed fet
 session-aware redirects and CSRF headers. 07 must configure HTTPS/origins, migration
 backup/restore, update root deployment instructions and exercise two real accounts.
 03/04/05/06 should consume the trusted execution contract, not user_id from payloads.
+
+For the pinned auth-PR integration candidate, native 03 ingestion choice and proposed
+consumer lock patches, see AUTH_INTEGRATION.md. Before starting PR #20 against an
+existing bound pair, stop API/workers, keep the paired migration backup, then run:
+
+```powershell
+uv run --project 02_api_backend/full --locked yk-full rag-init --workers-stopped
+```
+
+This verifies the existing pair first and invokes 04's additive initialization with
+the full launcher's selected settings. With PR #20 it adds missing cursor signing
+state without rotating an existing key or rebinding stores. Use `--env-file` before
+the command when selecting a custom full env file. It does not replace the backed-up
+0001 ownership migration, claim legacy owners, bind an unrelated store or stop workers.

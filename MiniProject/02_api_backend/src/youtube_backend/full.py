@@ -113,6 +113,10 @@ class FullSettings(Settings):
 
 
 def command_arguments(args):
+    if args.command == "rag-init":
+        # Additive 04 setup on an already verified pair, using this launcher's
+        # resolved environment rather than independently selected module dotenvs.
+        return [sys.executable, "-m", "youtube_rag.cli", "init", "--profile", "backend"]
     if args.command in {"migrate", "bootstrap-admin", "claim-legacy"}:
         command = [sys.executable, "-m", "youtube_backend.auth_cli", args.command]
         if args.command == "migrate":
@@ -136,6 +140,8 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("config", "init", "check", "api", "worker"):
         commands.add_parser(name)
+    rag_init = commands.add_parser("rag-init")
+    rag_init.add_argument("--workers-stopped", action="store_true", required=True)
     migration = commands.add_parser("migrate")
     migration.add_argument("--workers-stopped", action="store_true", required=True)
     migration.add_argument("--backup-dir", type=Path, required=True)

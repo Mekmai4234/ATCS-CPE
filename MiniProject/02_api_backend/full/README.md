@@ -166,3 +166,11 @@ status. 07 should also own frontend packaging, real-video/live acceptance,
 deployment, backup/restore and release instructions. 04 can later consume the
 shared configuration/binding contract in its direct CLI. All delivery edits here
 remain inside 02; calling old module CLIs directly does not acquire these guards.
+
+## Auth-phase integration update
+
+Authentication, native ingestion and consumer handoff are described in
+`../AUTH.md` and `../AUTH_INTEGRATION.md`. For an already bound pair upgraded to
+04 PR #20, stop API/workers and run `yk-full rag-init --workers-stopped` with the
+same selected full env file. This performs additive 04 setup after pair validation;
+it preserves existing cursor keys and does not replace the backed-up auth migration.
