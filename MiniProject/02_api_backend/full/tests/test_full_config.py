@@ -50,6 +50,15 @@ def test_selected_file_overridden_only_by_process_environment(config, monkeypatc
     assert FullSettings(_env_file=file).llm_model == "process-model"
 
 
+def test_trusted_origins_roundtrip_to_real_child_settings(config, monkeypatch):
+    from youtube_backend.config import Settings
+
+    config.auth_trusted_origins = ["https://app.example.com", "https://admin.example.com"]
+    for key, value in config.child_environment({}).items():
+        monkeypatch.setenv(key, value)
+    assert Settings(_env_file=None).auth_trusted_origins == config.auth_trusted_origins
+
+
 @pytest.mark.parametrize(
     "change",
     [
@@ -164,7 +173,9 @@ def test_cli_config_init_check_and_preflight_without_secret_leak(config, tmp_pat
     assert Path(config.chroma_persist_dir, MARKER).is_file()
 
 
-@pytest.mark.parametrize("command", ["api", "worker", "gc", "reindex"])
+@pytest.mark.parametrize(
+    "command", ["api", "worker", "gc", "reindex", "migrate", "bootstrap-admin", "claim-legacy"]
+)
 def test_launcher_dispatches_identical_environment_without_keys_in_argv(
     config, monkeypatch, tmp_path, command
 ):
@@ -181,6 +192,12 @@ def test_launcher_dispatches_identical_environment_without_keys_in_argv(
         args += ["--workers-stopped"]
     if command == "reindex":
         args += ["--video-id", "dQw4w9WgXcQ"]
+    if command == "migrate":
+        args += ["--backup-dir", str(tmp_path / "backup"), "--workers-stopped"]
+    if command == "bootstrap-admin":
+        args += ["--google-sub", "explicit-subject"]
+    if command == "claim-legacy":
+        args += ["--admin-sub", "explicit-admin", "--owner-sub", "explicit-owner"]
     monkeypatch.setattr(sys, "argv", args)
     captured = {}
 

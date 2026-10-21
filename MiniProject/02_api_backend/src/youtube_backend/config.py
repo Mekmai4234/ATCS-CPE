@@ -32,9 +32,15 @@ class Settings(BaseSettings):
         env_file=(PROJECT_ROOT / ".env", MODULE_ROOT / "integration" / ".env"),
         extra="ignore",
         env_file_encoding="utf-8",
+        hide_input_in_errors=True,
     )
 
     app_env: str = "development"
+    auth_enabled: bool = True
+    google_client_id: str = ""
+    session_ttl_seconds: int = Field(default=86400, ge=300, le=2592000)
+    session_cookie_secure: bool = True
+    auth_trusted_origins: list[str] = []
     log_level: str = "INFO"
     api_host: str = "127.0.0.1"
     api_port: int = Field(default=8000, ge=1, le=65535)
@@ -75,6 +81,28 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def supported_configuration(self):
+        from urllib.parse import urlsplit
+
+        origins = self.auth_trusted_origins or [self.web_origin]
+        for origin in origins:
+            parsed = urlsplit(origin)
+            if (
+                parsed.scheme not in {"http", "https"}
+                or not parsed.netloc
+                or parsed.path not in {"", "/"}
+                or parsed.query
+                or parsed.fragment
+                or parsed.username
+                or "*" in origin
+                or origin.endswith("/")
+            ):
+                raise ValueError("Trusted origins must be exact origins without trailing slash")
+        if self.app_env not in {"development", "test"} and (
+            not self.auth_enabled
+            or not self.session_cookie_secure
+            or any(not origin.startswith("https://") for origin in origins)
+        ):
+            raise ValueError("Production requires authentication, HTTPS origins and Secure cookies")
         if self.adapter_mode not in {"unavailable", "fixture", "custom"}:
             raise ValueError("ADAPTER_MODE must be unavailable, fixture, or custom")
         if self.adapter_mode == "custom" and not self.adapter_factory:

@@ -28,6 +28,18 @@ class ExecutionContext:
     deadline_at: float
     settings: Settings
 
+    @property
+    def user_id(self):
+        """Trusted durable owner, never a client-supplied request/payload field."""
+        return self.repository.check_execution(self.job_id, self.lease_token)["owner_id"]
+
+    def authorize_sources(self, sources):
+        job = self.repository.check_execution(self.job_id, self.lease_token)
+        allowed = job["payload"].get("sources", [])
+        if not sources or any(source.model_dump() not in allowed for source in sources):
+            raise AppError("invalid_scope", "Sources exceed this execution's authorized scope", 403)
+        return tuple(sources)
+
     def check(self):
         self.repository.check_execution(self.job_id, self.lease_token)
         if time.time() >= self.deadline_at:

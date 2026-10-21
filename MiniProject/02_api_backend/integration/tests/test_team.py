@@ -22,6 +22,7 @@ async def integrated(tmp_path):
     settings = Settings(
         _env_file=None,
         app_env="test",
+        auth_enabled=False,
         adapter_mode="custom",
         adapter_factory="youtube_backend.team:create_adapters",
         backend_integration_profile="offline",

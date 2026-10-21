@@ -152,7 +152,13 @@ def test_custom_profile_cannot_relabel_an_existing_database(env):
 
 def test_offline_profile_is_not_allowed_in_production():
     with pytest.raises(ValueError, match="development/test"):
-        Settings(_env_file=None, app_env="production", backend_integration_profile="offline")
+        Settings(
+            _env_file=None,
+            app_env="production",
+            backend_integration_profile="offline",
+            auth_enabled=True,
+            web_origin="https://example.com",
+        )
 
 
 async def test_database_closed_even_if_adapter_close_fails(env, monkeypatch):

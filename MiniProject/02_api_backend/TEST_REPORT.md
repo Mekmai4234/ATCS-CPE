@@ -1,5 +1,8 @@
 # Backend verification report
 
+Latest authentication/ownership work and integration dependencies are recorded in
+[AUTH_TEST_REPORT.md](AUTH_TEST_REPORT.md); prior reports below are historical.
+
 The following is the original 2026-10-17 baseline. For the 2026-10-20 review fixes
 and pending 05/06 compatibility, see [REVIEW_FIX_REPORT.md](REVIEW_FIX_REPORT.md).
 For the original full-system verification, see [FULL_TEST_REPORT.md](FULL_TEST_REPORT.md).
