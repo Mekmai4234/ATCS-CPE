@@ -85,6 +85,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env-file", type=Path)
     parser.add_argument("--require-key", action="store_true")
+    parser.add_argument(
+        "--auth-evidence",
+        type=Path,
+        help="Require auth release settings and reviewed integration evidence",
+    )
     action = parser.add_mutually_exclusive_group()
     action.add_argument("--initialize", action="store_true")
     action.add_argument("--run", choices=["api", "worker"])
@@ -92,6 +97,14 @@ def main():
     try:
         settings = resolve(args.env_file)
         result = inspect_settings(settings, args.require_key or bool(args.run))
+        if args.auth_evidence:
+            from auth_readiness import check
+
+            evidence = json.loads(args.auth_evidence.read_text(encoding="utf-8"))
+            readiness = check(settings, evidence)
+            if not readiness["auth_release_ready"]:
+                raise ValueError("Auth release is blocked")
+            result.update(readiness)
         if args.initialize:
             initialize_pair(settings)
             result["pair_verified"] = True

@@ -1,8 +1,10 @@
 # 07 — System verification and deployment
 
 This folder owns repeatable checks, release acceptance, packaging and recovery. Changes
-are confined to 07. Modules 02–06 already contain implementations; 01 has no runnable web
-application in this checkout. The repository-root README and environment example are
+are confined to 07 and the authorized repository-root GitHub workflow. Modules 01–06
+have runnable implementations; Google identity integration is still pending in separate
+module PRs. See [AUTH_ACCEPTANCE.md](AUTH_ACCEPTANCE.md) for the current auth matrix,
+candidate commands and release blockers. The repository-root environment example is
 outdated: current 04 uses Gemini embeddings, not the root OpenAI example.
 
 ## Install and verify
@@ -37,18 +39,21 @@ reindex AND garbage collection. No xfail/skips hide setup failures. See
 [KNOWN_ISSUES.md](KNOWN_ISSUES.md) and [REVIEW_FIX_REPORT.md](REVIEW_FIX_REPORT.md) for current
 results; [TEST_REPORT.md](TEST_REPORT.md) preserves the historical 19 October baseline.
 
-## CI template
+## Active CI
 
-`ci/offline.yml` contains Windows/Linux jobs, locked installation and report upload.
-GitHub activates workflows only under repository-root `.github/workflows/`; this template
-stays here to honor the 07-only boundary. It is **not active CI**. A maintainer can later
-install it at `.github/workflows/miniproject-offline.yml`. This template does not activate remote CI.
+The repository-root `.github/workflows/miniproject-offline.yml` runs on PRs into develop,
+develop pushes and manual dispatch. It checks the locked Windows/Linux Python environment,
+frontend typecheck/format/unit/build and Chromium browser tests. Auth acceptance runs when
+02 supplies its auth contract; otherwise the job summary explicitly says auth release is
+blocked. Baseline CI success is not auth release acceptance. `ci/offline.yml` is historical.
 
 ## Full team containers
 
 `Dockerfile` packages all five Python modules using the 07 lockfile. `compose.yaml` runs
 initialization, API and worker against one SQLite/Chroma volume through the existing
-`youtube_answers.team:create_adapters` factory. No frontend is added before 01 is ready.
+`youtube_answers.team:create_adapters` factory. The separate `Dockerfile.web` builds module
+01 and serves it through Caddy. The guarded auth overlay is described in
+[AUTH_DEPLOYMENT.md](AUTH_DEPLOYMENT.md); it is not yet accepted for public deployment.
 
 Export `GEMINI_API_KEY` securely in your local terminal and choose an account-accessible
 `LLM_MODEL`. No credentials are stored here. From MiniProject:
@@ -133,6 +138,6 @@ destinations. Retain compatible image/schema/embedding/chunk configuration.
 - 05/06 with 07: human review of supported claims and educational quality.
 - 01: runnable UI, citation seek/error states and browser acceptance.
 
-Root documentation corrections and active workflow changes remain outside this edit
-scope. Tests do not patch production files. Updated env/step/process describe the actual
-07 workflow; report missing frontend/live/container evidence as pending.
+Root documentation corrections remain outside this edit scope. The active workflow was
+explicitly authorized. Tests do not patch module production files. Updated env/step/process
+describe the current 07 workflow; missing integrated auth/live evidence stays pending.
