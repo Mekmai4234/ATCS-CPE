@@ -1,5 +1,11 @@
 # 07 — System verification and deployment
 
+Current review fixes (22 October): [REVIEW_AUTH_FIX_REPORT.md](REVIEW_AUTH_FIX_REPORT.md).
+The canonical `uv.lock` now targets the exact auth revisions in `integration.json`,
+including backend PR18 and answers PR23. Develop is still older: assemble the pinned
+candidate first. Direct locked sync against old develop is intentionally incompatible;
+the historical lock is preserved in `locks/develop-69f5347.uv.lock` for baseline-only work.
+
 This folder owns repeatable checks, release acceptance, packaging and recovery. Changes
 are confined to 07 and the authorized repository-root GitHub workflow. Modules 01–06
 have runnable implementations; Google identity integration is still pending in separate
@@ -12,8 +18,12 @@ outdated: current 04 uses Gemini embeddings, not the root OpenAI example.
 From **MiniProject**, with Python 3.11–3.13 and uv:
 
 ```powershell
+uv run --no-project python 07_testing_deployment/scripts/candidate.py --manifest 07_testing_deployment/integration.json
+# Change directory to the printed candidate root before the following commands.
+uv lock --check --project 07_testing_deployment
 uv sync --project 07_testing_deployment --locked
 uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/check.py
+uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/check.py --group auth
 ```
 
 The 07 lockfile installs 02–06, including 05's `team` extra, pytest and Ruff. Existing
@@ -41,11 +51,18 @@ results; [TEST_REPORT.md](TEST_REPORT.md) preserves the historical 19 October ba
 
 ## Active CI
 
-The repository-root `.github/workflows/miniproject-offline.yml` runs on PRs into develop,
-develop pushes and manual dispatch. It checks the locked Windows/Linux Python environment,
-frontend typecheck/format/unit/build and Chromium browser tests. Auth acceptance runs when
-02 supplies its auth contract; otherwise the job summary explicitly says auth release is
-blocked. Baseline CI success is not auth release acceptance. `ci/offline.yml` is historical.
+The root workflow assembles the SAME immutable auth manifest in every job. It checks
+the committed consumer lock, all upstream suites and strict auth on Windows/Linux,
+frontend typecheck/format/unit/build, browser fixtures, real HttpSessionPort/API/worker
+E2E and production auth factory/HTTPS containers. It never runs `uv lock` to repair the
+candidate. Artifacts contain revision/lock/tooling fingerprints. These remain unmerged
+candidate results, not actual develop acceptance or real Google acceptance.
+
+Inside that candidate, run `scripts/browser_identity.py` with the locked Python environment
+after installing module 01 dependencies/Chromium. It runs the real HTTP adapter without
+mocking `/api`, with only external GIS/provider fixtures. `scripts/docker_auth.py` checks
+the auth-enabled production factory and HTTPS proxy on an internal Docker network.
+Neither drill creates release attestation or calls paid providers.
 
 ## Full team containers
 

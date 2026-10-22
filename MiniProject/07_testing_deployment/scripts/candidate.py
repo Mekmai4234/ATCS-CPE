@@ -1,6 +1,7 @@
 """Create an immutable, reviewable integration candidate without merging pending PRs."""
 
 import argparse
+import hashlib
 import io
 import json
 import shutil
@@ -22,6 +23,13 @@ def git(*args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", default="origin/develop")
+    parser.add_argument("--manifest", type=Path, help="Exact base and module commits to test")
+    parser.add_argument("--github-output", action="store_true")
+    parser.add_argument(
+        "--baseline-lock",
+        action="store_true",
+        help="Use historical develop lock; never for auth acceptance",
+    )
     parser.add_argument(
         "--module-ref",
         action="append",
@@ -30,6 +38,12 @@ def main():
         help="Overlay only this numbered module from an explicitly selected Git ref",
     )
     args = parser.parse_args()
+    if args.manifest:
+        if args.module_ref or args.baseline_lock:
+            parser.error("A pinned auth manifest cannot be mixed with overrides/baseline lock")
+        manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+        args.base = manifest["base"]
+        args.module_ref = [f"{module}={ref}" for module, ref in manifest["modules"].items()]
     base = git("rev-parse", "--verify", f"{args.base}^{{commit}}").decode().strip()
     selections = {}
     allowed = {
@@ -42,6 +56,10 @@ def main():
         if module not in allowed or module in selections:
             parser.error("Select each existing 01-06 module at most once")
         selections[module] = git("rev-parse", "--verify", f"{ref}^{{commit}}").decode().strip()
+        if args.manifest and (len(ref) != 40 or ref != selections[module]):
+            parser.error("Manifest module refs must be immutable full commit SHAs")
+    if args.manifest and (set(selections) != allowed or args.base != base):
+        parser.error("Manifest must pin the base and every 01-06 module")
     output = MODULE / "runtime" / f"candidate-{uuid4().hex[:10]}"
     output.mkdir(parents=True)
     for module in sorted(allowed):
@@ -82,11 +100,29 @@ def main():
         modules={m: selections.get(m, base) for m in sorted(allowed)},
         status="candidate only; not merged develop",
         live_google_verified=False,
+        tooling_commit=git("rev-parse", "HEAD").decode().strip(),
+        tooling_dirty=bool(git("status", "--porcelain", "--", "MiniProject/07_testing_deployment")),
+        lock_profile="historical-baseline" if args.baseline_lock else "auth-candidate",
     )
+    if args.baseline_lock:
+        shutil.copyfile(MODULE / "locks/develop-69f5347.uv.lock", output / MODULE.name / "uv.lock")
+    provenance["lock_sha256"] = hashlib.sha256(
+        (output / MODULE.name / "uv.lock").read_bytes()
+    ).hexdigest()
+    fingerprint = hashlib.sha256()
+    for path in sorted((output / MODULE.name).rglob("*")):
+        if path.is_file():
+            fingerprint.update(path.relative_to(output / MODULE.name).as_posix().encode())
+            fingerprint.update(b"\0" + path.read_bytes() + b"\0")
+    provenance["tooling_sha256"] = fingerprint.hexdigest()
     (output / "candidate.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
     print(output)
-    print("Run uv lock in candidate/07_testing_deployment, then uv sync --locked there.")
-    print("Do not copy the candidate lock back: it describes pending module dependencies.")
+    if args.github_output:
+        import os
+
+        with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as stream:
+            stream.write(f"root={output}\n")
+    print("Run uv lock --check, then uv sync --locked. Never regenerate a verification lock.")
 
 
 if __name__ == "__main__":

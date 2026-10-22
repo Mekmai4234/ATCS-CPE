@@ -5,7 +5,7 @@
         Referrer-Policy strict-origin-when-cross-origin
         Cache-Control "no-store"
     }
-    @backend path /api/* /health
+    @backend path /api /api/* /health
     handle @backend {
         reverse_proxy api:8000
     }
