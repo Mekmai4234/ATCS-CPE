@@ -1,7 +1,10 @@
 # Auth deployment and legacy recovery
 
-**Current status: blocked for public auth deployment.** Develop lacks identity; the
-candidate UI's PendingSessionPort deliberately blocks the private workspace. Do not
+**Current status: blocked for public auth deployment pending real Google staging smoke.**
+The pinned candidate UI uses HttpSessionPort; develop still lacks the merged identity
+phase. First assemble `integration.json` with `scripts/candidate.py --manifest` and
+verify/sync the committed lock, as shown in README. Run all commands below INSIDE that
+candidate; direct old-develop sync cannot validate the auth lock. Do not
 substitute demo mode, disable authentication, or treat a manually edited evidence JSON
 as proof of integration. `auth_readiness.py` validates configuration and an operator's
 attestation; it does not independently verify claims inside that attestation.
@@ -69,6 +72,13 @@ docker compose -f 07_testing_deployment/compose.yaml build api
 uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/docker_startup.py
 ```
 
+For current auth acceptance, build the same web/API images inside the pinned candidate,
+then run `uv run --locked --project 07_testing_deployment python 07_testing_deployment/scripts/docker_auth.py`.
+`compose.auth-drill.yaml` uses production auth/live-factory settings and an internal-only
+network. It verifies HTTPS proxying, schema 0002, full pair preflight, secure challenge
+cookies and unauthenticated API denial. It runs no provider jobs and creates no release
+attestation. The public release overlay still requires truthful manual Google evidence.
+
 The web drill verifies actual container TLS, headers and SPA fallback, disables host
 proxy inheritance and trusts only the disposable container certificate for that request.
 It does not install that CA, validate public TLS, authenticate or verify backend proxy
@@ -98,5 +108,7 @@ traffic. Both drills clean only their randomly named containers/volumes.
    database or mix a migrated SQLite file with an unrelated Chroma directory.
 
 Use `yk-full --help` from the actual deployed 02 revision to confirm migration/admin
-commands before execution; develop without PR 18 does not provide them. No migration,
-bootstrap, legacy claim, live Google sign-in or public deployment was performed here.
+commands before execution; develop without PR 18 does not provide them. The 07 strict
+suite now rehearses migration/bootstrap/claim and pre/post-migration paired restore on
+a disposable copy of real fixture SQLite/Chroma. No user data migration, live Google
+sign-in or public deployment was performed.
