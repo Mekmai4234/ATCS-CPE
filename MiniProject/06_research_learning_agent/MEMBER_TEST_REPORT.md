@@ -1,5 +1,8 @@
 # Module 06 member execution verification
 
+Historical implementation evidence. See AUTH_REVIEW_REPORT.md for the subsequent
+2026-10-22 auth integration fixes, refreshed locks and current verification.
+
 Verified 2026-10-21 (Asia/Bangkok). Base: develop `69f5347`.
 Only module 06 files are changed. Dependency manifests, locks and other modules are unchanged.
 
