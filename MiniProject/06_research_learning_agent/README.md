@@ -223,3 +223,29 @@ See [MEMBER_AUTHORIZATION.md](MEMBER_AUTHORIZATION.md) for the account-aware bac
 contract, quota/revocation policy, deployment dependencies and commands. Test evidence
 is recorded in [MEMBER_TEST_REPORT.md](MEMBER_TEST_REPORT.md). This module does not add
 Google login or replace backend ownership checks on HTTP results/events/artifacts.
+
+### Auth integration review (2026-10-22)
+
+Core and acceptance locks now target the account-aware 02 dependency metadata, alongside
+authorized 04 and member-aware 05. Use the dependency revisions in
+[AUTH_REVIEW_REPORT.md](AUTH_REVIEW_REPORT.md); the earlier unauthenticated develop
+checkout does not satisfy these locks. Other modules' manifests and locks are unchanged.
+
+Evaluation creates a synthetic member in its NEW isolated database by default. Imports,
+jobs and artifacts use that durable owner; the report labels it `isolated-member-fixture`,
+which does not establish real Google login. `--legacy-test` explicitly selects offline-only
+regression in a separate NEW database and cannot be combined with `--live`. Neither mode
+changes application auth settings. Authorization failures cannot count as successful
+evaluation cases merely by allowing a failed state in a dataset.
+
+HTTP fixtures use the real challenge/session/CSRF flow with fixture Google claims. Real 05
+comparison acceptance now uses actual backend member permissions, including revocation
+inside generation. The optional `contracts` Docker target runs the backend session/ownership
+suite against the same candidate:
+
+```powershell
+docker compose -p yk06-auth-review -f 06_research_learning_agent/compose.test.yaml build tests acceptance contracts
+docker compose -p yk06-auth-review -f 06_research_learning_agent/compose.test.yaml run --rm contracts
+```
+
+See the latest report for commands, dependency revisions and actual gate results.

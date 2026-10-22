@@ -64,3 +64,11 @@ Member execution flow
 5. On revocation or suspension, abort without final/partial/artifact content; preserve existing cancellation fences.
 6. Recheck before events/output; 02 must check ownership and permissions again when persisting or serving results.
 7. Cookie expiry alone does not invalidate background ownership; current sessions still gate API reads.
+
+Auth regression flow (2026-10-22)
+1. Evaluation initializes a NEW database, creates a synthetic non-admin owner and binds 02's server actor context.
+2. Dataset imports, leased jobs and artifacts use that owner; actor context is reset even on failure.
+3. HTTP integration fixtures authenticate through challenge, nonce, session and CSRF before creating owned sources/jobs.
+4. Real 05 comparison uses the same backend/RAG scope; grant revocation during generation prevents later calls and output.
+5. Publication-fence tests revoke membership after Agent output exists but before 02.finish enters its write transaction; no result/artifact may persist.
+6. Core and acceptance environments use refreshed 06 locks against the recorded common dependency candidate.
