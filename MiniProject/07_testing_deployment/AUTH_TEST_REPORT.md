@@ -1,5 +1,8 @@
 # Auth/UI verification — 21 October 2026
 
+Historical report. For the 22 October review fixes and pinned current candidate, see
+[REVIEW_AUTH_FIX_REPORT.md](REVIEW_AUTH_FIX_REPORT.md).
+
 ## Result
 
 07 verification infrastructure is implemented; **multi-account release acceptance is

@@ -1,0 +1,47 @@
+[
+  {
+    "module": "02_api_backend",
+    "exit_code": 0,
+    "output": "Using CPython 3.11.16\nResolved 46 packages in 1ms\n"
+  },
+  {
+    "module": "02_api_backend/integration",
+    "exit_code": 0,
+    "output": "Using CPython 3.11.16\nResolved 112 packages in 3ms\n"
+  },
+  {
+    "module": "02_api_backend/full",
+    "exit_code": 0,
+    "output": "Using CPython 3.11.16\nResolved 116 packages in 7ms\n"
+  },
+  {
+    "module": "03_video_ingestion",
+    "exit_code": 0,
+    "output": "Using CPython 3.11.16\nResolved 113 packages in 4ms\n"
+  },
+  {
+    "module": "04_rag_knowledge",
+    "exit_code": 0,
+    "output": "Using CPython 3.11.16\nResolved 110 packages in 4ms\n"
+  },
+  {
+    "module": "05_ai_answers_analysis",
+    "exit_code": 0,
+    "output": "Using CPython 3.11.16\nResolved 115 packages in 16ms\n"
+  },
+  {
+    "module": "06_research_learning_agent",
+    "exit_code": 0,
+    "output": "Using CPython 3.11.16\nResolved 111 packages in 5ms\n"
+  },
+  {
+    "module": "06_research_learning_agent/acceptance",
+    "exit_code": 0,
+    "output": "Using CPython 3.11.16\nResolved 113 packages in 7ms\n"
+  },
+  {
+    "module": "07_testing_deployment",
+    "exit_code": 0,
+    "output": "Resolved 116 packages in 15ms\n"
+  }
+]

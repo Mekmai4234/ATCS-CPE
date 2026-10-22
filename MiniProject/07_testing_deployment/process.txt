@@ -2,6 +2,9 @@ Module 07: Process and boundaries
 
 Inputs: existing 02-06 implementations/tests, reference fixtures and acceptance criteria.
 The 07 lockfile composes dependencies without changing other manifests.
+integration.json pins the auth batch including module 05 PR23. All CI jobs archive those
+same immutable module revisions, preserve the committed lock and publish provenance.
+Candidate green is not merged-develop acceptance. Updating a pin requires lock/check/test.
 
 Offline: separate suite processes -> real domain-service integration -> cold recovery ->
 known-defect assertions -> lint/format -> logs/JUnit/JSON -> readiness report.
@@ -20,3 +23,6 @@ Outputs: runner, strict auth/ownership fixtures, candidate provenance, browser c
 reports, Docker/Caddy/Compose, active GitHub CI and operational guides. Edits remain in
 07 plus the explicitly authorized root workflow. Module 01-06 production fixes belong
 to their owners. Auth release stays blocked until real integration and Google smoke pass.
+Browser identity acceptance uses the real HTTP adapter/API/worker with external GIS
+fixtures. Production-container acceptance verifies local HTTPS, secure cookies and
+unauthenticated API denial on an internal network, without release attestation or paid calls.
