@@ -1,5 +1,7 @@
 # Member research and learning boundary
 
+Current dependency revisions and gate results: AUTH_REVIEW_REPORT.md.
+
 Module 06 consumes the durable actor/source contract from module 02. It does not
 implement Google verification, sessions, HTTP ownership, database ownership migration
 or frontend account switching. Those remain backend/frontend responsibilities.
@@ -88,5 +90,6 @@ uv run --project 06_research_learning_agent/acceptance pytest 06_research_learni
 
 The tests use real 02 HTTP/session/SQLite/job/ownership checks with fixture Google/provider
 responses. The regular acceptance environment additionally tests real 05 comparison
-with 02/04 and a fixture member authority, including revocation inside generation.
-See MEMBER_TEST_REPORT.md for the exact dependency revision and verified scope.
+with 02/04 and real backend member permissions, including revocation inside generation.
+See AUTH_REVIEW_REPORT.md for the current dependency revision and verified scope;
+MEMBER_TEST_REPORT.md retains the initial implementation evidence.

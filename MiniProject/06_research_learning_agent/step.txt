@@ -45,3 +45,10 @@ Member execution integration
 - Run core and acceptance Docker targets; run acceptance/backend_contract explicitly against the member backend snapshot.
 - Do not expose legacy unauthenticated APIs as member-safe endpoints. 02 must enforce session/owner checks and atomic publication.
 - See MEMBER_AUTHORIZATION.md for test commands and MEMBER_TEST_REPORT.md for results.
+
+Auth candidate verification (2026-10-22)
+- Assemble the 02/04/05 dependency revisions recorded in AUTH_REVIEW_REPORT.md before running the refreshed core/acceptance locks.
+- Run uv lock --check --offline and uv sync --locked for core and acceptance on that same candidate.
+- Run core, combined acceptance and optional backend_contract tests; Docker Compose now provides tests, acceptance and contracts services.
+- Run python -m youtube_agent.evaluation in a NEW state directory; its default report must label isolated-member-fixture and preserve durable owners.
+- Use --legacy-test only for explicitly isolated offline regression; never combine it with --live or change production auth to make a test pass.
