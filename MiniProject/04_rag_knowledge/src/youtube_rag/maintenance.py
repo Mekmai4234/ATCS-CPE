@@ -6,6 +6,7 @@ import sqlalchemy as sa
 from youtube_backend import database as db
 
 from .errors import error
+from .models import digest
 
 
 class MaintenanceExecution:
@@ -38,6 +39,28 @@ class MaintenanceExecution:
         with self.database.read() as connection:
             for source in sources:
                 self._source(connection, source)
+
+    def permission_scope(self, sources, *, operation="read"):
+        self.authorize(sources)
+        return digest(
+            {
+                "operator": "stopped-maintenance",
+                "operation": operation,
+                "sources": [s.model_dump() for s in sources],
+            }
+        )
+
+    def authorize_index(self, source, *, allow_reindex=False):
+        self.authorize([source])
+
+    def authorize_cleanup(self, *, source=None, include_staging=False):
+        self.check()
+
+    def cleanup_fence(self, connection, row):
+        self._idle(connection)
+        if self.remaining_seconds <= 0:
+            raise error("task_timeout", "Maintenance deadline exceeded", status=504)
+        return None
 
     def _source(self, connection, source):
         video = (

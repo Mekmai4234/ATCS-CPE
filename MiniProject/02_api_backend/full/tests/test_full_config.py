@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import sqlalchemy as sa
 from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -48,6 +49,15 @@ def test_selected_file_overridden_only_by_process_environment(config, monkeypatc
     assert selected.answer_max_chunks == 123
     monkeypatch.setenv("LLM_MODEL", "process-model")
     assert FullSettings(_env_file=file).llm_model == "process-model"
+
+
+def test_trusted_origins_roundtrip_to_real_child_settings(config, monkeypatch):
+    from youtube_backend.config import Settings
+
+    config.auth_trusted_origins = ["https://app.example.com", "https://admin.example.com"]
+    for key, value in config.child_environment({}).items():
+        monkeypatch.setenv(key, value)
+    assert Settings(_env_file=None).auth_trusted_origins == config.auth_trusted_origins
 
 
 @pytest.mark.parametrize(
@@ -164,7 +174,10 @@ def test_cli_config_init_check_and_preflight_without_secret_leak(config, tmp_pat
     assert Path(config.chroma_persist_dir, MARKER).is_file()
 
 
-@pytest.mark.parametrize("command", ["api", "worker", "gc", "reindex"])
+@pytest.mark.parametrize(
+    "command",
+    ["api", "worker", "gc", "reindex", "rag-init", "migrate", "bootstrap-admin", "claim-legacy"],
+)
 def test_launcher_dispatches_identical_environment_without_keys_in_argv(
     config, monkeypatch, tmp_path, command
 ):
@@ -177,10 +190,16 @@ def test_launcher_dispatches_identical_environment_without_keys_in_argv(
     for key, value in config.child_environment({}).items():
         monkeypatch.setenv(key, value)
     args = ["yk-full", "--env-file", str(file), command]
-    if command in {"gc", "reindex"}:
+    if command in {"gc", "reindex", "rag-init"}:
         args += ["--workers-stopped"]
     if command == "reindex":
         args += ["--video-id", "dQw4w9WgXcQ"]
+    if command == "migrate":
+        args += ["--backup-dir", str(tmp_path / "backup"), "--workers-stopped"]
+    if command == "bootstrap-admin":
+        args += ["--google-sub", "explicit-subject"]
+    if command == "claim-legacy":
+        args += ["--admin-sub", "explicit-admin", "--owner-sub", "explicit-owner"]
     monkeypatch.setattr(sys, "argv", args)
     captured = {}
 
@@ -200,6 +219,59 @@ def test_launcher_dispatches_identical_environment_without_keys_in_argv(
             assert field.upper() in captured["environment"]
     assert captured["environment"]["CHROMA_PERSIST_DIR"] == config.chroma_persist_dir
     assert captured["environment"]["DATABASE_URL"] == config.database_url
+    if command == "rag-init":
+        assert captured["arguments"][-3:] == ["init", "--profile", "backend"]
+
+
+def test_stopped_rag_init_updates_selected_pair_without_rotating_cursor_key(config, tmp_path):
+    from youtube_rag import manifest
+
+    from youtube_backend.database import Database
+
+    initialize_pair(config)
+    before = check_pair(config)
+    marker = Path(config.chroma_persist_dir, MARKER).read_bytes()
+    database = Database(config.database_url)
+    try:
+        security = getattr(manifest, "security", None)
+        if security is not None:
+            # Simulate a bound pre-PR20 store lacking its additive cursor table.
+            with database.write() as connection:
+                security.drop(connection)
+        selected = tmp_path / "selected.env"
+        selected.write_text("# configuration exported by the launcher\n", encoding="utf-8")
+        args = [
+            sys.executable,
+            "-m",
+            "youtube_backend.full",
+            "--env-file",
+            str(selected),
+            "rag-init",
+        ]
+        environment = config.child_environment(os.environ)
+        environment["GEMINI_API_KEY"] = ""
+
+        def run(*extra):
+            return subprocess.run(
+                args + list(extra), env=environment, capture_output=True, text=True, timeout=30
+            )
+
+        assert run().returncode == 2  # stopped assertion is mandatory even though 04 init lacks it
+        first = run("--workers-stopped")
+        assert first.returncode == 0, first.stderr
+        if security is not None:
+            with database.read() as connection:
+                key = connection.scalar(sa.select(security.c.cursor_key))
+            assert key
+        second = run("--workers-stopped")
+        assert second.returncode == 0, second.stderr
+        if security is not None:
+            with database.read() as connection:
+                assert connection.scalar(sa.select(security.c.cursor_key)) == key
+        assert check_pair(config) == before
+        assert Path(config.chroma_persist_dir, MARKER).read_bytes() == marker
+    finally:
+        database.close()
 
 
 async def test_runtime_pair_guard_runs_before_constructing_the_factory(

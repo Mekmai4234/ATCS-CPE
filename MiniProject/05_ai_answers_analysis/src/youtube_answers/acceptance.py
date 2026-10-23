@@ -8,6 +8,7 @@ import argparse
 import asyncio
 import json
 import math
+import os
 import re
 import time
 from datetime import UTC, datetime
@@ -94,14 +95,43 @@ class AcceptancePlan(Schema):
 
 
 class AcceptanceRunner:
-    def __init__(self, client, *, poll_timeout=300, poll_interval=1):
+    def __init__(self, client, *, poll_timeout=300, poll_interval=1, origin=None):
         self.client = client
         self.poll_timeout, self.poll_interval = poll_timeout, poll_interval
         self.transcripts = {}
+        self.origin = origin or client.headers.get("Origin") if client is not None else origin
+        self._actor = None
+
+    async def _session(self):
+        identity = await self._request("GET", "/api/auth/me")
+        user, csrf = identity.get("user", {}), identity.get("csrf_token")
+        actor = user.get("user_id")
+        if (
+            not actor
+            or user.get("status") != "active"
+            or not isinstance(csrf, str)
+            or len(csrf) < 32
+        ):
+            raise error(
+                "acceptance_authentication_required", "An active session is required", status=401
+            )
+        if self._actor is not None and actor != self._actor:
+            raise error("acceptance_actor_changed", "Session actor changed during run", status=403)
+        if not self.origin:
+            raise error("acceptance_auth_configuration", "Configure the trusted browser origin")
+        self._actor = actor
+        # Session/CSRF values stay only in the client; never include identity replies in reports.
+        self.client.headers.update({"Origin": self.origin, "X-CSRF-Token": csrf})
 
     async def _request(self, method, path, **kwargs):
         try:
-            response = await self.client.request(method, path, **kwargs)
+            response = await self.client.request(method, path, follow_redirects=False, **kwargs)
+            if response.status_code == 401:
+                raise error("authentication_required", "Session is missing or expired", status=401)
+            if response.status_code == 403:
+                raise error(
+                    "permission_denied", "Session/CSRF does not authorize the request", status=403
+                )
             response.raise_for_status()
             return response.json()
         except httpx.TimeoutException:
@@ -137,9 +167,13 @@ class AcceptanceRunner:
             if item["outcome"] == "rejected" or not item.get("job_id"):
                 raise error("acceptance_import_failed", "A planned video was rejected")
             value = await self._result(item)
-            if "source" not in value:
-                raise error("acceptance_import_failed", "Import did not produce an index receipt")
             job = await self._request("GET", f"/api/jobs/{item['job_id']}")
+            if "source" not in value and not (
+                job.get("kind") == "attach" and value.get("video_id") == item.get("video_id")
+            ):
+                raise error(
+                    "acceptance_import_failed", "Import/attach did not produce a ready source"
+                )
             if job.get("stage") != "ready":
                 raise error("acceptance_import_failed", "Video is not ready")
 
@@ -293,6 +327,7 @@ class AcceptanceRunner:
             )
         ):
             raise error("acceptance_wrong_runtime", "Use the live full-team runtime, not fixtures")
+        await self._session()
         await self._import(plan)
         videos = await self._sources(plan)
         results, conversations = [], {}
@@ -300,6 +335,7 @@ class AcceptanceRunner:
             request = dict(case.request)
             started = time.monotonic()
             try:
+                await self._session()
                 if case.conversation_from:
                     if case.conversation_from not in conversations:
                         raise error(
@@ -324,6 +360,13 @@ class AcceptanceRunner:
                     raise error("source_changed", "Sources changed during acceptance")
                 report = self._review(case, value, current, plan.expected_model)
             except Exception as exc:
+                if getattr(exc, "code", "") in {
+                    "authentication_required",
+                    "permission_denied",
+                    "acceptance_actor_changed",
+                    "acceptance_authentication_required",
+                }:
+                    raise  # Do not export earlier private results after session/actor failure.
                 report = {
                     "case_id": case.id,
                     "structural_checks_passed": False,
@@ -353,6 +396,15 @@ def main():
     )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
+        "--origin", default="http://localhost:3000", help="Server-trusted browser origin"
+    )
+    parser.add_argument(
+        "--session-env",
+        default="YK_ACCEPTANCE_SESSION",
+        help="Environment variable holding an opaque session cookie; never pass the token on CLI",
+    )
+    parser.add_argument("--session-cookie", choices=["yk_session", "__Host-yk_session"])
+    parser.add_argument(
         "--request-timeout",
         type=positive_seconds,
         default=DEFAULT_REQUEST_TIMEOUT,
@@ -377,12 +429,42 @@ def main():
         or url.fragment
     ):
         parser.error("Provide a server URL without credentials, query or fragment")
+    origin = urlsplit(args.origin)
+    if (
+        origin.scheme not in {"http", "https"}
+        or not origin.hostname
+        or origin.username
+        or origin.password
+        or origin.path not in {"", "/"}
+        or origin.query
+        or origin.fragment
+    ):
+        parser.error("Provide the trusted browser origin without credentials or a path")
+    if args.session_cookie == "__Host-yk_session" and url.scheme != "https":
+        parser.error("Host-prefixed session cookies require HTTPS")
 
     async def run():
+        session = os.environ.get(args.session_env, "")
+        if not session:
+            raise error(
+                "acceptance_authentication_required",
+                "Configure an existing session in the selected environment variable",
+                status=401,
+            )
         plan = AcceptancePlan.model_validate_json(args.plan.read_text("utf-8"))
         timeout = httpx.Timeout(args.request_timeout, connect=min(10, args.request_timeout))
-        async with httpx.AsyncClient(base_url=args.base_url, timeout=timeout) as client:
-            return await AcceptanceRunner(client, poll_timeout=args.poll_timeout).run(plan)
+        cookie = args.session_cookie or (
+            "__Host-yk_session" if url.scheme == "https" else "yk_session"
+        )
+        async with httpx.AsyncClient(
+            base_url=args.base_url,
+            timeout=timeout,
+            cookies={cookie: session},
+            follow_redirects=False,
+        ) as client:
+            return await AcceptanceRunner(
+                client, poll_timeout=args.poll_timeout, origin=args.origin
+            ).run(plan)
 
     try:
         report = asyncio.run(run())

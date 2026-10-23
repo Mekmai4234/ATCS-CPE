@@ -135,7 +135,7 @@ class DockerCheck:
             self.check(f"Linux container pytest: {match.group(0)}")
             self.dc("up", "-d", "--wait", "--wait-timeout", "90", "api", "worker", timeout=150)
             health, _ = self.request("GET", "/health")
-            assert health["schema_revision"] == "0001" and health["mode"] == "fixture"
+            assert health["schema_revision"] == "0002" and health["mode"] == "fixture"
             identity = self.dc(
                 "exec",
                 "-T",
