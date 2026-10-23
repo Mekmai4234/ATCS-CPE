@@ -57,6 +57,8 @@ async def integrated(tmp_path, config):
     settings = Settings(
         _env_file=None,
         app_env="test",
+        # Explicit single-user lifecycle regressions; authenticated coverage is separate.
+        auth_enabled=False,
         adapter_mode="custom",
         adapter_factory="youtube_ingestion.integration:create_adapters",
         database_url=f"sqlite:///{(tmp_path / 'app.db').as_posix()}",

@@ -28,6 +28,9 @@ async def test_acceptance_script_checks_pipeline_and_labels_fixture_vectors(
     result = await acceptance.check(state, [VIDEO_A])
     assert result["passed"] and result["embedding_provider"] == "fixture"
     assert not result["gemini_called"] and not result["semantic_quality_evaluated"]
+    assert result["authentication_enabled"]
+    assert result["identity_provider"] == "fixture-google-verifier"
+    assert not result["real_google_login_evaluated"]
     case = result["cases"][0]
     assert case["stage"] == "ready" and case["timestamps_match_provider"]
     assert case["duplicate_reuses_job"] and case["caption_fetches"] == 1
