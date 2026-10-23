@@ -27,6 +27,23 @@ Important details
 - Maintenance selects runtime factory profiles or explicit ordered env files. Config
   diagnostics expose resolved paths/model identity, never keys. GC needs no provider key.
 - GC verifies vectors are gone before forgetting run metadata; failures remain retryable.
+- Authenticated reads require a durable leased owner, frozen permitted sources and current
+  user_videos memberships. Prompt/request user_id and role fields confer no authority.
+- Snapshot grants/account revisions before reads and recheck before releasing evidence.
+- Validate Chroma candidates against exact SQLite run/source/version identities.
+- HMAC cursors bind account/job/grants/sources/runs; rag04_security persists the private key.
+- Shared import inventory is a worker publication check for remaining subscribers, not
+  permission for a detached creator to read text. No account evidence cache is introduced.
+- Physical GC checks refs/jobs under the writer fence and relies on 02's deleting
+  tombstone during asynchronous vector deletion. Ordinary AI jobs cannot run maintenance.
+- The permission upgrade is additive and preserves embedding fingerprints and vectors.
+- Consumer metadata includes backend google-auth/requests without package upgrades.
+- Integration checks export full backend metadata/source and this module's locked files,
+  install them with uv sync --locked, then build/test that same Docker candidate.
+- No PYTHONPATH-only source override establishes lock validity. Independent consumer
+  suites, browser login and whole-system release acceptance remain separate gates.
+- Use native 02 jobs/memberships plus 03 IngestionService in the selected full factory;
+  the alternative member_ingestion_backend proposal is not activated by module 04.
 
 Interfaces
 ----------
