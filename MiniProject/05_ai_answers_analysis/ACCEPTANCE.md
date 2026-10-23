@@ -1,4 +1,8 @@
-# Module 05 follow-up acceptance — updated 2026-10-21
+# Module 05 follow-up acceptance — updated 2026-10-22
+
+Member authentication prerequisites and current dependency versions are documented in
+[MEMBER_AUTHORIZATION.md](MEMBER_AUTHORIZATION.md). Earlier verification below remains
+historical; the current authenticated test results are in [MEMBER_TEST_REPORT.md](MEMBER_TEST_REPORT.md).
 
 This checklist responds to the review of `develop@25427fe`. It separates code changes,
 offline mechanism tests, live provider access and human semantic acceptance.
@@ -76,13 +80,26 @@ This is still **synthetic generation**, not acceptance against real videos.
    placeholder video ID/question and specify the model the server requests. The template
    intentionally fails validation before making requests until completed.
 3. Start the real full API and worker with the selected common configuration above.
-4. Run the opt-in acceptance client. It imports/reuses clips, polls import jobs until ready,
+4. Sign in through the normal Google login flow. Load the resulting opaque server session
+   cookie into the process environment variable `YK_ACCEPTANCE_SESSION` using your local
+   secret handling workflow. The client accepts an existing session, not a Google ID token.
+   Do not paste the cookie into command arguments, plans, reports or committed env files.
+5. Run the opt-in acceptance client. It imports/reuses clips, polls import jobs until ready,
    asks QA/unsupported/follow-up cases, then requests summaries and conflicting comparison.
    Chat accepts both immediate 200 and asynchronous 202; follow-ups reuse conversation IDs.
 
 ```powershell
-python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-answers-acceptance --live --base-url http://127.0.0.1:8000 --plan runtime/answers05/real-plan.json --output runtime/answers05/real-report.json --request-timeout 210 --poll-timeout 300
+python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-answers-acceptance --live --base-url http://127.0.0.1:8000 --origin http://localhost:3000 --plan runtime/answers05/real-plan.json --output runtime/answers05/real-report.json --request-timeout 210 --poll-timeout 300
 ```
+
+The client calls `/api/auth/me` before importing and before each case, binds the run to
+one active user and refreshes `X-CSRF-Token`. `--origin` must match a server-trusted
+browser origin. HTTPS defaults to `__Host-yk_session`; local HTTP defaults to `yk_session`.
+`--session-cookie` and `--session-env` select a cookie name/environment variable, never a
+raw credential argument. Redirects are disabled. Missing/expired sessions, forbidden
+access and actor changes fail explicitly; a fatal auth error discards earlier private
+case results. Cookie values, CSRF tokens and auth response bodies are not exported.
+Remove the process session variable after the run.
 
 The client rejects fixture/offline/limited capabilities before import, checks status,
 scope/coverage/model/provider, title, timestamp URL and transcript interval bounds. It
