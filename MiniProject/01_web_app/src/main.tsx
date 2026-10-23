@@ -7,5 +7,6 @@ import '@fontsource/ibm-plex-sans-thai/700.css';
 import '@fontsource-variable/manrope';
 import './styles.css';
 import './theme.css';
+import './mint.css';
 
 createRoot(document.getElementById('root')!).render(<SessionShell />);

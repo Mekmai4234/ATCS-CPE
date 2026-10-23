@@ -10,6 +10,7 @@ import '@fontsource/ibm-plex-sans-thai/700.css';
 import '@fontsource-variable/manrope';
 import '../src/styles.css';
 import '../src/theme.css';
+import '../src/mint.css';
 
 class FixtureSessionPort implements SessionPort {
   readonly demo = false;

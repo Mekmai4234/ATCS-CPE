@@ -7,6 +7,7 @@ import GoogleButton from './GoogleButton';
 import { HttpSessionPort } from './httpSession';
 import { DemoSessionPort, safeMemberSession, safeWorkspacePath } from './session';
 import type { MemberSession, SessionPort } from './session';
+import PublicInfo, { InfoLinks, isInfoPath } from './PublicInfo';
 
 const defaultPort: SessionPort =
   import.meta.env.VITE_DEMO_MODE === 'true'
@@ -95,6 +96,7 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
   const epoch = useRef(0);
   const controller = useRef<AbortController | null>(null);
   const mounted = useRef(true);
+  const destination = useRef(safeWorkspacePath(window.location.pathname));
   const navigate = useCallback((next: string) => {
     const safe = next === '/login' ? '/login' : safeWorkspacePath(next);
     if (window.location.pathname !== safe) window.history.pushState(null, '', safe);
@@ -102,6 +104,7 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
     window.scrollTo(0, 0);
   }, []);
   const expired = useCallback(() => {
+    destination.current = safeWorkspacePath(window.location.pathname);
     epoch.current++;
     controller.current?.abort();
     setSession(null);
@@ -112,6 +115,10 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
   useEffect(() => {
     mounted.current = true;
     async function restore() {
+      if (isInfoPath(window.location.pathname)) {
+        setPhase('guest');
+        return;
+      }
       const ticket = ++epoch.current;
       controller.current?.abort();
       controller.current = new AbortController();
@@ -125,6 +132,7 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
           setPhase('member');
           if (window.location.pathname === '/login') navigate('/');
         } else {
+          destination.current = safeWorkspacePath(window.location.pathname);
           setPhase('guest');
           navigate('/login');
         }
@@ -162,7 +170,11 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
       if (!mounted.current || ticket !== epoch.current) return;
       setSession(value);
       setPhase('member');
-      navigate('/');
+      navigate(
+        destination.current === '/admin' && value.member.role !== 'admin'
+          ? '/'
+          : destination.current,
+      );
     } catch (error) {
       if (!mounted.current || ticket !== epoch.current) return;
       setMessage(error instanceof Error ? error.message : 'เข้าสู่ระบบไม่สำเร็จ');
@@ -189,6 +201,7 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
     }
   }
 
+  if (isInfoPath(path)) return <PublicInfo path={path} />;
   if (phase === 'member' && session)
     return (
       <MemberArea
@@ -208,7 +221,9 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
       <ForestBackdrop />
       <header className="login-header">
         <BuddyLogo />
-        <span>พื้นที่เล็ก ๆ สำหรับการเรียนรู้ครั้งใหญ่</span>
+        <a className="help-link" href="/help">
+          ช่วยเหลือ
+        </a>
       </header>
       <main className="login-layout">
         <section className="login-story" aria-labelledby="login-intro">
@@ -231,7 +246,7 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
           <span className="login-spark" aria-hidden="true">
             ✦
           </span>
-          <span className="eyebrow">WELCOME TO YOUR KNOWLEDGE FOREST</span>
+          <span className="eyebrow">WELCOME TO RAG BUDDY</span>
           <h2 id="sign-in-title">ยินดีต้อนรับกลับ</h2>
           <p>
             เข้าสู่ระบบเพื่อเริ่มเรียนรู้จากคลิป
@@ -300,6 +315,7 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
           <div className="login-assurance">
             <span aria-hidden="true">⌁</span> คลังคลิปและผลการเรียนรู้เป็นของบัญชีคุณ
           </div>
+          <InfoLinks />
         </section>
       </main>
       <footer className="login-footer">RAG Buddy · เรียนรู้ในจังหวะของคุณ</footer>
