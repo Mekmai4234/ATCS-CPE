@@ -64,3 +64,12 @@
 - การสรุปทุกคลิปต้องประมวลผลให้ครอบคลุม ไม่ใช้ top-k แล้วอ้างว่าครบทั้งหมด
 - ห้ามนำรหัสลับจริงมาใส่ `env.txt` หรือ commit `.env`
 - การเชิญผู้ร่วมงานเป็นสิทธิ์ระดับ repository ATCS-CPE ดูรายละเอียดใน CONTRIBUTING
+
+## ผู้ร่วมพัฒนา MiniProject
+
+| Contributor | GitHub |
+|---|---|
+| **Marisa Pimpralab** | [@marisa46054](https://github.com/marisa46054) |
+| Mekmai Jankeaw | [@Mekmai4234](https://github.com/Mekmai4234) |
+
+[ดูประวัติการพัฒนาบน develop](https://github.com/Mekmai4234/ATCS-CPE/commits/develop/)
