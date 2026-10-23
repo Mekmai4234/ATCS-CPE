@@ -18,8 +18,20 @@ Architecture
   and are not written to localStorage or sessionStorage. No password forms are included.
   Server nonce/client_id initialize GIS. Challenges refresh before expiry and after failed
   exchange. Old callbacks are ignored and credentials are never automatically resubmitted.
-- Forest.tsx, HomeHero.tsx and theme.css implement responsive forest/mint surfaces with
-  separate WebP assets. AdminView.tsx renders only advertised session capabilities.
+- Forest.tsx retains legacy export names but renders a plain CSS mint backdrop and the
+  layered InteractiveBuddy. mint.css supersedes the former forest surfaces. Existing
+  fonts, reading cards and real Admin capabilities remain in use.
+- InteractiveBuddy.tsx uses independent raster head/body/waving-hand layers, code pupils,
+  bounded transforms and requestAnimationFrame/ref tracking. Hidden/reduced-motion modes
+  reset tracking; head-only/minimized rigs have no tracking listener. Animations are finite.
+- FloatingBuddy.tsx portals the authenticated launcher/dialog while consuming App's shared
+  draft/scope/turns/conversation/Api. It does not create a second chat client or store.
+  The launcher captures pointers after down, separates click/drag, clamps to visualViewport,
+  handles cancellation and provides keyboard corner/reset/hide/restore alternatives.
+- buddyModel.ts validates the versioned coordinate preference, geometry, IME input and
+  canonical scope identity. No private conversation/token data is persisted locally.
+- api.history loads known conversation messages with pagination; App merges by job identity
+  and preserves citation invalidation. There is no invented account-wide history-list route.
 - App.tsx coordinates library, import, selection, task forms and lifecycle state.
 - api.ts is the typed HTTP boundary, classified errors and sequential job observer.
   With session security it includes cookies/CSRF, expires on 401, refuses automatic 403

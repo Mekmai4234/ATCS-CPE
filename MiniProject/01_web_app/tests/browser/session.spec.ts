@@ -348,6 +348,10 @@ test('Google script network errors provide a retry without a password fallback',
     page.getByText('เชื่อมต่อ Google ไม่ได้ กรุณาตรวจสอบเครือข่าย', { exact: true }),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'ลองโหลด Google อีกครั้ง' })).toBeVisible();
+  await page.screenshot({
+    path: 'runtime/screenshots/mint-login-network-error.png',
+    fullPage: true,
+  });
   await expect(page.locator('input[type="password"]')).toHaveCount(0);
 });
 

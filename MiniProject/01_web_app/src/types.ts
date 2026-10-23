@@ -121,4 +121,19 @@ export interface ProgressEvent {
   summary: string;
   timestamp: string;
 }
+export interface ConversationPage {
+  conversation_id: string;
+  total: number;
+  limit: number;
+  offset: number;
+  messages: {
+    message_id: string;
+    job_id: string;
+    role: string;
+    content: string;
+    citations: Citation[];
+    scope: { video_id: string; generation?: number; transcript_version?: string }[];
+    state: JobState;
+  }[];
+}
 export type TaskType = 'chat' | 'summary' | 'compare' | 'research' | Artifact['type'];
