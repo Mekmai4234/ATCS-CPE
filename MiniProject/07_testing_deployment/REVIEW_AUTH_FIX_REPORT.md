@@ -1,5 +1,9 @@
 # Module 07 review fixes — 22 October 2026
 
+Historical pinned-candidate report. Default CI was corrected on 24 October to test the
+actual checkout. See [UI_CHECKOUT_REPORT.md](UI_CHECKOUT_REPORT.md) for current evidence
+and new UI blockers; the results below must not certify later source.
+
 ## Outcome and scope
 
 The reviewed P1 consumer-lock defect is fixed in **07/uv.lock**: backend metadata now

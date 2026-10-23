@@ -1,10 +1,9 @@
 # Auth deployment and legacy recovery
 
-**Current status: blocked for public auth deployment pending real Google staging smoke.**
-The pinned candidate UI uses HttpSessionPort; develop still lacks the merged identity
-phase. First assemble `integration.json` with `scripts/candidate.py --manifest` and
-verify/sync the committed lock, as shown in README. Run all commands below INSIDE that
-candidate; direct old-develop sync cannot validate the auth lock. Do not
+**24 October: public release remains blocked by missing frontend integration/new UI and
+real Google staging smoke.** Backend 02–06 is merged; validate the actual checkout with
+the locked environment and source fingerprints from README. Historical pinned source
+does not validate current rollout. Do not
 substitute demo mode, disable authentication, or treat a manually edited evidence JSON
 as proof of integration. `auth_readiness.py` validates configuration and an operator's
 attestation; it does not independently verify claims inside that attestation.
@@ -72,8 +71,8 @@ docker compose -f 07_testing_deployment/compose.yaml build api
 uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/docker_startup.py
 ```
 
-For current auth acceptance, build the same web/API images inside the pinned candidate,
-then run `uv run --locked --project 07_testing_deployment python 07_testing_deployment/scripts/docker_auth.py`.
+For current container checks, build the web/API images from the actual checkout,
+then run `uv run --locked --project 07_testing_deployment python 07_testing_deployment/scripts/docker_auth.py --checkout`.
 `compose.auth-drill.yaml` uses production auth/live-factory settings and an internal-only
 network. It verifies HTTPS proxying, schema 0002, full pair preflight, secure challenge
 cookies and unauthenticated API denial. It runs no provider jobs and creates no release
