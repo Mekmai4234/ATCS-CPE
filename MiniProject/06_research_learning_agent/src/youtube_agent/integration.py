@@ -4,6 +4,7 @@ from youtube_rag.config import RagSettings
 from youtube_rag.integration import RagAdapters
 from youtube_rag.manifest import BackendExecution
 
+from .authorization import MemberAgentService
 from .config import AgentSettings
 from .gemini import GeminiModel
 from .service import AgentService
@@ -37,6 +38,7 @@ class AgentAdapters(RagAdapters):
         rag_settings=None,
         embedder=None,
         analyzer=None,
+        member_authority=None,
     ):
         # Construct the model first so missing generation configuration cannot leak RAG resources.
         config = agent_settings or AgentSettings.from_backend(settings)
@@ -49,6 +51,8 @@ class AgentAdapters(RagAdapters):
             settings=settings, repository=repository, rag_settings=rag_settings, embedder=embedder
         )
         self.agent = AgentService(config, gateway, RagKnowledge(self.rag), analyzer=analyzer)
+        if member_authority is not None:
+            self.agent = MemberAgentService(self.agent, member_authority)
 
     async def research(self, request, sources, context):
         return await self.agent.research(request, sources, context)
@@ -58,7 +62,8 @@ class AgentAdapters(RagAdapters):
 
     async def close(self):
         try:
-            await self.agent.model.close()
+            agent = self.agent.agent if isinstance(self.agent, MemberAgentService) else self.agent
+            await agent.model.close()
         finally:
             await super().close()
 
@@ -70,6 +75,28 @@ async def create_adapters(*, settings, repository):
     try:
         return AgentAdapters(
             settings=settings, repository=repository, agent_settings=config, model=gateway
+        )
+    except BaseException:
+        await gateway.close()
+        raise
+
+
+async def create_member_adapters(*, settings, repository):
+    """Member entrypoint; do not fall back to legacy execution when 02 is unavailable."""
+    from .models import error
+
+    authority = getattr(repository, "agent_authority", None)
+    if authority is None:
+        raise error("member_authority_unavailable", "Backend member authority required", status=503)
+    config = AgentSettings.from_backend(settings)
+    gateway = GeminiModel(config)
+    try:
+        return AgentAdapters(
+            settings=settings,
+            repository=repository,
+            agent_settings=config,
+            model=gateway,
+            member_authority=authority,
         )
     except BaseException:
         await gateway.close()

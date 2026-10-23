@@ -95,6 +95,8 @@ async def test_http_acceptance_polls_follows_history_and_builds_review_packets()
         path = request.url.path
         if path == "/health":
             data = health()
+        elif path == "/api/auth/me":
+            data = {"user": {"user_id": "member-a", "status": "active"}, "csrf_token": "s" * 64}
         elif path == "/api/videos/import":
             data = {
                 "jobs": [
@@ -151,7 +153,9 @@ async def test_http_acceptance_polls_follows_history_and_builds_review_packets()
     async with httpx.AsyncClient(
         base_url="http://test", transport=httpx.MockTransport(handler)
     ) as client:
-        report = await AcceptanceRunner(client, poll_interval=0).run(plan())
+        report = await AcceptanceRunner(
+            client, poll_interval=0, origin="http://localhost:3000"
+        ).run(plan())
     assert report["structural_checks_passed"]
     assert report["semantic_acceptance"] == "pending_human_review"
     assert sent[1]["conversation_id"] == "conversation-1"
@@ -272,6 +276,8 @@ def test_cli_uses_configured_http_and_polling_budgets(
 ):
     from youtube_answers import acceptance
 
+    monkeypatch.setenv("YK_ACCEPTANCE_SESSION", "test-only-session")
+
     plan_file, output = tmp_path / "plan.json", tmp_path / "result.json"
     plan_file.write_text(plan().model_dump_json(), encoding="utf-8")
     client_type = httpx.AsyncClient
@@ -307,6 +313,7 @@ def test_cli_uses_configured_http_and_polling_budgets(
     assert requests[0].extensions["timeout"]["read"] == request_timeout
     assert requests[0].extensions["timeout"]["write"] == request_timeout
     assert requests[0].extensions["timeout"]["connect"] == 10
+    assert "test-only-session" not in output.read_text("utf-8")
 
 
 @pytest.mark.parametrize("value", ["0", "-1", "nan", "inf", "-inf", "invalid"])
@@ -362,3 +369,58 @@ async def test_real_http_read_budget_allows_slow_response_within_configured_limi
         await server.wait_closed()
         if tasks:
             await asyncio.gather(*tasks)
+
+
+@pytest.mark.parametrize(
+    "status,code", [(401, "authentication_required"), (403, "permission_denied")]
+)
+async def test_session_errors_are_not_insufficient_evidence_and_are_redacted(status, code):
+    async with httpx.AsyncClient(
+        base_url="http://test",
+        transport=httpx.MockTransport(
+            lambda _: httpx.Response(status, json={"error": "session-secret csrf-secret"})
+        ),
+    ) as client:
+        with pytest.raises(AppError) as caught:
+            await AcceptanceRunner(client)._session()
+    assert caught.value.code == code and caught.value.status_code == status
+    assert "secret" not in str(caught.value)
+
+
+async def test_session_csrf_refresh_is_bound_to_one_actor():
+    actors = iter(["a", "b"])
+
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "user": {"user_id": next(actors), "status": "active"},
+                "csrf_token": "c" * 64,
+            },
+        )
+
+    async with httpx.AsyncClient(
+        base_url="http://test", transport=httpx.MockTransport(handler)
+    ) as client:
+        runner = AcceptanceRunner(client, origin="http://localhost:3000")
+        await runner._session()
+        assert client.headers["X-CSRF-Token"] == "c" * 64
+        assert client.headers["Origin"] == "http://localhost:3000"
+        with pytest.raises(AppError) as caught:
+            await runner._session()
+        assert caught.value.code == "acceptance_actor_changed"
+
+
+def test_cli_missing_session_fails_closed_without_network_or_secret_report(tmp_path, monkeypatch):
+    from youtube_answers import acceptance
+
+    monkeypatch.delenv("YK_ACCEPTANCE_SESSION", raising=False)
+    output = tmp_path / "report.json"
+    monkeypatch.setattr(
+        "sys.argv", ["acceptance", "--live", "--plan", "missing.json", "--output", str(output)]
+    )
+    monkeypatch.setattr(
+        acceptance.httpx, "AsyncClient", lambda **_: pytest.fail("Network not allowed")
+    )
+    assert acceptance.main() == 1
+    assert '"error_code": "acceptance_authentication_required"' in output.read_text("utf-8")

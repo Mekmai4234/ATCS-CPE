@@ -16,6 +16,14 @@ VIDEO_A = "dQw4w9WgXcQ"
 VIDEO_B = "jNQXAC9IVRw"
 
 
+@pytest.fixture(autouse=True)
+def legacy_single_user_tests(request, monkeypatch):
+    # Existing coordinator tests explicitly retain their single-user test environment.
+    # New identity tests enable authentication on their Settings instance.
+    if not request.module.__name__.endswith("test_identity"):
+        monkeypatch.setenv("AUTH_ENABLED", "false")
+
+
 @pytest.fixture
 def env(tmp_path):
     settings = Settings(
