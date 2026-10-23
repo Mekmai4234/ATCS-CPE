@@ -1,5 +1,7 @@
 # Auth integration — module 02 PR18
 
+Current UI update (2026-10-24): the member backend is now in develop. The same HttpSessionPort is reused by full and floating chat. Use `python tests/identity_smoke.py --checkout` for actual-checkout HTTP/worker evidence; `--ref origin/develop` remains the isolated archive option. Historical PR18 notes below explain the original adapter handoff. See [MINT_BUDDY_REPORT.md](MINT_BUDDY_REPORT.md) for current validation and limitations.
+
 Updated 2026-10-22. Default production now uses HttpSessionPort. Contract inspected/tested from origin/codex/02-google-auth-ownership@b047e809f983ffb2e4f3f9d3e3f074b8976cd6da. This dependency remains separate from develop; module 01 changed no backend files or consumer locks.
 
 ## HTTP mapping

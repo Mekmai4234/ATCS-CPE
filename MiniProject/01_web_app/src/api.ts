@@ -175,6 +175,19 @@ export class Api {
       await this.request<Accepted>(`/api/videos/${encodeURIComponent(id)}`, { method: 'DELETE' })
     ).data;
   }
+  async history(id: string, offset = 0, signal?: AbortSignal) {
+    const { data } = await this.request<import('./types').ConversationPage>(
+      `/api/conversations/${encodeURIComponent(id)}?limit=50&offset=${offset}`,
+      { signal, cache: 'no-store' },
+    );
+    if (
+      !Array.isArray(data.messages) ||
+      !Number.isInteger(data.total) ||
+      data.conversation_id !== id
+    )
+      throw new ApiError('ประวัติสนทนาไม่ตรง API', 'invalid_response', false);
+    return data;
+  }
   async research(id: string, after = 0, signal?: AbortSignal) {
     return (
       await this.request<Job & { events: ProgressEvent[] }>(

@@ -1,10 +1,10 @@
 # 01 · YouTube Knowledge Web
 
-## RAG Buddy UI / auth integration — 22 October 2026
+## RAG Buddy mint UI / Floating Buddy — 24 October 2026
 
-ปรับหน้าตามภาพอ้างอิง `D:\Web` เป็นธีมป่า พร้อมหน้า login, home, library, chat/learning และ admin ตาม capability ดู [รายงานรอบนี้](RAGBUDDY_UI_REPORT.md) และ [ภาพตัวอย่าง](docs/screenshots/ragbuddy-home-1440.png)
+ปรับตามภาพชุดล่าสุด `D:\Web\New folder` เป็นพื้นมิ้นต์สว่าง มาสคอตแยกชั้นที่มองตาม pointer และแชต Buddy ลากย้ายได้หลัง login ใช้ state/API/conversation ร่วมกับหน้าแชตเต็ม ดู [รายงานรอบนี้](MINT_BUDDY_REPORT.md) และ [ที่มา assets/rig](design/buddy-rig/README.md) ส่วนรายงานฉากป่าเดิมเก็บไว้เป็นประวัติ
 
-**เชื่อม HttpSessionPort กับทีม 02 PR18 แล้ว:** ใช้ challenge nonce, Google exchange, session/CSRF และ Admin API จริง ดู [AUTH_INTEGRATION.md](AUTH_INTEGRATION.md) และ [ผลแก้ review](AUTH_REVIEW_REPORT.md) ต้องใช้ backend ที่เปิด auth จาก PR18; backend เดิมบน develop ไม่รองรับ flow นี้ การทดสอบอัตโนมัติใช้ verifier fixture ยังไม่ใช่บัญชี Google จริง จึงคง Draft จนผ่าน release acceptance
+**ใช้ HttpSessionPort เดิม:** challenge nonce, Google exchange, session/CSRF และ Admin API มาจากงานทีม 02 ซึ่งรวมใน develop แล้ว ไม่สร้าง auth client ซ้ำ การทดสอบอัตโนมัติจำลอง external Google verifier; การใช้บัญชี Google จริงและการตั้งค่า HTTPS/origins ยังต้องตรวจแยกก่อนประกาศพร้อม deploy
 
 หน้าเว็บ React + TypeScript สำหรับนำเข้าคลิป เลือกแหล่งข้อมูล ถามพร้อม citation วิเคราะห์ และแสดงสื่อเรียนรู้ ใช้ Vite เพราะเป็นเว็บฝั่ง client ที่เชื่อม FastAPI อยู่แล้ว ไม่ต้องมี Node server อีกชุดตอนนำ build ไปใช้งาน
 
@@ -69,19 +69,28 @@ Browser tests ใช้ Google Chrome ที่ติดตั้งอยู่
 
 พอร์ต 3001/3002 ใช้ standalone workspace harness เพื่อรักษา regression เดิม พอร์ต 3003 ใช้ SessionShell กับ test adapter `/__test__/` และ mock GIS โดยเฉพาะ ไม่ใช่ contract ทีม 02 และไม่ใช่การทดสอบ Google จริง โหมด harness ทั้งสองห้าม build สำหรับ deploy
 
-Browser suite ปกติทดสอบ demo และ mock HTTP contract โดยข้าม 7 integration cases ซึ่งรันแยกผ่านสองคำสั่งด้านล่าง ทดสอบ backend จริงแยกได้ด้วย Python 3.11+ ที่ติดตั้ง dependencies ของ module 02 แล้ว:
+Browser suite ปกติทดสอบ demo และ mock HTTP contract โดยข้าม 8 integration cases: auth 7 เคสรันด้วย identity_smoke ด้านล่าง ส่วน legacy single-user 1 เคสใช้ snapshot เก่าเท่านั้น ต้องมี Python 3.11+ และ dependencies ของ module 02:
 
 ```powershell
-python tests/backend_smoke.py --ref develop
+python tests/backend_smoke.py --ref 69f5347
 ```
 
 ทดสอบ session/nonce/Admin/ownership ด้วย HTTP backend ที่เปิด auth และ verifier fixture (ต้องมี dependencies ของ module 02) ใช้พอร์ต 3001–3004:
 
 ```powershell
-python tests/identity_smoke.py --ref origin/codex/02-google-auth-ownership
+python tests/identity_smoke.py --checkout
 ```
 
-คำสั่งนี้ใช้หน้า entry ตามปกติและฐานข้อมูลแยก ไม่แก้ backend checkout หรือฐานข้อมูลเดิม ไม่ใช่การทดสอบบัญชี Google จริง
+ใช้ `python tests/identity_smoke.py --checkout` เพื่อตรวจหน้า entry ปกติกับ source backend ใน actual checkout และฐานข้อมูลแยก โดยไม่แก้ backend หรือฐานข้อมูลเดิม หรือใช้ `--ref origin/develop` เพื่อตรวจ snapshot จาก Git ไม่ใช่การทดสอบบัญชี Google จริง
+
+## ใช้ Floating Buddy
+
+- เปิดปุ่ม Buddy หลังเข้าสู่ระบบ เลือกคลิปที่พร้อม แล้วถามได้ด้วย Enter; Shift+Enter ขึ้นบรรทัดใหม่และไม่ส่งระหว่าง IME composition
+- ลากปุ่มวงกลม หรือใช้เมนูจุดสามจุดเลือกมุม/คืนตำแหน่ง การลากไม่เปิดแชต และเก็บเฉพาะ `{v,x,y}` ใน localStorage; storage ใช้ไม่ได้ก็ยังใช้งานได้
+- ย่อแล้วเปิดกลับหรือไปหน้าแชตเต็ม ใช้ข้อความ/คลิป/conversation ชุดเดียวกัน เปลี่ยน scope แล้วคำถามถัดไปเริ่ม conversation ใหม่พร้อมแจ้งให้ทราบ
+- ประวัติใช้ GET ของ conversation ที่ session นี้รู้จัก มี pagination และไม่เก็บ ID/ประวัติใน localStorage ปัจจุบัน backend ไม่มี endpoint รายการ conversations ทั้งบัญชี จึงไม่สร้างเมนูรายการย้อนหลังที่เรียก API สมมติ
+- Suggestion เติมร่างข้อความเท่านั้น ไม่ส่งหรือเรียก LLM จนกดยืนยัน หน้า Login ไม่เปิดแชตส่วนตัว หน้า Admin ใช้ console เดิม; กลับพื้นที่เรียนรู้เพื่อใช้ Buddy ด้วยคลังของบัญชีผู้ดูแลเอง
+- มือถือใช้ modal sheet พร้อม focus/Escape; desktop เป็น non-modal เลื่อนอ่านของเก่าแล้วจะไม่ดึงกลับท้ายเมื่อมีคำตอบใหม่
 
 สคริปต์อ่าน source module 02 จาก local Git ref ไปยังโฟลเดอร์ใหม่ใน `runtime/` เปิด API/worker บนพอร์ตว่าง ใช้ฐานข้อมูล fixture ใหม่ แล้วเรียก browser test โดยไม่ได้ mock HTTP ปิด API/worker เมื่อเสร็จ ไม่แก้ branch หรือฐานข้อมูลเดิม ต้องมี Node.js, Git, Chrome และ dependencies ของ module 02 อยู่บนเครื่อง
 
