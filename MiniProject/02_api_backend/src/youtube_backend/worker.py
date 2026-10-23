@@ -35,6 +35,9 @@ class Worker:
     async def _process(self, job, context):
         context.check()
         kind, job_id, token = job["kind"], job["job_id"], job["lease_token"]
+        if kind == "attach":
+            self.repo.finish(job_id, token, {"video_id": job["video_id"]})
+            return
         if kind == "import":
             self.repo.stage(job_id, token, "fetching_transcript")
             transcript = TranscriptResult.model_validate(
@@ -159,7 +162,7 @@ class Worker:
                 if task is not None:
                     with suppress(asyncio.CancelledError, Exception):
                         await task
-        final = self.repo.get_job(job["job_id"])
+        final = self.repo.get_job(job["job_id"], internal=True)
         logger.info(
             "job_finished job_id=%s request_id=%s kind=%s state=%s stage=%s latency_ms=%.1f",
             job["job_id"],
