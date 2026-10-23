@@ -23,6 +23,7 @@ from youtube_backend.schemas import (
 )
 from youtube_backend.urls import canonical_url
 
+from .authorization import member_service
 from .gemini import byte_size, json_text
 from .models import TOOL_MODELS, Usage, error
 
@@ -81,6 +82,9 @@ class AgentService:
         )
         if remaining <= 0:
             raise error("agent_budget_exhausted", "Research finalization reserve reached")
+        before_call = getattr(run.context, "before_agent_call", None)
+        if before_call is not None:
+            before_call()
         async with asyncio.timeout(min(remaining, self.settings.llm_timeout_seconds)):
             value = await function(min(remaining, self.settings.llm_timeout_seconds))
         run.context.check()
@@ -294,6 +298,9 @@ class AgentService:
         return artifact
 
     async def artifact(self, request, sources, context):
+        member = member_service(self, context)
+        if member is not None:
+            return await member.artifact(request, sources, context)
         run = self._run(sources, context)
         request = self._request(ArtifactRequest, request, run)
         try:
@@ -419,6 +426,9 @@ class AgentService:
         )
 
     async def research(self, request, sources, context):
+        member = member_service(self, context)
+        if member is not None:
+            return await member.research(request, sources, context)
         run = self._run(sources, context)
         request = self._request(ResearchRequest, request, run)
         history = [

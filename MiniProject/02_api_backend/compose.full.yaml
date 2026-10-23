@@ -12,7 +12,10 @@ x-backend: &backend
       required: false
   environment: &settings
     MINIPROJECT_ROOT: /app
-    APP_ENV: development
+    APP_ENV: ${APP_ENV:-development}
+    AUTH_ENABLED: "true"
+    GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
     ADAPTER_MODE: custom
     ADAPTER_FACTORY: youtube_answers.team:create_adapters
     BACKEND_INTEGRATION_PROFILE: live

@@ -1,5 +1,12 @@
 # Module 04 — Maintenance/store-pair verification
 
+Latest 2026-10-22 locked-candidate evidence:
+[LOCK_HANDOFF_TEST_REPORT.md](LOCK_HANDOFF_TEST_REPORT.md).
+
+For the 2026-10-21 account-aware changes, see
+[AUTHORIZATION_TEST_REPORT.md](AUTHORIZATION_TEST_REPORT.md). The results below
+describe the earlier maintenance update and migration checks.
+
 Verified on 2026-10-19 against the current integrated checkout (`25427fe`). Changes
 are limited to module 04. No commit, push, PR, deployment or migration of existing
 application data was performed in this update.
