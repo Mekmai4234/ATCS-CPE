@@ -77,3 +77,16 @@ and a Chroma-directory marker bind fresh stores to one profile/factory/fingerpri
 Explicit init and startup/maintenance checks do not rebind or migrate legacy data.
 The full Docker image is separate from the 04/06-only integration image.
 See full/README.md and FULL_TEST_REPORT.md for deployment and verification limits.
+
+Floating chat HTTP/session contract
+-----------------------------------
+The floating and full-page interfaces reuse chat, job polling and paginated history.
+CORS wraps authentication middleware so trusted credentialed browser clients can
+read 401/403 and clear private state. Unknown origins remain unapproved and CSRF
+checks remain required. No widget-specific API, user role input or auth fallback exists.
+The frontend owns session-revision checks that discard responses from a previous
+account. A job freezes its source scope; historical context sent to the provider is
+filtered to sources/versions permitted by the new turn. Removed sources are marked
+unavailable in owner-visible saved results/history, never used for new retrieval.
+See FLOATING_CHAT_CONTRACT.md and FLOATING_CHAT_TEST_REPORT.md for exact examples,
+errors, lifecycle rules and the boundaries of browser/provider verification.

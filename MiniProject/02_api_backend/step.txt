@@ -77,3 +77,15 @@ Full-system startup workflow (implemented in 02)
 5. Submit scoped chat/analysis requests and inspect persisted citations/history.
 6. Stop API/workers before explicit guarded maintenance; never adopt old demo data.
 See full/README.md for exact commands, limitations and module-07 handoff.
+
+Floating and Full-page Chat Integration
+--------------------------------------
+1. Follow FLOATING_CHAT_CONTRACT.md and its schema-checked JSON examples. Both UI
+   surfaces share one session, conversation and pending turn key; select ready videos.
+2. Run: uv run --project 02_api_backend --locked pytest
+   02_api_backend/tests/test_chat_contract.py -q -W error (join onto one command line).
+3. Run the full locked backend/integration/full suites and scripts/docker_full_smoke.py.
+4. Verify the actual frontend adapter with auth enabled, including readable cross-origin
+   401/403 responses, and label synthetic Google/provider transports in the report.
+5. Before live acceptance, configure real Google origins/Client ID and HTTPS cookies;
+   do not interpret fixture browser tests as real Google or live AI verification.
