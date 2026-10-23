@@ -6,6 +6,54 @@ from sqlalchemy import event
 from sqlalchemy.engine import make_url
 
 metadata = sa.MetaData()
+SCHEMA_REVISION = "0002"
+
+users = sa.Table(
+    "users",
+    metadata,
+    sa.Column("user_id", sa.String(36), primary_key=True),
+    sa.Column("google_sub", sa.String(255), nullable=False, unique=True),
+    sa.Column("email", sa.String(320)),
+    sa.Column("name", sa.String(200)),
+    sa.Column("picture", sa.Text),
+    sa.Column("role", sa.String(10), nullable=False),
+    sa.Column("status", sa.String(12), nullable=False),
+    sa.Column("created_at", sa.Float, nullable=False),
+    sa.Column("updated_at", sa.Float, nullable=False),
+    sa.CheckConstraint("role IN ('user','admin')", name="ck_user_role"),
+    sa.CheckConstraint("status IN ('active','suspended')", name="ck_user_status"),
+)
+sessions = sa.Table(
+    "sessions",
+    metadata,
+    sa.Column("token_hash", sa.String(64), primary_key=True),
+    sa.Column("user_id", sa.ForeignKey("users.user_id"), nullable=False, index=True),
+    sa.Column("csrf_hash", sa.String(64), nullable=False),
+    sa.Column("expires_at", sa.Float, nullable=False),
+    sa.Column("revoked", sa.Boolean, nullable=False),
+    sa.Column("created_at", sa.Float, nullable=False),
+)
+login_challenges = sa.Table(
+    "login_challenges",
+    metadata,
+    sa.Column("token_hash", sa.String(64), primary_key=True),
+    sa.Column("csrf_hash", sa.String(64), nullable=False),
+    sa.Column("nonce_hash", sa.String(64), nullable=False),
+    sa.Column("ip_hash", sa.String(64), nullable=False, index=True),
+    sa.Column("created_at", sa.Float, nullable=False),
+    sa.Column("expires_at", sa.Float, nullable=False),
+    sa.Column("consumed", sa.Boolean, nullable=False),
+)
+admin_audit = sa.Table(
+    "admin_audit",
+    metadata,
+    sa.Column("audit_id", sa.Integer, primary_key=True, autoincrement=True),
+    sa.Column("actor_id", sa.ForeignKey("users.user_id")),
+    sa.Column("target_id", sa.ForeignKey("users.user_id"), nullable=False),
+    sa.Column("action", sa.String(40), nullable=False),
+    sa.Column("data", sa.JSON, nullable=False),
+    sa.Column("created_at", sa.Float, nullable=False),
+)
 
 videos = sa.Table(
     "videos",
@@ -55,12 +103,14 @@ conversations = sa.Table(
     metadata,
     sa.Column("conversation_id", sa.String(36), primary_key=True),
     sa.Column("created_at", sa.Float, nullable=False),
+    sa.Column("owner_id", sa.ForeignKey("users.user_id"), index=True),
 )
 
 jobs = sa.Table(
     "jobs",
     metadata,
     sa.Column("job_id", sa.String(36), primary_key=True),
+    sa.Column("owner_id", sa.ForeignKey("users.user_id"), index=True),
     sa.Column("request_id", sa.String(36), nullable=False),
     sa.Column("kind", sa.String(20), nullable=False),
     sa.Column("video_id", sa.ForeignKey("videos.video_id")),
@@ -121,6 +171,7 @@ artifacts = sa.Table(
     "learning_artifacts",
     metadata,
     sa.Column("artifact_id", sa.String(36), primary_key=True),
+    sa.Column("owner_id", sa.ForeignKey("users.user_id"), index=True),
     sa.Column("job_id", sa.ForeignKey("jobs.job_id"), nullable=False),
     sa.Column("scope", sa.JSON, nullable=False),
     sa.Column("data", sa.JSON, nullable=False),
@@ -128,6 +179,20 @@ artifacts = sa.Table(
 )
 
 # ONLY fixture mode uses this table. Production vectors belong to module 04.
+user_videos = sa.Table(
+    "user_videos",
+    metadata,
+    sa.Column("user_id", sa.ForeignKey("users.user_id"), primary_key=True),
+    sa.Column("video_id", sa.ForeignKey("videos.video_id"), primary_key=True),
+    sa.Column("created_at", sa.Float, nullable=False),
+)
+
+legacy_sources = sa.Table(
+    "legacy_sources",
+    metadata,
+    sa.Column("video_id", sa.ForeignKey("videos.video_id"), primary_key=True),
+)
+
 fixture_chunks = sa.Table(
     "fixture_chunks",
     metadata,
@@ -172,7 +237,7 @@ class Database:
         with self.read() as connection:
             from alembic.runtime.migration import MigrationContext
 
-            if MigrationContext.configure(connection).get_current_revision() != "0001":
+            if MigrationContext.configure(connection).get_current_revision() != SCHEMA_REVISION:
                 raise RuntimeError("Database schema missing/outdated; run yk-db upgrade head")
 
     def close(self):

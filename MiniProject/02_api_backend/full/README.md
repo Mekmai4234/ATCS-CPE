@@ -1,5 +1,10 @@
 # Full-system backend launcher (owned by 02)
 
+The default API now requires Google login. Read [AUTH.md](../AUTH.md) before starting,
+including migration from 0001, GOOGLE_CLIENT_ID, cookie/origin settings and CSRF.
+Operator commands `migrate`, `bootstrap-admin`, and `claim-legacy` use this launcher's
+selected configuration too. Old anonymous flow examples below require authentication.
+
 This environment installs the unchanged 03–06 packages and uses the existing
 `youtube_answers.team:create_adapters` factory. It supports import, indexing,
 question answering, analysis, research and artifacts. The older `integration/`
@@ -161,3 +166,11 @@ status. 07 should also own frontend packaging, real-video/live acceptance,
 deployment, backup/restore and release instructions. 04 can later consume the
 shared configuration/binding contract in its direct CLI. All delivery edits here
 remain inside 02; calling old module CLIs directly does not acquire these guards.
+
+## Auth-phase integration update
+
+Authentication, native ingestion and consumer handoff are described in
+`../AUTH.md` and `../AUTH_INTEGRATION.md`. For an already bound pair upgraded to
+04 PR #20, stop API/workers and run `yk-full rag-init --workers-stopped` with the
+same selected full env file. This performs additive 04 setup after pair validation;
+it preserves existing cursor keys and does not replace the backed-up auth migration.

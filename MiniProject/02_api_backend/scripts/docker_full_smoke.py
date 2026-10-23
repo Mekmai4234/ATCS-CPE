@@ -11,7 +11,7 @@ import re
 import sys
 from datetime import UTC, datetime
 
-from docker_smoke import ROOT, VIDEO_A, DockerCheck
+from docker_smoke import ROOT, DockerCheck
 
 CLIENT = """
 import json, sys, urllib.request, urllib.error
@@ -61,6 +61,7 @@ class FullCheck(DockerCheck):
         ]
         self.environment = dict(
             os.environ,
+            APP_ENV="test",
             BACKEND_FULL_PORT=str(self.port),
             GEMINI_API_KEY="test-only-invalid-key",
             LLM_MODEL="gemini-3.5-flash",
@@ -104,16 +105,8 @@ class FullCheck(DockerCheck):
             )
             assert mismatch.returncode != 0
             self.check("Wrong Chroma directory is rejected before maintenance")
-            self.dc("stop", "worker", timeout=30)
-            imported, _ = self.request(
-                "POST",
-                "/api/videos/import",
-                {"urls": [f"https://youtu.be/{VIDEO_A}"]},
-                expected=202,
-            )
-            job_id = imported["jobs"][0]["job_id"]
-            cancel, _ = self.request("POST", f"/api/jobs/{job_id}/cancel")
-            assert cancel["state"] == "cancelled"
+            self.request("GET", "/api/videos", expected=401)
+            self.request("POST", "/api/chat", {}, expected=401)
             self.dc(
                 "up",
                 "-d",
@@ -125,9 +118,10 @@ class FullCheck(DockerCheck):
                 "worker",
                 timeout=150,
             )
-            persisted, _ = self.request("GET", f"/api/jobs/{job_id}")
-            assert persisted["state"] == "cancelled"
-            self.check("HTTP import/cancel and pair/job state survive API/worker recreation")
+            health, _ = self.request("GET", "/health")
+            assert health["authentication_required"] and health["schema_revision"] == "0002"
+            self.request("GET", "/api/videos", expected=401)
+            self.check("Authentication enforced before and after container recreation")
             self.results["passed"] = True
         except BaseException:
             self.dc("logs", "--no-color", "--tail", "80", timeout=30, allow_failure=True)

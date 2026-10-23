@@ -2,6 +2,13 @@
 
 Setup and entrypoints
 ---------------------
+Authenticated setup: read AUTH.md first. Initialize a fresh revision-0002 database,
+or stop processes and use the explicit paired-backup migration for existing 0001.
+Configure Google client ID, HTTPS cookie policy and exact origins. The web obtains
+a one-time nonce/CSRF challenge, submits verified Google credentials, and includes
+the session cookie plus CSRF header on every data mutation. Bootstrap an intended
+registered administrator explicitly; approve legacy ownership separately.
+
 See README.md for PowerShell install/start/demo/test commands. From MiniProject:
 uv sync --project 02_api_backend --locked
 uv run --project 02_api_backend --locked yk-db upgrade head

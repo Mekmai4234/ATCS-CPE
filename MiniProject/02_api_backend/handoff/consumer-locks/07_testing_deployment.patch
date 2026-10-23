@@ -1,0 +1,42 @@
+--- a/MiniProject/07_testing_deployment/uv.lock
++++ b/MiniProject/07_testing_deployment/uv.lock
+@@ -3,8 +3,8 @@
+ requires-python = ">=3.11, <3.14"
+ resolution-markers = [
+     "python_full_version >= '3.13' and sys_platform == 'emscripten'",
++    "python_full_version >= '3.13' and sys_platform != 'emscripten'",
+     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
+-    "python_full_version >= '3.13' and sys_platform != 'emscripten'",
+     "python_full_version == '3.12.*' and sys_platform != 'emscripten'",
+     "python_full_version < '3.12'",
+ ]
+@@ -1300,8 +1300,8 @@
+ source = { registry = "https://pypi.org/simple" }
+ resolution-markers = [
+     "python_full_version >= '3.13' and sys_platform == 'emscripten'",
++    "python_full_version >= '3.13' and sys_platform != 'emscripten'",
+     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
+-    "python_full_version >= '3.13' and sys_platform != 'emscripten'",
+     "python_full_version == '3.12.*' and sys_platform != 'emscripten'",
+ ]
+ sdist = { url = "https://files.pythonhosted.org/packages/95/b0/c7453d0b6e2073c3264468b106ee1563750cecc910965e67357e3698c83e/numpy-2.5.4.tar.gz", hash = "sha256:9a94cf751c9ad8ebaa835bcd3d40dacf8534ad086b88c38029b65123c7999d2a", size = 20866315, upload-time = "2026-10-10T20:05:31.422Z" }
+@@ -2553,7 +2553,9 @@
+ dependencies = [
+     { name = "alembic" },
+     { name = "fastapi" },
++    { name = "google-auth" },
+     { name = "pydantic-settings" },
++    { name = "requests" },
+     { name = "sqlalchemy" },
+     { name = "uvicorn" },
+ ]
+@@ -2562,7 +2564,9 @@
+ requires-dist = [
+     { name = "alembic", specifier = ">=1.14,<2" },
+     { name = "fastapi", specifier = ">=0.115,<1" },
++    { name = "google-auth", specifier = ">=2.40,<3" },
+     { name = "pydantic-settings", specifier = ">=2.7,<3" },
++    { name = "requests", specifier = ">=2.32,<3" },
+     { name = "sqlalchemy", specifier = ">=2.0,<2.1" },
+     { name = "uvicorn", specifier = ">=0.34,<1" },
+ ]
