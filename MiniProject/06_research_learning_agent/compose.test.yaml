@@ -21,3 +21,14 @@ services:
       APP_ENV: test
       GEMINI_API_KEY: ""
       MINIPROJECT_ROOT: /app
+  contracts:
+    build:
+      context: ..
+      dockerfile: 06_research_learning_agent/Dockerfile
+      target: contracts
+    network_mode: none
+    init: true
+    environment:
+      APP_ENV: test
+      GEMINI_API_KEY: ""
+      MINIPROJECT_ROOT: /app

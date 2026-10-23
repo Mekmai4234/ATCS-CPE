@@ -13,6 +13,8 @@ dependencies = [
   "sqlalchemy>=2.0,<2.1",
   "alembic>=1.14,<2",
   "pydantic-settings>=2.7,<3",
+  "google-auth>=2.40,<3",
+  "requests>=2.32,<3",
 ]
 
 [dependency-groups]
@@ -25,6 +27,7 @@ dev = [
 ]
 
 [project.scripts]
+yk-auth = "youtube_backend.auth_cli:main"
 yk-full = "youtube_backend.full:main"
 yk-api = "youtube_backend.cli:api"
 yk-worker = "youtube_backend.cli:worker"

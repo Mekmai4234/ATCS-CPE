@@ -24,7 +24,7 @@ def migrate():
     database = Database(Settings().database_url)
     try:
         upgrade_database(database)
-        print("Database upgraded to head (0001).")
+        print("Database upgraded to head (0002).")
     finally:
         database.close()
 
@@ -89,7 +89,7 @@ def integration_init():
         upgrade_database(database)
         Repository(database, settings).check_mode()
         initialize(database)
-        print("Backend schema 0001 and RAG manifest v1 initialized.")
+        print("Backend schema 0002 and RAG manifest v1 initialized.")
     finally:
         database.close()
 

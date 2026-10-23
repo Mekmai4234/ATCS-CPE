@@ -4,10 +4,12 @@ services:
   migrate:
     environment:
       APP_ENV: test
+      AUTH_ENABLED: "false"
       ADAPTER_MODE: fixture
   api:
     environment:
       APP_ENV: test
+      AUTH_ENABLED: "false"
       ADAPTER_MODE: fixture
       JOB_RETRY_BASE_SECONDS: "0.1"
       JOB_LEASE_SECONDS: "2"
@@ -15,6 +17,7 @@ services:
   worker:
     environment:
       APP_ENV: test
+      AUTH_ENABLED: "false"
       ADAPTER_MODE: fixture
       JOB_RETRY_BASE_SECONDS: "0.1"
       JOB_LEASE_SECONDS: "2"

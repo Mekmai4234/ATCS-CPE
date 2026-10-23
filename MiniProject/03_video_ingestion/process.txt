@@ -35,7 +35,20 @@ Scope / verification
 - Integration: real 02 API/worker/migrations, real 04 Chroma and fixture embeddings.
 - Separate live public-caption check; observed results are in TEST_REPORT.md.
 - FOLLOWUP_REPORT.md records the cleanup regression and real Thai/English acceptance checks.
-- scripts/acceptance_check.py uses a new isolated DB/index and explicit fixture embeddings
+- scripts/acceptance_check.py uses a new isolated DB/index and explicit fixture identity/embeddings
   to check live captions, all stored timestamps, ready status and duplicate URL reuse.
 - Root documentation may still describe the older planned-only status.
-- Discovery/refresh/scheduling/authenticated access/ASR/container deployment remain separate work.
+- Discovery/refresh/scheduling/authenticated YouTube captions/ASR/production deployment remain separate work.
+
+Native member integration
+- Reuse the 02 session/CSRF, private import/attach jobs and user_videos transaction.
+- Use the existing 03 IngestionAdapters and 04 BackendExecution without a second contract.
+- member_adapters.py retains a compatibility factory name and checks the native 02 contract.
+- Removed the proposal-only members.py, fake backend and 29 simulation tests.
+- Authenticated tests now use real HTTP, migrations, SQLite, worker and Chroma with
+  provider-only doubles; legacy lifecycle fixtures explicitly disable auth for those tests.
+- Acceptance uses a test-only Google verifier with real challenge/cookies/CSRF and labels
+  identity/vector fixtures. Never install that verifier in a production application.
+- MEMBER_CONTRACT.md describes the native handoff; MEMBER_REPORT.md records validation.
+- Refresh 03 uv.lock against native 02/04; do not rewrite other modules' lockfiles.
+- Pending/running quotas and fair claims are not implemented by 03 or proven by DTOs.
