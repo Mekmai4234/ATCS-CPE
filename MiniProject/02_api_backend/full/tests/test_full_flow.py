@@ -388,6 +388,14 @@ async def test_authenticated_accounts_share_real_rag_without_cross_account_acces
         assert response.json()["citations"]
         conversation_id = response.json()["conversation_id"]
         assert (await a.get(f"/api/conversations/{conversation_id}")).status_code == 404
+        followup = await b.post(
+            "/api/chat",
+            json=dict(request_body, conversation_id=conversation_id, question="RAG again"),
+        )
+        assert followup.status_code == 200, followup.text
+        assert followup.json()["conversation_id"] == conversation_id
+        history = (await b.get(f"/api/conversations/{conversation_id}?limit=2&offset=2")).json()
+        assert history["total"] == 4 and len(history["messages"]) == 2
         await a.delete(f"/api/videos/{VIDEO_A}")
         assert (await a.get(f"/api/videos/{VIDEO_A}/transcript")).status_code == 404
         assert (await b.get(f"/api/videos/{VIDEO_A}/transcript")).status_code == 200
