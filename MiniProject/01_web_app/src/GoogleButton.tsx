@@ -156,7 +156,9 @@ export default function GoogleButton({
           </button>
         </div>
       )}
-      <small>หากปิดหน้าต่างเลือกบัญชี สามารถกดปุ่ม Google อีกครั้งได้</small>
+      <small>
+        หากหน้าต่างเลือกบัญชีถูกปิดหรือถูกบล็อก ให้อนุญาต popup แล้วกดปุ่ม Google อีกครั้ง
+      </small>
     </div>
   );
 }
