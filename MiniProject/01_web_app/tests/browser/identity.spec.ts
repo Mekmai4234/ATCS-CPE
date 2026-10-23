@@ -71,6 +71,74 @@ test('real session cookie, nullable profile, challenge nonce and returning ident
   await expect(page.getByRole('heading', { name: /เปลี่ยนคลิป/ })).toBeVisible();
 });
 
+test('floating Buddy uses the actual checkout API, shared conversation, history and logout boundary', async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  await signIn(page, 'fixture-floating-member');
+  await importOne(page);
+  const sent: {
+    question: string;
+    conversation_id: string | null;
+    scope: { video_ids: string[] };
+  }[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/chat')
+      sent.push(request.postDataJSON());
+  });
+  await page.locator('.buddy-launcher').click();
+  const buddy = page.getByRole('dialog', { name: 'Buddy AI แชตจากคลิป' });
+  await buddy.locator('summary').click();
+  await buddy.getByRole('checkbox').check();
+  await buddy.getByLabel('ข้อความถึง Buddy', { exact: true }).fill('Explain RAG from my clip');
+  await buddy.getByLabel('ข้อความถึง Buddy', { exact: true }).press('Enter');
+  await expect(buddy.locator('.buddy-message')).toHaveCount(1);
+  await expect(buddy.getByRole('link', { name: /^เปิดหลักฐาน/ }).first()).toHaveAttribute(
+    'href',
+    /youtube\.com\/watch\?v=dQw4w9WgXcQ&t=\d+s/,
+  );
+  await buddy.getByRole('button', { name: 'โหลดประวัติบทสนทนานี้' }).click();
+  await expect(buddy.getByText(/โหลดประวัติแล้ว/)).toBeVisible();
+  await expect(buddy.locator('.buddy-message')).toHaveCount(1);
+  await buddy.getByRole('button', { name: /ไปหน้าแชตเต็ม/ }).click();
+  await expect(page.locator('.turn')).toHaveCount(1);
+  await page.getByLabel('คำถามของคุณ').fill('A follow-up question');
+  await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
+  await expect(page.locator('.turn')).toHaveCount(2);
+  expect(sent).toHaveLength(2);
+  expect(sent[0].conversation_id).toBeNull();
+  expect(sent[1].conversation_id).toBeTruthy();
+  expect(sent[0].scope.video_ids).toEqual(['dQw4w9WgXcQ']);
+  await page.locator('.buddy-launcher').click();
+  await expect(buddy.locator('.buddy-message')).toHaveCount(2);
+  await buddy.getByRole('button', { name: 'ย่อหน้าต่างแชต' }).click();
+  await page.getByRole('button', { name: 'หน้าแรก', exact: true }).click();
+  await page.getByLabel('วางลิงก์ YouTube', { exact: true }).fill('https://youtu.be/wD3NSzYtsMc');
+  await page.getByRole('button', { name: 'เพิ่มวิดีโอ', exact: true }).click();
+  await expect.poll(async () => page.locator('input[type="checkbox"]:enabled').count()).toBe(2);
+  await page.locator('.buddy-launcher').click();
+  await buddy.locator('summary').click();
+  await buddy.getByRole('checkbox').nth(1).check();
+  await buddy
+    .getByLabel('ข้อความถึง Buddy', { exact: true })
+    .fill('Question with a changed clip set');
+  await buddy.getByLabel('ข้อความถึง Buddy', { exact: true }).press('Enter');
+  await expect(buddy.locator('.buddy-message')).toHaveCount(3);
+  expect(sent[2].conversation_id).toBeNull();
+  expect(sent[2].scope.video_ids).toHaveLength(2);
+  await buddy.getByRole('button', { name: 'ย่อหน้าต่างแชต' }).click();
+  await page.getByRole('button', { name: 'ออกจากระบบ', exact: true }).click();
+  await expect(page.locator('.buddy-launcher')).toHaveCount(0);
+  await expect(page.locator('.buddy-message')).toHaveCount(0);
+  await page.evaluate(() => {
+    (window as Window & { fixtureSub?: string }).fixtureSub = 'fixture-floating-other';
+  });
+  await page.getByRole('button', { name: 'Google fixture sign-in' }).click();
+  await page.locator('.buddy-launcher').click();
+  await expect(buddy.locator('.buddy-message')).toHaveCount(0);
+  await expect(buddy.getByRole('checkbox')).toHaveCount(0);
+});
+
 test('a rejected nonce consumes its challenge and the UI obtains a fresh one before retry', async ({
   page,
 }) => {
@@ -138,7 +206,7 @@ test('HTTP source lifecycle, artifacts and account switching preserve privacy', 
   await page.locator('.video-card').getByRole('button', { name: /^ลบ / }).click();
   await page.getByRole('button', { name: 'ยืนยันลบคลิป', exact: true }).click();
   await expect(page.locator('.turn').locator('a[href*="v=dQw4w9WgXcQ&"]')).toHaveCount(0);
-  await expect(page.getByText('การลบคลิป: เสร็จแล้ว', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^(การลบคลิป|นำออกจากคลัง): เสร็จแล้ว$/)).toBeVisible();
   await page.getByRole('button', { name: 'คลังวิดีโอ', exact: true }).click();
   await page.getByLabel('ลิงก์วิดีโอ YouTube').fill('https://youtu.be/dQw4w9WgXcQ');
   await page.getByRole('button', { name: 'เพิ่มวิดีโอ', exact: true }).click();
