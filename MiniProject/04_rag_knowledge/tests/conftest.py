@@ -103,6 +103,7 @@ async def env(tmp_path, config):
     result.settings = Settings(
         _env_file=None,
         app_env="test",
+        auth_enabled=False,
         adapter_mode="custom",
         adapter_factory="youtube_rag.integration:create_adapters",
         database_url=f"sqlite:///{(tmp_path / 'app.db').as_posix()}",

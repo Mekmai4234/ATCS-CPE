@@ -1,0 +1,22 @@
+--- a/MiniProject/06_research_learning_agent/acceptance/uv.lock
++++ b/MiniProject/06_research_learning_agent/acceptance/uv.lock
+@@ -2557,7 +2557,9 @@
+ dependencies = [
+     { name = "alembic" },
+     { name = "fastapi" },
++    { name = "google-auth" },
+     { name = "pydantic-settings" },
++    { name = "requests" },
+     { name = "sqlalchemy" },
+     { name = "uvicorn" },
+ ]
+@@ -2566,7 +2568,9 @@
+ requires-dist = [
+     { name = "alembic", specifier = ">=1.14,<2" },
+     { name = "fastapi", specifier = ">=0.115,<1" },
++    { name = "google-auth", specifier = ">=2.40,<3" },
+     { name = "pydantic-settings", specifier = ">=2.7,<3" },
++    { name = "requests", specifier = ">=2.32,<3" },
+     { name = "sqlalchemy", specifier = ">=2.0,<2.1" },
+     { name = "uvicorn", specifier = ">=0.34,<1" },
+ ]

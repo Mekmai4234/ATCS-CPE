@@ -9,6 +9,11 @@ Installation, runnable commands and full integration are documented in README.md
 
 Architecture
 ------------
+- MemberContext verifies the durable job owner, frozen sources, active account, library
+  grant identity and conversation ownership before and after retrieval/provider awaits.
+- Only the durable job's history is accepted. Admin roles do not bypass private ownership.
+- 02 owns sessions, resource authorization and final publication; 04 owns evidence permissions.
+- 05 has no cross-request answer/history cache and introduces no separate identity store.
 - AnswerService coordinates ranked question answering and hierarchical analysis.
 - RagKnowledge adapts 04 search/read/inventory/evidence using BackendExecution.
 - Versioned prompts separate trusted policy from untrusted questions/history/evidence.

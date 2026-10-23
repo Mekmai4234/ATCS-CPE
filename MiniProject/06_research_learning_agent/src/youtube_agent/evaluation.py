@@ -8,8 +8,10 @@ import time
 from importlib.resources import files
 from pathlib import Path
 from typing import Literal
+from uuid import uuid4
 
 from pydantic import Field, model_validator
+from youtube_backend import database as backend_db
 from youtube_backend.config import Settings
 from youtube_backend.database import Database
 from youtube_backend.errors import AppError
@@ -24,6 +26,14 @@ from youtube_rag.manifest import initialize
 from .config import AgentSettings
 from .gemini import GeminiModel
 from .integration import AgentAdapters
+
+AUTHORIZATION_ERRORS = {
+    "authentication_required",
+    "authorization_unavailable",
+    "permission_denied",
+    "member_access_denied",
+    "member_authority_unavailable",
+}
 
 
 def default_dataset():
@@ -72,7 +82,9 @@ class DatasetAdapters(AgentAdapters):
         return self.transcripts[video_id]
 
 
-async def evaluate(dataset_path, state, *, live=False):
+async def evaluate(dataset_path, state, *, live=False, legacy_test=False):
+    if live and legacy_test:
+        raise ValueError("Legacy test mode cannot call live providers")
     dataset = Dataset.model_validate_json(
         dataset_path.read_text(encoding="utf-8")
         if hasattr(dataset_path, "read_text")
@@ -85,6 +97,7 @@ async def evaluate(dataset_path, state, *, live=False):
     settings = Settings(
         _env_file=None,
         app_env="test",
+        auth_enabled=not legacy_test,
         adapter_mode="custom" if live else "fixture",
         adapter_factory="youtube_agent.integration:create_adapters" if live else None,
         backend_integration_profile="live" if live else "offline",
@@ -110,10 +123,29 @@ async def evaluate(dataset_path, state, *, live=False):
         **rag_values,
     )
     database = Database(settings.database_url)
-    adapters = model = None
+    adapters = model = actor_token = None
     try:
         upgrade_database(database)
         initialize(database)
+        if not legacy_test:
+            # A synthetic member owns only this NEW evaluation database, never existing content.
+            from youtube_backend.auth import actor_id
+
+            owner = str(uuid4())
+            now = time.time()
+            with database.write() as connection:
+                connection.execute(
+                    backend_db.users.insert().values(
+                        user_id=owner,
+                        google_sub=f"evaluation-fixture:{owner}",
+                        name="[FIXTURE] Evaluation member",
+                        role="user",
+                        status="active",
+                        created_at=now,
+                        updated_at=now,
+                    )
+                )
+            actor_token = actor_id.set(owner)
         repository = Repository(database, settings)
         model = GeminiModel(agent_config) if live else OfflineModel(agent_config.llm_model)
         adapters = DatasetAdapters(
@@ -147,7 +179,10 @@ async def evaluate(dataset_path, state, *, live=False):
                     "operation": case.operation,
                     "state": completed["state"],
                     "error_code": completed["error_code"],
-                    "contract_passed": completed["state"] in case.expected_states,
+                    "contract_passed": (
+                        completed["state"] in case.expected_states
+                        and completed["error_code"] not in AUTHORIZATION_ERRORS
+                    ),
                     "wall_latency_ms": (time.monotonic() - started) * 1000,
                     "provider_metadata": result.get("provider_metadata") if result else None,
                     "result": result,
@@ -158,6 +193,9 @@ async def evaluate(dataset_path, state, *, live=False):
             "dataset": dataset.label,
             "provenance": dataset.provenance,
             "mode": "live-gemini" if live else "offline-fixture",
+            "authorization_mode": "isolated-legacy-test"
+            if legacy_test
+            else "isolated-member-fixture",
             "semantic_quality_verified": False,
             "limitation": "Contract checks and timings do not establish semantic quality. "
             "Review each output against its source transcript.",
@@ -171,7 +209,11 @@ async def evaluate(dataset_path, state, *, live=False):
             elif model is not None:
                 await model.close()
         finally:
-            database.close()
+            try:
+                database.close()
+            finally:
+                if actor_token is not None:
+                    actor_id.reset(actor_token)
 
 
 def main():
@@ -188,9 +230,16 @@ def main():
         "--output", type=Path, required=True, help="JSON report with review outputs"
     )
     parser.add_argument("--live", action="store_true", help="Explicitly call paid Gemini services")
+    parser.add_argument(
+        "--legacy-test",
+        action="store_true",
+        help="Offline-only regression in a NEW database with auth disabled only there",
+    )
     args = parser.parse_args()
     try:
-        report = asyncio.run(evaluate(args.dataset, args.state, live=args.live))
+        report = asyncio.run(
+            evaluate(args.dataset, args.state, live=args.live, legacy_test=args.legacy_test)
+        )
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         print(
@@ -198,6 +247,7 @@ def main():
                 {
                     "contract_passed": report["contract_passed"],
                     "mode": report["mode"],
+                    "authorization_mode": report["authorization_mode"],
                     "cases": len(report["cases"]),
                 }
             )

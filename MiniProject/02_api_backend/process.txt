@@ -2,10 +2,14 @@
 
 Overview
 --------
-The implemented backend owns application persistence, HTTP contracts, job coordination,
-history and delivery. The optional 02-owned team composition connects unchanged 04/06
-packages. It uses real Chroma and the real agent controller; offline model/embedding doubles
-are labelled. Live 03 ingestion and 05 answer/analysis remain pending.
+The backend owns Google identity verification, hashed opaque sessions, CSRF enforcement,
+account-scoped persistence, HTTP contracts and durable execution. Full composition connects
+03-06; the smaller optional integration environment connects 04/06 with labelled offline
+doubles. Source storage is shared, library membership authorizes access, and private job,
+conversation and artifact owners come only from the authenticated server principal.
+Worker lease/publication checks revalidate active account and authorized sources. Last-member
+deletion waits for source readers and rechecks membership under the SQLite writer lock.
+Explicit administrator bootstrap and paired legacy migration are documented in AUTH.md.
 
 Architecture
 ------------
