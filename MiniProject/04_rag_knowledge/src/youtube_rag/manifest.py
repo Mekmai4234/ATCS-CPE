@@ -5,6 +5,7 @@ the backend's BEGIN IMMEDIATE transaction, preventing a check/write race with ca
 lease recovery and deletion. No changes to backend tables or migrations are needed.
 """
 
+import secrets
 import time
 
 import sqlalchemy as sa
@@ -12,6 +13,7 @@ from sqlalchemy.dialects.sqlite import insert
 from youtube_backend import database as backend_db
 from youtube_backend.schemas import Source
 
+from .authorization import authenticated, permission_scope, readers, references
 from .errors import error
 from .models import Chunk, source_key
 
@@ -58,6 +60,12 @@ store_binding = sa.Table(
     sa.Column("id", sa.Integer, primary_key=True),
     sa.Column("store_id", sa.String, nullable=False),
 )
+security = sa.Table(
+    "rag04_security",
+    metadata,
+    sa.Column("id", sa.Integer, primary_key=True),
+    sa.Column("cursor_key", sa.String, nullable=False),
+)
 
 
 def initialize(database):
@@ -68,6 +76,9 @@ def initialize(database):
         if version is not None and version != 1:
             raise error("index_schema_mismatch", "Unsupported module 04 schema version")
         connection.execute(insert(schema).values(id=1, version=1).on_conflict_do_nothing())
+        connection.execute(
+            insert(security).values(id=1, cursor_key=secrets.token_hex(32)).on_conflict_do_nothing()
+        )
 
 
 class BackendExecution:
@@ -79,7 +90,30 @@ class BackendExecution:
         return self.context.remaining_seconds
 
     def check(self):
+        authenticated(self.context.settings)
         self.context.check()
+
+    def permission_scope(self, sources, *, operation="read"):
+        return permission_scope(self.context, sources, operation=operation)
+
+    def authorize_index(self, source, *, allow_reindex=False):
+        job = self.context.repository.check_execution(self.context.job_id, self.context.lease_token)
+        if job["kind"] != "import" or allow_reindex:
+            raise error(
+                "invalid_operation",
+                "Index/reindex requires an import worker or stopped operator",
+                status=403,
+            )
+
+    def authorize_cleanup(self, *, source=None, include_staging=False):
+        self.check()
+        job = self.context.repository.check_execution(self.context.job_id, self.context.lease_token)
+        if job["kind"] != "import" or source is None or include_staging:
+            raise error(
+                "invalid_operation",
+                "Only scoped import cleanup or stopped maintenance is permitted",
+                status=403,
+            )
 
     def authorize(self, sources):
         self.check()
@@ -98,6 +132,13 @@ class BackendExecution:
             allowed = job["payload"].get("sources", [])
         if any(source.model_dump() not in allowed for source in sources):
             raise error("invalid_scope", "Sources exceed the current job's authorized scope")
+        if authenticated(self.context.settings) and job["kind"] != "import":
+            authorize = getattr(self.context, "authorize_sources", None)
+            if not callable(authorize):
+                raise error(
+                    "authorization_unavailable", "Trusted source authorizer is required", status=503
+                )
+            authorize(sources)
 
     def _import_version(self, video_id):
         with self.context.repository.db.read() as connection:
@@ -127,6 +168,10 @@ class BackendExecution:
             raise error("invalid_scope", "Job does not authorize this video generation")
         if delete:
             valid = job["kind"] == "delete" and video["status"] == "deleting"
+            if references(connection, source.video_id) or readers(
+                connection, source.video_id, except_job=job["job_id"]
+            ):
+                raise error("source_in_use", "Source still has library references or active jobs")
         else:
             valid = (
                 job["kind"] == "import"
@@ -135,6 +180,28 @@ class BackendExecution:
             )
         if not valid:
             raise error("source_changed", "Video lifecycle no longer authorizes this operation")
+
+    def cleanup_fence(self, connection, row):
+        ctx = self.context
+        job = ctx.repository._owned(connection, ctx.job_id, ctx.lease_token)
+        if time.time() >= ctx.deadline_at:
+            raise error("task_timeout", "Task exceeded its deadline", status=504)
+        valid_generation = (
+            row["generation"] <= job["generation"]
+            if job["kind"] == "delete"
+            else row["generation"] == job["generation"]
+        )
+        if (
+            job["kind"] not in {"import", "delete"}
+            or job["video_id"] != row["video_id"]
+            or not valid_generation
+        ):
+            raise error(
+                "invalid_operation",
+                "User retrieval jobs cannot perform central maintenance",
+                status=403,
+            )
+        return job["job_id"]
 
 
 class Manifest:
@@ -160,6 +227,20 @@ class Manifest:
                 raise error(
                     "index_schema_missing", "Run yk-rag init to add the store binding table"
                 ) from None
+
+    def cursor_key(self):
+        with self.database.read() as connection:
+            try:
+                value = connection.scalar(
+                    sa.select(security.c.cursor_key).where(security.c.id == 1)
+                )
+            except sa.exc.OperationalError:
+                value = None
+        if not value:
+            raise error(
+                "index_schema_missing", "Run stopped yk-rag init to add cursor signing state"
+            )
+        return bytes.fromhex(value)
 
     def all_runs(self, connection=None):
         if connection is None:
@@ -308,9 +389,34 @@ class Manifest:
                 ).mappings()
             ]
 
-    def forget(self, run_id):
+    def _removal_guard(self, connection, row, execution):
+        job_id = execution.cleanup_fence(connection, row)
+        if connection.scalar(sa.select(active.c.run_id).where(active.c.run_id == row["run_id"])):
+            raise error("active_index", "Cannot remove an active index")
+        if readers(connection, row["video_id"], except_job=job_id):
+            raise error("source_in_use", "Active jobs still reference this source")
+        if row["state"] == "deleting" and references(connection, row["video_id"]):
+            raise error("source_in_use", "Source still belongs to a library")
+
+    def check_removal(self, row, execution):
         with self.database.write() as connection:
-            if connection.scalar(sa.select(active.c.run_id).where(active.c.run_id == run_id)):
-                raise error("active_index", "Cannot remove an active index")
+            current = (
+                connection.execute(sa.select(runs).where(runs.c.run_id == row["run_id"]))
+                .mappings()
+                .first()
+            )
+            if current is not None:
+                self._removal_guard(connection, current, execution)
+
+    def forget(self, run_id, execution):
+        with self.database.write() as connection:
+            row = (
+                connection.execute(sa.select(runs).where(runs.c.run_id == run_id))
+                .mappings()
+                .first()
+            )
+            if row is None:
+                return
+            self._removal_guard(connection, row, execution)
             connection.execute(chunks.delete().where(chunks.c.run_id == run_id))
             connection.execute(runs.delete().where(runs.c.run_id == run_id))

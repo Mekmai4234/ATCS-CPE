@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 from pydantic_settings import DotEnvSettingsSource
+from youtube_agent.models import Generated as AgentGenerated
 from youtube_agent.models import ModelReply
 from youtube_answers.models import Generated, GeneratedAnswer
 from youtube_ingestion.models import CaptionTrack, Metadata, RawSegment
@@ -112,6 +113,26 @@ class ModelDouble:
         pass
 
 
+class AgentModelDouble(ModelDouble):
+    async def generate(self, request, records, schema, timeout):
+        # Match the actual agent provider boundary, separate from 05's answer API.
+        return AgentGenerated(
+            schema.model_validate(
+                {
+                    "questions": [
+                        {
+                            "question": "[FIXTURE] What does RAG retrieve?",
+                            "answer": "Evidence",
+                            "explanation": records[0].text,
+                            "citations": [records[0].chunk_id],
+                        }
+                    ]
+                }
+            ),
+            metadata(),
+        )
+
+
 def install_doubles(monkeypatch):
     from youtube_agent import gemini
     from youtube_answers import team
@@ -148,17 +169,20 @@ def install_doubles(monkeypatch):
             self.settings = settings
 
     monkeypatch.setattr(team, "GeminiModel", ModelDouble)
-    monkeypatch.setattr(gemini, "GeminiModel", ModelDouble)
+    monkeypatch.setattr(gemini, "GeminiModel", AgentModelDouble)
     monkeypatch.setattr(integration, "GeminiEmbedder", HashDouble)
     monkeypatch.setattr(SubprocessCaptions, "fetch", captions)
     monkeypatch.setattr(YouTubeMetadata, "fetch", title)
 
 
 @pytest.fixture
-async def full(tmp_path, monkeypatch):
+async def full(tmp_path, monkeypatch, request):
     settings = FullSettings(
         _env_file=None,
         app_env="test",
+        auth_enabled=getattr(request, "param", False),
+        google_client_id="fixture-client",
+        session_cookie_secure=False,
         database_url=f"sqlite:///{(tmp_path / 'app.db').as_posix()}",
         chroma_persist_dir=str(tmp_path / "chroma"),
         gemini_api_key="test-only-not-a-real-key",
@@ -205,6 +229,7 @@ async def full(tmp_path, monkeypatch):
         ) as c:
             yield SimpleNamespace(
                 settings=settings,
+                app=app,
                 runtime_settings=runtime_settings,
                 db=database,
                 repo=repo,
@@ -225,7 +250,9 @@ async def import_ready(env):
     assert response.status_code == 202, response.text
     for item in response.json()["jobs"]:
         await env.worker.run_once(item["job_id"])
-        job = env.repo.get_job(item["job_id"])
+        result = await env.client.get(f"/api/jobs/{item['job_id']}")
+        assert result.status_code == 200, result.text
+        job = result.json()
         assert job["stage"] == "ready", job
 
 
@@ -311,3 +338,186 @@ async def test_full_analysis_cannot_publish_after_cancel_or_delete(full, monkeyp
         if not running.done():
             running.cancel()
             await asyncio.gather(running, return_exceptions=True)
+
+
+async def sign_in_member(full, client, subject):
+    """Test-only Google verifier; exercise the actual nonce/session/CSRF endpoints."""
+    import time
+
+    challenge = (await client.get("/api/auth/challenge")).json()
+    full.app.state.auth.verifier = lambda credential, audience: dict(
+        sub=subject,
+        aud=audience,
+        iss="https://accounts.google.com",
+        exp=time.time() + 300,
+        nonce=challenge["nonce"],
+        name=f"[FIXTURE] {subject}",
+    )
+    result = await client.post(
+        "/api/auth/google",
+        headers={"Origin": "http://localhost:3000"},
+        json={"credential": "fixture-credential", "csrf_token": challenge["csrf_token"]},
+    )
+    assert result.status_code == 200, result.text
+    client.headers.update(
+        {"Origin": "http://localhost:3000", "X-CSRF-Token": result.json()["csrf_token"]}
+    )
+
+
+@pytest.mark.parametrize("full", [True], indirect=True)
+async def test_authenticated_accounts_share_real_rag_without_cross_account_access(full):
+
+    a = full.client
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(full.app), base_url="http://test"
+    ) as b:
+        await sign_in_member(full, a, "a")
+        await sign_in_member(full, b, "b")
+        data = {"urls": [f"https://youtu.be/{VIDEO_A}"]}
+        first = (await a.post("/api/videos/import", json=data)).json()["jobs"][0]["job_id"]
+        await full.worker.run_once(first)
+        assert (await a.get(f"/api/jobs/{first}")).json()["stage"] == "ready"
+        assert (await b.get(f"/api/jobs/{first}")).status_code == 404
+        assert (await b.get(f"/api/videos/{VIDEO_A}/transcript")).status_code == 404
+        request_body = {"question": "RAG", "scope": {"video_ids": [VIDEO_A]}}
+        assert (await b.post("/api/chat", json=request_body)).status_code == 404
+        second = (await b.post("/api/videos/import", json=data)).json()["jobs"][0]["job_id"]
+        assert second != first
+        response = await b.post("/api/chat", json=request_body)
+        assert response.status_code == 200, response.text
+        assert response.json()["citations"]
+        conversation_id = response.json()["conversation_id"]
+        assert (await a.get(f"/api/conversations/{conversation_id}")).status_code == 404
+        await a.delete(f"/api/videos/{VIDEO_A}")
+        assert (await a.get(f"/api/videos/{VIDEO_A}/transcript")).status_code == 404
+        assert (await b.get(f"/api/videos/{VIDEO_A}/transcript")).status_code == 200
+        deleted = (await b.delete(f"/api/videos/{VIDEO_A}")).json()["job_id"]
+        await full.worker.run_once(deleted)
+        assert (await b.get(f"/api/jobs/{deleted}")).json()["state"] == "completed"
+        assert await full.runtime.adapter.answers.rag.vectors.call("count", 10) == 0
+
+
+@pytest.mark.parametrize("full", [True], indirect=True)
+async def test_authenticated_research_stays_private_and_revoked_run_cannot_publish(
+    full, monkeypatch
+):
+    a = full.client
+    await sign_in_member(full, a, "research-owner")
+    await import_ready(full)
+    body = {"goal": "Compare RAG", "scope": {"video_ids": [VIDEO_A, VIDEO_B]}}
+    accepted = await a.post("/api/research", json=body)
+    assert accepted.status_code == 202, accepted.text
+    job_id = accepted.json()["job_id"]
+    await full.worker.run_once(job_id)
+    completed = await a.get(f"/api/research/{job_id}")
+    assert completed.json()["state"] == "completed", completed.text
+    assert completed.json()["result"]["citations"]
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(full.app), base_url="http://test"
+    ) as b:
+        await sign_in_member(full, b, "other-researcher")
+        # Private status, events and retry/cancel remain private even with a known ID.
+        assert (await b.get(f"/api/research/{job_id}")).status_code == 404
+        assert (await b.get(f"/api/jobs/{job_id}")).status_code == 404
+        assert (await b.post(f"/api/jobs/{job_id}/retry")).status_code == 404
+        assert (await b.post(f"/api/research/{job_id}/cancel")).status_code == 404
+        assert (await b.post("/api/research", json=body)).status_code == 404
+
+    started, proceed = asyncio.Event(), asyncio.Event()
+    original = ModelDouble.decide
+
+    async def paused(self, history, timeout):
+        started.set()
+        await proceed.wait()
+        return await original(self, history, timeout)
+
+    monkeypatch.setattr(ModelDouble, "decide", paused)
+    queued = await a.post("/api/research", json=body)
+    assert queued.status_code == 202, queued.text
+    revoked_id = queued.json()["job_id"]
+    running = asyncio.create_task(full.worker.run_once(revoked_id))
+    try:
+        await asyncio.wait_for(started.wait(), 15)
+        assert (await a.delete(f"/api/videos/{VIDEO_A}")).status_code == 202
+        proceed.set()
+        await asyncio.wait_for(running, 15)
+        denied = (await a.get(f"/api/jobs/{revoked_id}")).json()
+        assert denied["state"] == "cancelled", denied
+        assert denied["result"] is None
+    finally:
+        proceed.set()
+        if not running.done():
+            running.cancel()
+            await asyncio.gather(running, return_exceptions=True)
+
+
+@pytest.mark.parametrize("full", [True], indirect=True)
+async def test_authenticated_learning_artifact_is_private_and_tracks_removed_sources(full):
+    a = full.client
+    await sign_in_member(full, a, "artifact-owner")
+    await import_ready(full)
+    accepted = await a.post(
+        "/api/learning-artifacts", json={"type": "quiz", "scope": {"video_ids": [VIDEO_A]}}
+    )
+    assert accepted.status_code == 202, accepted.text
+    job_id = accepted.json()["job_id"]
+    await full.worker.run_once(job_id)
+    job = (await a.get(f"/api/jobs/{job_id}")).json()
+    assert job["state"] == "completed", job
+    artifact_id = job["result"]["artifact_ids"][0]
+    path = f"/api/learning-artifacts/{artifact_id}"
+    artifact = await a.get(path)
+    assert artifact.status_code == 200, artifact.text
+    assert artifact.json()["sources_available"]
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(full.app), base_url="http://test"
+    ) as b:
+        await sign_in_member(full, b, "other-learner")
+        assert (await b.get(path)).status_code == 404
+    assert (await a.delete(f"/api/videos/{VIDEO_A}")).status_code == 202
+    assert not (await a.get(path)).json()["sources_available"]
+
+
+async def test_legacy_migration_preserves_actual_sqlite_chroma_pair(full, tmp_path):
+    from pathlib import Path
+
+    import sqlalchemy as sa
+    from alembic import command
+    from youtube_rag.vectors import ChromaStore
+
+    from youtube_backend import database as tables
+    from youtube_backend.auth_cli import paired_backup
+    from youtube_backend.migration import alembic_config, upgrade_database
+
+    await import_ready(full)
+    pending = full.repo.enqueue("analysis", {"type": "summary", "scope": {"video_ids": [VIDEO_A]}})
+    original = check_pair(full.settings)
+    marker_path = Path(full.settings.chroma_persist_dir) / ".yk04-store.json"
+    marker = marker_path.read_bytes()
+    await full.runtime.close()  # stop actual Chroma subprocess before paired backup
+    with full.db.engine.begin() as connection:
+        command.downgrade(alembic_config(connection), "0001")
+    backup = tmp_path / "paired-backup"
+    paired_backup(full.settings, backup)
+    upgrade_database(full.db, allow_legacy=True)
+    assert check_pair(full.settings) == original
+    assert marker_path.read_bytes() == marker == (backup / "chroma/.yk04-store.json").read_bytes()
+    with full.db.read() as connection:
+        assert connection.scalar(sa.select(sa.func.count()).select_from(tables.legacy_sources)) == 2
+        assert connection.scalar(sa.select(sa.func.count()).select_from(tables.user_videos)) == 0
+        job = (
+            connection.execute(
+                sa.select(tables.jobs).where(tables.jobs.c.job_id == pending["job_id"])
+            )
+            .mappings()
+            .one()
+        )
+        assert job["state"] == "cancelled" and job["error_code"] == "legacy_owner_required"
+        assert job["owner_id"] is None
+    store = ChromaStore(
+        Path(full.settings.chroma_persist_dir), full.settings.services()["rag"].collection_name
+    )
+    try:
+        assert await store.call("count", 15) > 0
+    finally:
+        await store.close()
