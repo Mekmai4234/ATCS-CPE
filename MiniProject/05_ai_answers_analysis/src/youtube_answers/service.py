@@ -13,6 +13,7 @@ from youtube_backend.schemas import (
 )
 from youtube_backend.urls import canonical_url
 
+from .authorization import MemberContext, guard_context
 from .models import GeneratedAnswer, error
 from .prompts import input_size, json_text, payload
 
@@ -34,18 +35,21 @@ class AnswerService:
     def __init__(self, settings, model, knowledge):
         self.settings, self.model, self.knowledge = settings, model, knowledge
 
-    def _run(self, sources, context):
+    def _run(self, sources, context, kinds):
         context.check()
-        sources = [Source.model_validate(s) for s in sources]
+        sources = [Source.model_validate(s).model_copy(deep=True) for s in sources]
         if not sources or len({s.video_id for s in sources}) != len(sources):
             raise error("invalid_scope", "Provide distinct authorized sources", status=422)
+        context = guard_context(context, sources, kinds)
         return Run(sources, context)
 
     def _request(self, schema, request, run):
         request = schema.model_validate(request).model_dump(mode="json")
-        if set(request["scope"]["video_ids"]) != {s.video_id for s in run.sources}:
+        authorized = {s.video_id for s in run.sources}
+        if not authorized.issubset(request["scope"]["video_ids"]):
             raise error("invalid_scope", "Request and authorized source IDs differ", status=422)
         # Channel/date/ownership filters were resolved by 02 when freezing Source records.
+        request["scope"]["video_ids"] = [s.video_id for s in run.sources]
         return request
 
     async def _bounded(self, run, function):
@@ -124,8 +128,11 @@ class AnswerService:
         return list(reversed(selected))
 
     async def answer(self, request, sources, history, context):
-        run = self._run(sources, context)
+        run = self._run(sources, context, {"chat"})
         request = self._request(ChatRequest, request, run)
+        if isinstance(run.context, MemberContext):
+            run.context.conversation(request.get("conversation_id"))
+            history = run.context.history(history)
         history = self._history(history, run)
         # Carry recent user context into retrieval without asking a model to change scope.
         query = request["question"]
@@ -134,12 +141,12 @@ class AnswerService:
             if item["role"] == "user" and len(candidate.encode("utf-8")) <= 6500:
                 query = candidate
         expected = await self._bounded(
-            run, lambda _: self.knowledge.inventory(run.sources, context)
+            run, lambda _: self.knowledge.inventory(run.sources, run.context)
         )
         hits = await self._bounded(
             run,
             lambda _: self.knowledge.search(
-                query, run.sources, context, top_k=self.settings.retrieval_top_k
+                query, run.sources, run.context, top_k=self.settings.retrieval_top_k
             ),
         )
         nodes = [self._record(run, hit.chunk.evidence()) for hit in hits]
@@ -180,7 +187,7 @@ class AnswerService:
         return groups
 
     async def analyze(self, request, sources, context):
-        run = self._run(sources, context)
+        run = self._run(sources, context, {"analysis", "research"})
         request = self._request(AnalysisRequest, request, run)
         if request["type"] == "compare" and len(run.sources) < 2:
             raise error("invalid_scope", "Comparison needs at least two videos", status=422)
@@ -189,7 +196,10 @@ class AnswerService:
             page = await self._bounded(
                 run,
                 lambda _, cursor=cursor: self.knowledge.read(
-                    run.sources, context, limit=self.settings.answer_read_page_size, cursor=cursor
+                    run.sources,
+                    run.context,
+                    limit=self.settings.answer_read_page_size,
+                    cursor=cursor,
                 ),
             )
             signature = (page.total, page.inventory.model_dump_json())

@@ -1,6 +1,8 @@
 # Module 05 — AI Answers and Analysis
 
-Latest review fixes and combined verification: [REVIEW_FIX_REPORT.md](REVIEW_FIX_REPORT.md).
+Latest member authorization work: [MEMBER_AUTHORIZATION.md](MEMBER_AUTHORIZATION.md).
+Member verification: [MEMBER_TEST_REPORT.md](MEMBER_TEST_REPORT.md).
+Earlier review fixes and combined verification: [REVIEW_FIX_REPORT.md](REVIEW_FIX_REPORT.md).
 Previous follow-up results: [FOLLOWUP_REPORT.md](FOLLOWUP_REPORT.md).
 Live acceptance prerequisites and review workflow: [ACCEPTANCE.md](ACCEPTANCE.md).
 
@@ -9,8 +11,8 @@ Live acceptance prerequisites and review workflow: [ACCEPTANCE.md](ACCEPTANCE.md
 evidence and embeddings. 05 supplies `answer(request, sources, history, context)` and
 `analyze(request, sources, context)`, returning 02's existing `AnswerResult`.
 
-Runtime changes are local to this folder. A 02 full-flow test consumer is also updated
-to verify the resolved-settings interface; 02/03/04/06 runtime factories are unchanged.
+This member integration changes only module 05. It depends on 02's authenticated
+backend contract (PR #18); permission-aware 04/06 integration is tested separately.
 The optional `youtube_answers.team:create_adapters`
 composition connects existing 03 ingestion, 04 RAG, 05 answers and 06 research/artifacts,
 with 06's comparison tool delegated to 05 and one shared RAG service.
