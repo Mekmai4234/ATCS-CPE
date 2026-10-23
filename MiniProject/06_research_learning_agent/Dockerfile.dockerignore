@@ -3,6 +3,8 @@
 !02_api_backend/pyproject.toml
 !02_api_backend/src/
 !02_api_backend/src/**
+!02_api_backend/tests/
+!02_api_backend/tests/test_identity.py
 !04_rag_knowledge/
 !04_rag_knowledge/pyproject.toml
 !04_rag_knowledge/src/
@@ -23,5 +25,7 @@
 !06_research_learning_agent/acceptance/uv.lock
 !06_research_learning_agent/acceptance/tests/
 !06_research_learning_agent/acceptance/tests/**
+!06_research_learning_agent/acceptance/backend_contract/
+!06_research_learning_agent/acceptance/backend_contract/**
 **/__pycache__/
 **/*.pyc

@@ -32,3 +32,12 @@ COPY 06_research_learning_agent/acceptance/tests ./tests
 ENV PATH="/app/06_research_learning_agent/acceptance/.venv/bin:$PATH"
 USER 10001:10001
 CMD ["pytest", "-c", "pyproject.toml", "../tests", "tests", "-q", "-W", "error", "-o", "cache_dir=/tmp/pytest-cache"]
+
+# Explicit contract gate against the same account-aware 02/04/05 candidate.
+FROM acceptance AS contracts
+USER 0:0
+COPY 02_api_backend/tests/test_identity.py /app/02_api_backend/tests/test_identity.py
+COPY 06_research_learning_agent/acceptance/backend_contract ./backend_contract
+ENV PYTHONPATH="/app/06_research_learning_agent/tests:/app/02_api_backend/tests"
+USER 10001:10001
+CMD ["pytest", "-c", "pyproject.toml", "backend_contract", "-q", "-W", "error", "-o", "cache_dir=/tmp/pytest-cache"]
