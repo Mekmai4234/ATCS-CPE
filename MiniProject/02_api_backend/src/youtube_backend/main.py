@@ -73,20 +73,13 @@ def create_app(settings=None, database=None, adapters=None):
         description="Account-scoped backend. Fixture mode is explicitly synthetic. "
         "Long tasks return 202 and are polled through /api/jobs/{job_id}.",
         responses={
-            code: {"model": ErrorResponse} for code in (400, 404, 409, 422, 500, 502, 503, 504)
+            code: {"model": ErrorResponse}
+            for code in (400, 401, 403, 404, 409, 422, 429, 500, 502, 503, 504)
         },
     )
     app.state.settings, app.state.repository = settings, repository
     app.state.worker, app.state.adapters = worker, runtime
     app.state.auth = auth
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.auth_trusted_origins or [settings.web_origin],
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "DELETE"],
-        allow_headers=["Content-Type", "Idempotency-Key", "X-CSRF-Token"],
-        expose_headers=["X-Request-ID", "X-Adapter-Mode", "Location"],
-    )
 
     def error_response(request, code, message, status, retryable=False, job_id=None):
         detail = dict(
@@ -146,6 +139,17 @@ def create_app(settings=None, database=None, adapters=None):
         finally:
             actor_id.reset(identity_token)
             request_id.reset(token)
+
+    # Registered last so CORS wraps authentication failures created by correlation
+    # itself. A credentialed frontend must be able to read 401/403 and clear state.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.auth_trusted_origins or [settings.web_origin],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "DELETE"],
+        allow_headers=["Content-Type", "Idempotency-Key", "X-CSRF-Token"],
+        expose_headers=["X-Request-ID", "X-Adapter-Mode", "Location"],
+    )
 
     @app.exception_handler(AppError)
     async def app_error(request, error):
