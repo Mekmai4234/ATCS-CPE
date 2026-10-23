@@ -2,9 +2,10 @@ Module 07: Process and boundaries
 
 Inputs: existing 02-06 implementations/tests, reference fixtures and acceptance criteria.
 The 07 lockfile composes dependencies without changing other manifests.
-integration.json pins the auth batch including module 05 PR23. All CI jobs archive those
-same immutable module revisions, preserve the committed lock and publish provenance.
-Candidate green is not merged-develop acceptance. Updating a pin requires lock/check/test.
+Default PR/push CI tests the merge-test/current checkout directly and publishes verified
+before/after source fingerprints. Changed source is tested or provenance fails. The
+integration.json workflow is now separately named and manual-only; candidate green cannot
+certify current develop. Updating a pin requires lock/check/test only for that optional job.
 
 Offline: separate suite processes -> real domain-service integration -> cold recovery ->
 known-defect assertions -> lint/format -> logs/JUnit/JSON -> readiness report.

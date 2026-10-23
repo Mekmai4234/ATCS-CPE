@@ -1,10 +1,10 @@
 # 07 — System verification and deployment
 
-Current review fixes (22 October): [REVIEW_AUTH_FIX_REPORT.md](REVIEW_AUTH_FIX_REPORT.md).
-The canonical `uv.lock` now targets the exact auth revisions in `integration.json`,
-including backend PR18 and answers PR23. Develop is still older: assemble the pinned
-candidate first. Direct locked sync against old develop is intentionally incompatible;
-the historical lock is preserved in `locks/develop-69f5347.uv.lock` for baseline-only work.
+Current work (24 October): [UI_CHECKOUT_REPORT.md](UI_CHECKOUT_REPORT.md) and
+[FLOATING_UI_ACCEPTANCE.md](FLOATING_UI_ACCEPTANCE.md). Backend modules 02–06 are now
+merged into develop and the locked environment works on the actual checkout. Default
+CI never replaces app sources with `integration.json`. Historical candidate evidence
+and the 22 October report remain available, but do not certify a later revision.
 
 This folder owns repeatable checks, release acceptance, packaging and recovery. Changes
 are confined to 07 and the authorized repository-root GitHub workflow. Modules 01–06
@@ -18,12 +18,12 @@ outdated: current 04 uses Gemini embeddings, not the root OpenAI example.
 From **MiniProject**, with Python 3.11–3.13 and uv:
 
 ```powershell
-uv run --no-project python 07_testing_deployment/scripts/candidate.py --manifest 07_testing_deployment/integration.json
-# Change directory to the printed candidate root before the following commands.
+uv run --no-project python 07_testing_deployment/scripts/source.py record --record 07_testing_deployment/runtime/checkout-source.json
 uv lock --check --project 07_testing_deployment
 uv sync --project 07_testing_deployment --locked
 uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/check.py
 uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/check.py --group auth
+uv run --no-project python 07_testing_deployment/scripts/source.py verify --record 07_testing_deployment/runtime/checkout-source.json
 ```
 
 The 07 lockfile installs 02–06, including 05's `team` extra, pytest and Ruff. Existing
@@ -51,14 +51,19 @@ results; [TEST_REPORT.md](TEST_REPORT.md) preserves the historical 19 October ba
 
 ## Active CI
 
-The root workflow assembles the SAME immutable auth manifest in every job. It checks
-the committed consumer lock, all upstream suites and strict auth on Windows/Linux,
-frontend typecheck/format/unit/build, browser fixtures, real HttpSessionPort/API/worker
-E2E and production auth factory/HTTPS containers. It never runs `uv lock` to repair the
-candidate. Artifacts contain revision/lock/tooling fingerprints. These remain unmerged
-candidate results, not actual develop acceptance or real Google acceptance.
+The default PR/push workflow tests the GitHub merge-test/current checkout directly.
+`source.py` records HEAD plus actual source file fingerprints before tests and verifies
+them afterward. A changed marker after a pin is covered by `tests/test_source.py`:
+the changed source fails its real subprocess and old provenance is rejected. There is
+no pinned fallback. Python, frontend and image builds use the same source policy.
+Real adapter E2E runs only when that harness exists in the current checkout; otherwise
+the job summary explicitly states BLOCKED. Screenshot capture is not UI acceptance.
 
-Inside that candidate, run `scripts/browser_identity.py` with the locked Python environment
+`miniproject-pinned.yml` is a separately named manual-only historical integration job.
+It cannot trigger on a PR or push. Choose it deliberately for an unmerged batch; never
+use it to certify later source or replace the checkout regression gate.
+
+On a checkout with module 01's real adapter, run `scripts/browser_identity.py --checkout` with the locked Python environment
 after installing module 01 dependencies/Chromium. It runs the real HTTP adapter without
 mocking `/api`, with only external GIS/provider fixtures. `scripts/docker_auth.py` checks
 the auth-enabled production factory and HTTPS proxy on an internal Docker network.

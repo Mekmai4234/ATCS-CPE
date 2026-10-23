@@ -1,9 +1,12 @@
 """Production auth factory + real HTTPS proxy on isolated state/network; no false attestation."""
 
+import argparse
 import json
 import subprocess
 from pathlib import Path
 from uuid import uuid4
+
+from source import context
 
 MODULE = Path(__file__).resolve().parents[1]
 
@@ -46,8 +49,10 @@ print(json.dumps(dict(health=h, tls_proxy_verified=True,
 
 
 def main():
-    if not (MODULE.parent / "candidate.json").is_file():
-        raise SystemExit("Run only in the pinned candidate with its committed lock")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--checkout", action="store_true")
+    args = parser.parse_args()
+    provenance = context(args.checkout)
     project = f"yk07-auth-{uuid4().hex[:10]}"
     output = MODULE / "runtime" / project
     output.mkdir(parents=True)
@@ -66,7 +71,7 @@ def main():
         real_google_verified=False,
         public_https_verified=False,
         release_attestation_created=False,
-        candidate=json.loads((MODULE.parent / "candidate.json").read_text(encoding="utf-8")),
+        source=provenance,
     )
 
     def run(*args, required=True):

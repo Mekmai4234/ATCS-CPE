@@ -1,5 +1,10 @@
 # Google identity and multi-account verification
 
+24 October source policy: default PR/push CI tests the actual checkout, with before/after
+`source.py` fingerprints. The candidate commands/matrix below describe historical opt-in
+integration work; they are not the current default or proof for later source. See
+[FLOATING_UI_ACCEPTANCE.md](FLOATING_UI_ACCEPTANCE.md) and [UI_CHECKOUT_REPORT.md](UI_CHECKOUT_REPORT.md).
+
 Updated 22 October: use the exact manifest and committed auth consumer lock below.
 The previous PendingSessionPort/29-failure result is historical; current results are in
 [REVIEW_AUTH_FIX_REPORT.md](REVIEW_AUTH_FIX_REPORT.md). Real Google remains pending because
@@ -44,8 +49,8 @@ uv run --project 07_testing_deployment --locked python 07_testing_deployment/scr
 ```
 
 The default runner excludes the separately executed strict auth group. It clears
-inherited provider/auth settings. Root CI always tests both groups on the exact auth
-manifest. Missing contracts and stale locks fail; no auth skip-to-green is used.
+inherited provider/auth settings. Root CI tests both groups on actual checked-out source.
+Pinned manifests are manual-only. Missing contracts/stale locks fail; no fallback replaces source.
 
 Prepare a candidate without changing 01–06 or merging unreviewed PRs:
 

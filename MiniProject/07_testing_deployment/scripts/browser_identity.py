@@ -1,5 +1,6 @@
 """Exercise 01's real HTTP adapter against the pinned 02 API/worker, external GIS doubled."""
 
+import argparse
 import json
 import shutil
 import socket
@@ -11,6 +12,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from check import clean_environment, run_command
+from source import context
 
 MODULE = Path(__file__).resolve().parents[1]
 ROOT = MODULE.parent
@@ -18,8 +20,10 @@ ROOT = MODULE.parent
 
 def main():
     web = ROOT / "01_web_app"
-    if not (ROOT / "candidate.json").is_file():
-        raise SystemExit("Run only inside a manifest-pinned candidate")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--checkout", action="store_true")
+    args = parser.parse_args()
+    provenance = context(args.checkout)
     output = MODULE / "runtime" / f"browser-identity-{uuid4().hex[:10]}"
     output.mkdir(parents=True)
     with socket.socket() as sock:
@@ -52,8 +56,18 @@ def main():
         frontend_adapter="HttpSessionPort",
         api_routes_mocked=False,
         paid_providers_called=False,
-        candidate=json.loads((ROOT / "candidate.json").read_text(encoding="utf-8")),
+        source=provenance,
     )
+    if not (web / "tests/identity_server.py").is_file():
+        report.update(
+            passed=None,
+            status="blocked",
+            cleanup_passed=True,
+            blockers=["actual_frontend_has_no_identity_harness"],
+        )
+        (output / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+        print(output / "report.json")
+        return 2
     try:
         for role, args in (
             ("api", [sys.executable, str(web / "tests/identity_server.py")]),

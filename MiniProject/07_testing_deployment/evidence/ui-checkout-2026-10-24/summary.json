@@ -1,0 +1,177 @@
+{
+  "mode": "actual-checkout-fixture-capture",
+  "fixture": true,
+  "accepted": false,
+  "real_google_verified": false,
+  "performance_target_agreed": false,
+  "revision": "ec5b02111a2b451c0503bee77ade3c4219c68733",
+  "environment": {
+    "platform": "win32",
+    "node": "v24.22.1",
+    "logical_cpus": 16,
+    "browser": "156.0.8078.4"
+  },
+  "views": [
+    {
+      "width": 375,
+      "launcher_present": false,
+      "google_button_present": false,
+      "home_horizontal_overflow": false,
+      "screenshot_only": true
+    },
+    {
+      "width": 768,
+      "launcher_present": false,
+      "google_button_present": false,
+      "home_horizontal_overflow": false,
+      "screenshot_only": true
+    },
+    {
+      "width": 1024,
+      "launcher_present": false,
+      "google_button_present": false,
+      "home_horizontal_overflow": false,
+      "screenshot_only": true
+    },
+    {
+      "width": 1440,
+      "launcher_present": false,
+      "google_button_present": false,
+      "home_horizontal_overflow": false,
+      "screenshot_only": true
+    }
+  ],
+  "bundles": [
+    {
+      "name": "ibm-plex-sans-thai-latin-400-normal-CwmoKdEh.woff2",
+      "bytes": 17736
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-400-normal-YXrLwNa7.woff",
+      "bytes": 16228
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-500-normal-DQcnnbdd.woff2",
+      "bytes": 18520
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-500-normal-h5t7erDE.woff",
+      "bytes": 17340
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-600-normal-BR-dhaTH.woff2",
+      "bytes": 18992
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-600-normal-P_JjY83V.woff",
+      "bytes": 17556
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-700-normal-Ct-BCS9V.woff2",
+      "bytes": 18016
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-700-normal-SmVfMUPf.woff",
+      "bytes": 16452
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-ext-400-normal-DBkYO1u-.woff2",
+      "bytes": 6356
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-ext-400-normal-n-X-g5Z4.woff",
+      "bytes": 4844
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-ext-500-normal-DcylQI4B.woff",
+      "bytes": 4856
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-ext-500-normal-n470B0cW.woff2",
+      "bytes": 6248
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-ext-600-normal-BXI6PlF4.woff2",
+      "bytes": 6276
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-ext-600-normal-iH120vlL.woff",
+      "bytes": 4876
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-ext-700-normal-BKYUUsrV.woff2",
+      "bytes": 6280
+    },
+    {
+      "name": "ibm-plex-sans-thai-latin-ext-700-normal-CIKhqm8k.woff",
+      "bytes": 4828
+    },
+    {
+      "name": "ibm-plex-sans-thai-thai-400-normal-Bt1rR4gi.woff2",
+      "bytes": 11804
+    },
+    {
+      "name": "ibm-plex-sans-thai-thai-400-normal-DKc8V4lk.woff",
+      "bytes": 10416
+    },
+    {
+      "name": "ibm-plex-sans-thai-thai-500-normal-BoHUoq0p.woff",
+      "bytes": 10352
+    },
+    {
+      "name": "ibm-plex-sans-thai-thai-500-normal-BrMc1XKn.woff2",
+      "bytes": 11716
+    },
+    {
+      "name": "ibm-plex-sans-thai-thai-600-normal-BOwfviun.woff",
+      "bytes": 10484
+    },
+    {
+      "name": "ibm-plex-sans-thai-thai-600-normal-DvfsyWAn.woff2",
+      "bytes": 11804
+    },
+    {
+      "name": "ibm-plex-sans-thai-thai-700-normal-0moayseG.woff2",
+      "bytes": 11944
+    },
+    {
+      "name": "ibm-plex-sans-thai-thai-700-normal-Bo0ALcDh.woff",
+      "bytes": 10508
+    },
+    {
+      "name": "index-CsCmvWR4.css",
+      "bytes": 43365,
+      "gzip_bytes": 17412
+    },
+    {
+      "name": "index-qz_zFanD.js",
+      "bytes": 259009,
+      "gzip_bytes": 78979
+    },
+    {
+      "name": "manrope-cyrillic-wght-normal-Dvxsihut.woff2",
+      "bytes": 14500
+    },
+    {
+      "name": "manrope-greek-wght-normal-DL7QRZyv.woff2",
+      "bytes": 9444
+    },
+    {
+      "name": "manrope-latin-ext-wght-normal-Ch3YOpNY.woff2",
+      "bytes": 15120
+    },
+    {
+      "name": "manrope-latin-wght-normal-DHIcAJRg.woff2",
+      "bytes": 24836
+    },
+    {
+      "name": "manrope-vietnamese-wght-normal-usUDDRr7.woff2",
+      "bytes": 8520
+    }
+  ],
+  "blockers": [
+    "floating_launcher_not_implemented_or_selector_not_bound",
+    "login_entry_not_accepted_by_this_fixture_capture",
+    "drag_motion_focus_ime_account_switch_require_strict_runtime_suite"
+  ]
+}

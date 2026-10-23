@@ -1,0 +1,1 @@
+Legacy checkout fixture captures only. These images do not show the requested new mint UI and are not acceptance evidence for Floating Buddy or real Google. summary.json records the pre-commit capture revision, environment, bundle sizes and blockers. Full 12 screenshots and 4 traces are retained in runtime/ui-qa locally and regenerated as current-head CI artifacts.
