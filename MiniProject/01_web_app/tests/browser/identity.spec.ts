@@ -25,7 +25,7 @@ async function signIn(page: Page, sub: string) {
   await google(page, sub);
   await page.goto(web);
   await page.getByRole('button', { name: 'Google fixture sign-in' }).click();
-  await expect(page.getByRole('heading', { name: /เปลี่ยนคลิป/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
 }
 async function importOne(page: Page) {
   await page.getByLabel('วางลิงก์ YouTube', { exact: true }).fill('https://youtu.be/dQw4w9WgXcQ');
@@ -63,12 +63,12 @@ test('real session cookie, nullable profile, challenge nonce and returning ident
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
   await page.getByRole('button', { name: 'ออกจากระบบ', exact: true }).click();
   await page.getByRole('button', { name: 'Google fixture sign-in' }).click();
-  await expect(page.getByRole('heading', { name: /เปลี่ยนคลิป/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
   expect((await (await page.request.get(`${api}/api/auth/me`)).json()).user.user_id).toBe(
     me.user.user_id,
   );
   await page.reload();
-  await expect(page.getByRole('heading', { name: /เปลี่ยนคลิป/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
 });
 
 test('floating Buddy uses the actual checkout API, shared conversation, history and logout boundary', async ({
@@ -165,7 +165,7 @@ test('a rejected nonce consumes its challenge and the UI obtains a fresh one bef
     (window as Window & { fixtureBadNonce?: boolean }).fixtureBadNonce = false;
   });
   await page.getByRole('button', { name: 'Google fixture sign-in' }).click();
-  await expect(page.getByRole('heading', { name: /เปลี่ยนคลิป/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
 });
 
 test('HTTP source lifecycle, artifacts and account switching preserve privacy', async ({
@@ -217,7 +217,7 @@ test('HTTP source lifecycle, artifacts and account switching preserve privacy', 
     (window as Window & { fixtureSub?: string }).fixtureSub = 'fixture-source-b';
   });
   await page.getByRole('button', { name: 'Google fixture sign-in' }).click();
-  await expect(page.getByRole('heading', { name: /เปลี่ยนคลิป/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
   expect((await (await page.request.get(`${api}/api/videos`)).json()).total).toBe(0);
   expect(chatResult.conversation_id).toBeTruthy();
   for (const privatePath of [
@@ -261,9 +261,9 @@ test('an idle challenge refreshes and callbacks from its old Google button are i
       credential: 'old-callback',
     }),
   );
-  await expect(page.getByRole('heading', { name: /เปลี่ยนคลิป/ })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Google fixture sign-in' }).click();
-  await expect(page.getByRole('heading', { name: /เปลี่ยนคลิป/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
 });
 
 test('admin stats/users, role changes, CSRF, revocation and last-admin protection use real routes', async ({

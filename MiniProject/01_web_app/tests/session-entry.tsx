@@ -11,6 +11,7 @@ import '@fontsource-variable/manrope';
 import '../src/styles.css';
 import '../src/theme.css';
 import '../src/mint.css';
+import '../src/polish.css';
 
 class FixtureSessionPort implements SessionPort {
   readonly demo = false;

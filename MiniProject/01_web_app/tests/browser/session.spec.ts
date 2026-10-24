@@ -165,7 +165,7 @@ test('pending real backend keeps private routes closed and makes no workspace re
 }) => {
   const server = await fixture(page);
   await page.goto(`${base}/admin?pending=1`);
-  await expect(page.getByRole('heading', { name: 'ยินดีต้อนรับกลับ' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'ยินดีต้อนรับ' })).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'เข้าสู่ระบบด้วย Google', exact: true }),
   ).toBeDisabled();
@@ -178,7 +178,7 @@ test('Google button exchanges only the credential and never persists credentials
   const server = await fixture(page);
   await page.goto(base);
   await page.getByRole('button', { name: 'Continue with Google' }).click();
-  await expect(page.getByRole('heading', { name: /เปลี่ยนคลิป/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
   const exchange = server.requests.find((request) => request.path === '/__test__/google')!;
   expect(exchange.body).toEqual({ credential: 'fixture-A' });
   expect(exchange.headers['x-test-login-csrf']).toBe('login-nonce');
@@ -335,7 +335,7 @@ test('a slow session check never flashes the private workspace', async ({ page }
   await expect(page.getByRole('checkbox')).toHaveCount(0);
   expect(server.requests.filter((request) => request.path.startsWith('/api/'))).toHaveLength(0);
   release();
-  await expect(page.getByRole('heading', { name: /เปลี่ยนคลิป/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
 });
 
 test('Google script network errors provide a retry without a password fallback', async ({
@@ -366,7 +366,7 @@ for (const width of [375, 768, 1440]) {
     );
     await page.screenshot({ path: `runtime/screenshots/login-${width}.png`, fullPage: true });
     await page.getByRole('button', { name: 'ทดลองด้วยบัญชี A' }).click();
-    await expect(page.getByRole('heading', { name: /เปลี่ยนคลิป/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );

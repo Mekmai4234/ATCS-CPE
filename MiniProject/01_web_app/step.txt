@@ -72,3 +72,10 @@ D) Analysis, Research and Learning
 5. Render typed learning content, per-item citations, source availability and coverage.
 6. Show synthetic fixture mode whenever reported by response headers/body.
 7. Browser memory holds current UI history; reload restoration is not implemented.
+
+INTEGRATED CHECKOUT
+1. Install with pnpm install --frozen-lockfile.
+2. Run pnpm format:check, pnpm test, pnpm build and pnpm test:production.
+3. Run pnpm exec playwright test and the module-07 floating config.
+4. Run module-07 browser_identity.py --checkout for the real HTTP/API/worker flow.
+5. Register the actual Google origin and verify real login separately; demo screenshots do not prove it.

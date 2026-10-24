@@ -78,3 +78,8 @@ See TEST_REPORT.md for actual commands/results, not assumed acceptance.
 No authentication, reload/session restoration, animated mascot or embedded player is
 implemented. External YouTube playback and timestamp links are provided. Deployment
 is outside the verified frontend runtime; delivery is tracked through Git and PR history.
+
+INTEGRATED MINT UI (24 October 2026)
+Use the shared SessionShell/API and conversation state for full and floating chat.
+polish.css refines the reference layout; Visuals.tsx supplies decorative learning objects and consistent icons.
+Keep decorative overflow inside its scene, preserve reduced-motion behavior and clamp the launcher/panel.

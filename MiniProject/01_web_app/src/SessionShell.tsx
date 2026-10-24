@@ -8,6 +8,7 @@ import { HttpSessionPort } from './httpSession';
 import { DemoSessionPort, safeMemberSession, safeWorkspacePath } from './session';
 import type { MemberSession, SessionPort } from './session';
 import PublicInfo, { InfoLinks, isInfoPath } from './PublicInfo';
+import { LearningScene, LoginBenefits, UiIcon } from './Visuals';
 
 const defaultPort: SessionPort =
   import.meta.env.VITE_DEMO_MODE === 'true'
@@ -222,37 +223,29 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
       <header className="login-header">
         <BuddyLogo />
         <a className="help-link" href="/help">
-          ช่วยเหลือ
+          <UiIcon name="help" /> ช่วยเหลือ
         </a>
       </header>
       <main className="login-layout">
         <section className="login-story" aria-labelledby="login-intro">
-          <span className="forest-eyebrow">YOUR KNOWLEDGE, A LITTLE MORE ALIVE.</span>
+          <span className="forest-eyebrow">YOUR PERSONAL LEARNING BUDDY</span>
           <h1 id="login-intro">
-            ทุกคำตอบ
-            <br />
-            มีที่มา
+            เพื่อนคู่คิดจากคลิปโปรด
             <span className="coral-stroke" />
           </h1>
-          <p>
-            เปลี่ยนคลิปให้เป็นความรู้ของคุณ
-            <br />
-            เรียนรู้พร้อมหลักฐานจากคลิป
-          </p>
-          <Mascot />
+          <p>ถาม สรุป และเรียนรู้ไปกับ Buddy</p>
+          <div className="login-mascot-stage">
+            <LearningScene />
+            <Mascot />
+          </div>
           <span className="story-caption">พบกับ RAG Buddy · เพื่อนร่วมทางการเรียนรู้</span>
         </section>
         <section className="login-card" aria-labelledby="sign-in-title">
-          <span className="login-spark" aria-hidden="true">
-            ✦
+          <span className="login-welcome-pill">
+            <UiIcon name="spark" size={18} /> เริ่มต้นเรียนรู้กับ RAG Buddy
           </span>
-          <span className="eyebrow">WELCOME TO RAG BUDDY</span>
-          <h2 id="sign-in-title">ยินดีต้อนรับกลับ</h2>
-          <p>
-            เข้าสู่ระบบเพื่อเริ่มเรียนรู้จากคลิป
-            <br />
-            เข้าครั้งแรกก็สร้างบัญชีได้ในขั้นตอนเดียว
-          </p>
+          <h2 id="sign-in-title">ยินดีต้อนรับ</h2>
+          <p>เข้าสู่ระบบหรือสมัครสมาชิกด้วย Google</p>
           {message && (
             <p className={`notice ${message === 'ออกจากระบบแล้ว' ? '' : 'warning'}`} role="status">
               {message}
@@ -306,7 +299,13 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
               </button>
             </div>
           )}
+          <p className="signup-note">
+            ครั้งแรก? ระบบจะสร้างบัญชีให้คุณอัตโนมัติ
+            <br />
+            มีบัญชีแล้ว? ใช้ Google เดิมเพื่อเข้าสู่ระบบ
+          </p>
           <div className="login-divider" />
+          <LoginBenefits />
           <p className="login-privacy">
             ใช้ Google เพื่อยืนยันตัวตนเท่านั้น
             <br />
