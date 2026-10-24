@@ -1,3 +1,10 @@
+# Historical UI acceptance matrix — superseded integration status
+
+The legacy/absent-UI observations below describe the earlier review checkout.
+See [INTEGRATED_SYSTEM.md](INTEGRATED_SYSTEM.md) for the current combined implementation,
+bound floating test config, runtime evidence and remaining external acceptance.
+Do not interpret the historical BLOCKED rows as a fresh test result.
+
 # Floating Buddy / mint UI acceptance — 24 October 2026
 
 This is a release matrix, not a declaration that module 01 has implemented these

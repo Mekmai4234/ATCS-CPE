@@ -1,6 +1,7 @@
 # 07 — System verification and deployment
 
-Current work (24 October): [UI_CHECKOUT_REPORT.md](UI_CHECKOUT_REPORT.md) and
+Integrated develop work (24 October): [INTEGRATED_SYSTEM.md](INTEGRATED_SYSTEM.md).
+The earlier [UI_CHECKOUT_REPORT.md](UI_CHECKOUT_REPORT.md) and
 [FLOATING_UI_ACCEPTANCE.md](FLOATING_UI_ACCEPTANCE.md). Backend modules 02–06 are now
 merged into develop and the locked environment works on the actual checkout. Default
 CI never replaces app sources with `integration.json`. Historical candidate evidence
@@ -8,8 +9,8 @@ and the 22 October report remain available, but do not certify a later revision.
 
 This folder owns repeatable checks, release acceptance, packaging and recovery. Changes
 are confined to 07 and the authorized repository-root GitHub workflow. Modules 01–06
-have runnable implementations; Google identity integration is still pending in separate
-module PRs. See [AUTH_ACCEPTANCE.md](AUTH_ACCEPTANCE.md) for the current auth matrix,
+have runnable implementations, including the shared HTTP identity and floating-chat UI.
+Real Google registration/public deployment acceptance remains pending. See [AUTH_ACCEPTANCE.md](AUTH_ACCEPTANCE.md) for the historical auth matrix,
 candidate commands and release blockers. The repository-root environment example is
 outdated: current 04 uses Gemini embeddings, not the root OpenAI example.
 
@@ -97,7 +98,8 @@ runtime and maintenance database/vector/fingerprint/model values before initiali
 state. All service children receive the same snapshot and verify this pair before startup.
 No .env files, keys, data or Windows environments are included in Docker build inputs.
 `/health` checks schema/capabilities, not provider access or useful worker completion.
-This remains a localhost single-user prototype; public HTTPS/authentication is separate.
+The base Compose setup is for local use. Member authentication is implemented; use the
+auth overlay and its evidence gates before any public HTTPS deployment.
 
 For local commands, select one full-system environment file explicitly:
 

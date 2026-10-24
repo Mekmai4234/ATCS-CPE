@@ -1,24 +1,21 @@
-// Future product acceptance, NOT included in baseline CI or counted as implemented UI.
+// Delivered UI interactions; identity/provider integration is verified separately.
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 const { test, expect } = createRequire(
   resolve(__dirname, "../../../01_web_app/package.json"),
 )("@playwright/test");
 
-const opener = (page) =>
-  page.getByRole("button", {
-    name: /เปิด.*(?:Buddy|บัดดี้).*แชต|เปิดแชต.*(?:Buddy|บัดดี้)|open buddy chat/i,
-  });
+const opener = (page) => page.locator(".buddy-launcher");
 const panel = (page) => page.getByRole("dialog", { name: /Buddy|บัดดี้|แชต/i });
 const minimize = (page) =>
-  page.getByRole("button", { name: /ย่อแชต|ย่อ.*Buddy|minimi[sz]e chat/i });
+  page.getByRole("button", { name: "ย่อหน้าต่างแชต", exact: true });
 async function enter(page) {
-  await page.goto("/");
+  await page.goto("/?demo=1");
   const demo = page.getByRole("button", {
     name: "ทดลองด้วยบัญชี A",
     exact: true,
   });
-  if (await demo.count()) await demo.click();
+  await demo.click();
   await expect(
     opener(page),
     "BLOCKED: no floating Buddy launcher in this source (or bind reviewed ARIA names)",
@@ -100,9 +97,9 @@ test("unavailable localStorage retains keyboard opening and reset alternative", 
   await expect(panel(page)).toBeVisible();
   await minimize(page).click();
   await page
-    .getByRole("button", { name: /ตำแหน่ง.*Buddy|ย้าย.*มุม|Buddy position/i })
+    .getByRole("button", { name: "ตำแหน่งและการแสดงแชต", exact: true })
     .click();
-  await page.getByRole("menuitem", { name: /คืนตำแหน่ง|reset/i }).click();
+  await page.getByRole("button", { name: "คืนตำแหน่ง", exact: true }).click();
   await contained(page);
 });
 

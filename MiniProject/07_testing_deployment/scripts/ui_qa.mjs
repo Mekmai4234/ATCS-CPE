@@ -104,10 +104,9 @@ try {
       name: "ทดลองด้วยบัญชี A",
       exact: true,
     });
-    if (await demo.count()) await demo.click();
-    const launcher = page.getByRole("button", {
-      name: /เปิด.*(?:Buddy|บัดดี้).*แชต|เปิดแชต.*(?:Buddy|บัดดี้)|open buddy chat/i,
-    });
+    await demo.click();
+    const launcher = page.locator(".buddy-launcher");
+    await launcher.waitFor();
     const hasLauncher = (await launcher.count()) > 0;
     await page.screenshot({
       path: resolve(output, `home-${width}.png`),
@@ -128,18 +127,20 @@ try {
       path: resolve(output, `chat-${width}.png`),
       fullPage: true,
     });
-    await page.goto(`${origin}/login`);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "ออกจากระบบ", exact: true }).click();
+    await page
+      .getByRole("button", { name: "ทดลองด้วยบัญชี A", exact: true })
+      .waitFor();
     await page.screenshot({
       path: resolve(output, `login-${width}.png`),
       fullPage: true,
     });
-    const googleLogin = await page
-      .getByRole("button", { name: /Google/ })
-      .count();
     evidence.views.push({
       width,
       launcher_present: hasLauncher,
-      google_button_present: googleLogin > 0,
+      demo_login_present: await demo.isVisible(),
+      google_button_verified: false,
       home_horizontal_overflow: overflow,
       screenshot_only: true,
     });
@@ -158,8 +159,17 @@ try {
     evidence.blockers.push(
       "floating_launcher_not_implemented_or_selector_not_bound",
     );
-  if (evidence.views.some((view) => !view.google_button_present))
-    evidence.blockers.push("login_entry_not_accepted_by_this_fixture_capture");
+  evidence.surface_ready = evidence.views.every(
+    (view) =>
+      view.launcher_present &&
+      view.demo_login_present &&
+      !view.home_horizontal_overflow,
+  );
+  if (!evidence.surface_ready)
+    evidence.blockers.push("surface_layout_or_entry_failed");
+  evidence.blockers.push(
+    "real_google_and_public_https_require_registered_environment",
+  );
   evidence.blockers.push(
     "drag_motion_focus_ime_account_switch_require_strict_runtime_suite",
   );
@@ -180,5 +190,6 @@ if (process.env.GITHUB_STEP_SUMMARY) {
       evidence.blockers.map((item) => `- ${item}\n`).join(""),
   );
 }
-if (process.argv.includes("--require-floating") && evidence.blockers.length)
+// This flag is a surface gate only. Screenshot capture never grants production acceptance.
+if (process.argv.includes("--require-floating") && !evidence.surface_ready)
   process.exitCode = 2;

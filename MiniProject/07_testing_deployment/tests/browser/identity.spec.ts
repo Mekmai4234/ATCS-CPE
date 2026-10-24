@@ -19,7 +19,7 @@ test("real HTTP research job produces events/citations and logout clears the wor
   );
   await page.goto("http://127.0.0.1:3004");
   await page.getByRole("button", { name: "Google fixture sign-in" }).click();
-  await expect(page.getByRole("heading", { name: /เปลี่ยนคลิป/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /ดูน้อยลง/ })).toBeVisible();
   await page
     .getByLabel("วางลิงก์ YouTube", { exact: true })
     .fill("https://youtu.be/dQw4w9WgXcQ");
