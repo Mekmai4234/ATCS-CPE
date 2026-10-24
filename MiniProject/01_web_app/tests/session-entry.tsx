@@ -4,6 +4,7 @@ import SessionShell from '../src/SessionShell';
 import { DemoSessionPort, PendingSessionPort, safeMemberSession } from '../src/session';
 import type { SessionPort, MemberSession, AdminSnapshot, Member } from '../src/session';
 import { ApiError } from '../src/api';
+import { visualFixture } from './visual-fixture';
 import '@fontsource/ibm-plex-sans-thai/400.css';
 import '@fontsource/ibm-plex-sans-thai/600.css';
 import '@fontsource/ibm-plex-sans-thai/700.css';
@@ -14,6 +15,9 @@ import '../src/mint.css';
 import '../src/polish.css';
 
 class FixtureSessionPort implements SessionPort {
+  readonly evidence = new URLSearchParams(location.search).has('visual')
+    ? visualFixture
+    : undefined;
   readonly demo = false;
   readonly ready = true;
   private session: MemberSession | null = null;
