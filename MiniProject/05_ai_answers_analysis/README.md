@@ -158,7 +158,19 @@ image does not package this integration; the commands above use the local 05 env
 
 ## Evaluation and limits
 
-### Full transcript requests
+### Performer attribution
+
+Questions such as `Jay ร้องท่อนไหน` scan every available authorized caption chunk,
+not just ranked top-k results. Possible explicit caption labels or attribution cues
+are sent to the model for grounded attribution; an artist's name in a title, a lyric
+or conversation history cannot identify that artist's passage. No voice or face
+identification is performed. If there is no supporting attribution, the result stays
+`insufficient_evidence`, explains the caption/time basis and missing evidence, and
+includes the checked sources with timestamps. Complete coverage means the imported
+captions were inspected, not that the requested identity was established. Existing
+source version, ownership and publication checks also apply to these checked citations.
+
+### Full transcript display
 
 Explicit requests such as `ขอเนื้อเพลงทั้งหมด`, `เพลงร้องว่าอย่างไร`, or
 `show full lyrics` display the entire stored transcript in original caption order.

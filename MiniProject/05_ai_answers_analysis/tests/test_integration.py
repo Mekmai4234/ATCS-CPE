@@ -156,6 +156,26 @@ async def integrated(tmp_path):
     db.close()
 
 
+async def test_http_performer_absence_has_checked_citations_and_complete_scan(integrated):
+    env = integrated
+    before = len(env.model.payloads)
+    response = await env.client.post(
+        "/api/chat",
+        json={"question": "Jay ร้องท่อนไหน", "scope": {"video_ids": [VIDEO_A]}},
+    )
+    assert response.status_code in {200, 202}, response.text
+    job_id = response.json()["job_id"]
+    if response.status_code == 202:
+        await env.worker.run_once(job_id)
+    job = env.repo.get_job(job_id)
+    assert job["state"] == "completed", job
+    result = job["result"]
+    assert result["status"] == "insufficient_evidence"
+    assert result["coverage"]["complete"] and result["citations"]
+    assert len(env.model.payloads) == before
+    assert "บทถอดเสียงพร้อมเวลา" in result["answer"]
+
+
 async def test_http_full_transcript_uses_original_captions_without_model(integrated):
     env = integrated
     before = len(env.model.payloads)
