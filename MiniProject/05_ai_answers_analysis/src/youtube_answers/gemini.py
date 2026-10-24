@@ -12,6 +12,24 @@ from .models import Generated, GeneratedAnswer, error
 from .prompts import POLICY, json_text
 
 
+def provider_response_schema():
+    """Keep high-cardinality array bounds out of Gemini's constrained decoder.
+
+    The nested 100 statements / 1000 citation IDs limits can make generateContent
+    reject this otherwise valid schema with INVALID_ARGUMENT. They are still enforced
+    by GeneratedAnswer when validating the actual response, before it is published.
+    """
+
+    def compact(value):
+        if isinstance(value, dict):
+            return {key: compact(item) for key, item in value.items() if key != "maxItems"}
+        if isinstance(value, list):
+            return [compact(item) for item in value]
+        return value
+
+    return compact(GeneratedAnswer.model_json_schema())
+
+
 class GeminiModel:
     def __init__(self, settings, *, client=None):
         self.settings = settings
@@ -33,7 +51,7 @@ class GeminiModel:
             system_instruction=POLICY,
             max_output_tokens=self.settings.answer_max_output_tokens,
             response_mime_type="application/json",
-            response_json_schema=GeneratedAnswer.model_json_schema(),
+            response_json_schema=provider_response_schema(),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
         contents = [types.Content(role="user", parts=[types.Part(text=json_text(payload))])]

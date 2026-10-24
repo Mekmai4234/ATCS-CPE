@@ -87,7 +87,29 @@ async def test_real_sdk_schema_count_policy_and_metadata(make_model):
     assert body["generationConfig"]["responseMimeType"] == "application/json"
     assert body["generationConfig"]["maxOutputTokens"] == 1200
     assert "responseJsonSchema" in body["generationConfig"]
+    # Large nested maxItems bounds fail on the real constrained decoder. The local
+    # output validator below must retain these limits independently of wire hints.
+    assert "maxItems" not in json.dumps(body["generationConfig"]["responseJsonSchema"])
     assert "tools" not in body
+
+
+@pytest.mark.parametrize("oversized", ["statements", "citation_ids"])
+async def test_provider_output_still_enforces_array_limits(make_model, oversized):
+    statements = [{"text": "Evidence", "citation_ids": ["c1"]}]
+    if oversized == "statements":
+        statements *= 101
+    else:
+        statements[0]["citation_ids"] = [f"c{i}" for i in range(1001)]
+    output = response(json.dumps({"status": "answered", "statements": statements}))
+
+    def handler(request):
+        return httpx.Response(
+            200, json={"totalTokens": 5} if request.url.path.endswith(":countTokens") else output
+        )
+
+    with pytest.raises(AppError) as caught:
+        await make_model(handler).generate({}, 5)
+    assert caught.value.code == "invalid_model_output"
 
 
 @pytest.mark.parametrize(

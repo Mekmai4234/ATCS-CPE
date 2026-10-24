@@ -59,3 +59,8 @@ Limits
 - Real semantic acceptance is never inferred from mock passes or citation identity alone.
 - The acceptance client uses configurable finite positive HTTP/poll budgets (210/300 seconds
   by default), records them, and classifies request timeouts separately from failed jobs.
+
+LIVE GEMINI STRUCTURED OUTPUT COMPATIBILITY (24 October 2026)
+Keep high-cardinality maxItems bounds out of the provider decoder schema.
+Validate the returned JSON with the complete GeneratedAnswer model before publication; local size, citation and outcome checks remain mandatory.
+Do not switch model identifiers or disable validation to bypass a provider error.
