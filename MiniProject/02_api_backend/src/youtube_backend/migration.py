@@ -16,7 +16,7 @@ def upgrade_database(database, revision="head", *, allow_legacy=False):
         from alembic.runtime.migration import MigrationContext
 
         if (
-            MigrationContext.configure(connection).get_current_revision() == "0001"
+            MigrationContext.configure(connection).get_current_revision() in {"0001", "0002"}
             and revision == "head"
             and not allow_legacy
         ):
