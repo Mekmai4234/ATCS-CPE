@@ -43,8 +43,9 @@ class StoreBinding:
                 "index_store_mismatch",
                 "SQLite and Chroma do not match; select runtime env files or restore both together",
             )
-        if not (self.path / "chroma.sqlite3").is_file() and any(
-            row["state"] in {"published", "retired"} for row in self.manifest.all_runs()
+        if not (self.path / "chroma.sqlite3").is_file() and (
+            self.manifest.has_published_media()
+            or any(row["state"] in {"published", "retired"} for row in self.manifest.all_runs())
         ):
             raise error(
                 "index_store_mismatch", "Bound Chroma data is missing; restore the paired backup"

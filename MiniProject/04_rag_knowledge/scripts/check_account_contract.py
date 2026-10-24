@@ -15,9 +15,9 @@ import zipfile
 from pathlib import Path
 from uuid import uuid4
 
-BASE = "69f534730669f59051a453d9833a0be88695f263"
-INGESTION = "4b051318b5816c6bc247a038f48eff6d21b7e741"
-AGENT = "84fb1b6e40f3dd685df4c8d300ba058612de6c09"
+BASE = "1814bf3622eb62f0963da4f682ea31661728907c"
+INGESTION = "1814bf3622eb62f0963da4f682ea31661728907c"
+AGENT = "1814bf3622eb62f0963da4f682ea31661728907c"
 
 
 def git(repo, *arguments):
