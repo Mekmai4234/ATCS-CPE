@@ -191,7 +191,7 @@ export function demoTransport(): Transport {
     json({ error: { message, code, retryable: false, request_id: 'demo' } }, status);
   return async (input, init) => {
     init?.signal?.throwIfAborted();
-    const url = new URL(String(input));
+    const url = new URL(String(input), 'http://demo.test');
     const path = url.pathname;
     const method = init?.method || 'GET';
     const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
@@ -289,6 +289,47 @@ export function demoTransport(): Transport {
             sources_available: sourcesAvailable(artifactSources.get(artifact.artifact_id!) || []),
           })
         : error('ไม่พบสื่อเรียนรู้', 'not_found', 404);
+    }
+    if (path.startsWith('/api/conversations/') && method === 'GET') {
+      const id = decodeURIComponent(path.split('/')[3]);
+      const messages = [...jobs.values()]
+        .filter((job) => job.kind === 'chat' && job.result?.conversation_id === id)
+        .flatMap((job) => {
+          const scope = (jobSources.get(job.job_id) || []).map((source) => ({
+            video_id: source.video_id,
+            generation: source.generation,
+            transcript_version: source.indexed_version,
+          }));
+          const available = sourcesAvailable(jobSources.get(job.job_id) || []);
+          const base = { job_id: job.job_id, scope, state: job.state };
+          return [
+            {
+              ...base,
+              message_id: `${job.job_id}-q`,
+              role: 'user',
+              content: String(job.payload?.question || ''),
+              citations: [],
+            },
+            {
+              ...base,
+              message_id: `${job.job_id}-a`,
+              role: 'assistant',
+              content: job.result?.answer || '',
+              citations: (job.result?.citations || []).map((citation) => ({
+                ...citation,
+                source_available: available,
+              })),
+            },
+          ];
+        });
+      const offset = Number(url.searchParams.get('offset') || 0);
+      return json({
+        conversation_id: id,
+        messages: messages.slice(offset, offset + 50),
+        total: messages.length,
+        limit: 50,
+        offset,
+      });
     }
     if (['/api/chat', '/api/analysis', '/api/research', '/api/learning-artifacts'].includes(path)) {
       const scope = body.scope as Scope;

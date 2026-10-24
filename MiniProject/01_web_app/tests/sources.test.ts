@@ -30,6 +30,19 @@ const result: TaskResult = {
 };
 const flags = (value: TaskResult) => value.citations?.map((c) => c.source_available);
 describe('historical source availability', () => {
+  it('allows fresh authorized answers after shared-source reattachment without reviving old membership evidence', () => {
+    const scope = {
+      video_ids: videos.map((video) => video.video_id),
+      channel_ids: [],
+      date_from: null,
+      date_to: null,
+    };
+    const old = snapshotSources(videos, scope, new Map());
+    const fresh = snapshotSources(videos, scope, new Map([[videos[0].video_id, 1]]));
+    const retired = new Set([sourceKey(old[0])]);
+    expect(flags(reconcileSources(result, old, { videos, retired }))).toEqual([false, true]);
+    expect(flags(reconcileSources(result, fresh, { videos, retired }))).toEqual([true, true]);
+  });
   it('invalidates only the deleted video, including nested learning artifacts', () => {
     const artifact = {
       type: 'flashcards',
