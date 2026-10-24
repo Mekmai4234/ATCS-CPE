@@ -78,6 +78,10 @@ export function buildScope(
   };
 }
 export function jobWarning(job: Job): string | null {
+  if (job.state === 'failed' && job.error_code === 'transcript_too_large')
+    return 'บทถอดเสียงยาวเกินขีดจำกัดการแสดงผล กรุณาเลือกคลิปเดียวหรือถามเฉพาะช่วงที่ต้องการ';
+  if (job.state === 'failed' && job.error_code === 'transcript_unavailable')
+    return 'ไม่พบบทถอดเสียงต้นฉบับของคลิป กรุณาตรวจสอบการนำเข้าวิดีโอ';
   if (job.state === 'failed' && job.error_code === 'generation_output_truncated')
     return 'คำตอบยาวเกินขีดจำกัดและถูกตัด กรุณาถามให้เจาะจงขึ้นหรือขอสรุปสั้น ๆ';
   if (job.state === 'failed') return `งานไม่สำเร็จ (${job.error_code || 'task_failed'})`;

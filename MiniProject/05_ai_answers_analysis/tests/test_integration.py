@@ -156,6 +156,31 @@ async def integrated(tmp_path):
     db.close()
 
 
+async def test_http_full_transcript_uses_original_captions_without_model(integrated):
+    env = integrated
+    before = len(env.model.payloads)
+    response = await env.client.post(
+        "/api/chat",
+        json={"question": "ขอเนื้อเพลงทั้งหมด", "scope": {"video_ids": [VIDEO_A]}},
+    )
+    assert response.status_code in {200, 202}, response.text
+    job_id = response.json()["job_id"]
+    if response.status_code == 202:
+        await env.worker.run_once(job_id)
+    job = env.repo.get_job(job_id)
+    assert job["state"] == "completed", job
+    result = job["result"]
+    lines = [
+        "[FIXTURE] RAG retrieves evidence before answering questions.",
+        "[FIXTURE] คำตอบต้องมีหลักฐานและอ้างอิงวิดีโอต้นทาง",
+    ]
+    assert all(result["answer"].count(line) == 1 for line in lines)
+    assert result["answer"].index(lines[0]) < result["answer"].index(lines[1])
+    assert result["coverage"]["complete"]
+    assert result["provider_metadata"]["provider"] == "transcript"
+    assert result["citations"] and len(env.model.payloads) == before
+
+
 async def test_http_chat_citations_history_and_database_reopen(integrated):
     env = integrated
     request = {"question": "RAG คืออะไร", "scope": {"video_ids": [VIDEO_A]}}
