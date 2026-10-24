@@ -1,4 +1,38 @@
 import type { Citation, Job, Scope, Video } from './types';
+export const evidenceLabels = {
+  transcript: 'บทถอดเสียง',
+  ocr: 'ข้อความบนภาพ',
+  visual: 'ภาพวิเคราะห์แล้ว',
+};
+export const enrichmentLabels = {
+  preparing_frames: 'เตรียมภาพ',
+  reading_text: 'อ่านข้อความ',
+  waiting_ai: 'รอคิว AI',
+  quota_paused: 'พักเพราะข้อจำกัดการใช้งาน',
+  partial: 'พร้อมบางส่วน',
+  completed: 'เสร็จแล้ว',
+};
+export const videoQueryable = (video: Video) =>
+  !['deleted', 'deleting'].includes(video.status) &&
+  (video.status === 'ready' ||
+    !!(video.presentation?.queryable && video.presentation.kinds.length));
+export function jobStatus(job: Job) {
+  const extra = job.presentation;
+  const provider =
+    job.error_code === 'generation_rate_limited'
+      ? 'Gemini จำกัดการใช้งาน (429); ยังไม่ทราบว่าโควตารายวันหมดหรือไม่'
+      : job.error_code === 'generation_provider_busy'
+        ? 'Gemini ไม่พร้อมให้บริการชั่วคราว (503)'
+        : '';
+  const stage = extra
+    ? enrichmentLabels[extra.stage]
+    : statusLabels[job.stage] || statusLabels[job.state] || job.state;
+  const when =
+    extra?.retryAt && Number.isFinite(Date.parse(extra.retryAt))
+      ? ` · Backend ระบุให้ลองอีกครั้ง ${new Date(extra.retryAt).toLocaleString('th-TH')}`
+      : '';
+  return `${stage}${provider ? ` · ${provider}` : ''}${when}`;
+}
 
 export const terminal = (state: string) =>
   ['completed', 'partial', 'failed', 'cancelled'].includes(state);
@@ -59,7 +93,7 @@ export function buildScope(
   if (ids.length > 100) throw new Error('เลือกแหล่งข้อมูลได้สูงสุด 100 คลิป');
   if (from && to && from > to) throw new Error('วันเริ่มต้นต้องไม่อยู่หลังวันสิ้นสุด');
   const selected = ids.map((id) => videos.find((video) => video.video_id === id));
-  if (selected.some((video) => !video || video.status !== 'ready'))
+  if (selected.some((video) => !video || !videoQueryable(video)))
     throw new Error('คลิปที่เลือกยังไม่พร้อมใช้งาน กรุณาตรวจสอบอีกครั้ง');
   const eligible = selected.filter(
     (video) =>
