@@ -5,6 +5,13 @@ Includes a 03-owned factory for `ingest -> 02 persistence -> 04 index`, offline 
 real SQLite/Chroma integration tests, and an explicit public YouTube read check.
 Existing 02/04/06 source and factories are unchanged.
 
+The 2026-10-24 local media/OCR work is documented in
+[MEDIA_PREPARATION.md](MEDIA_PREPARATION.md) and [MEDIA_TEST_REPORT.md](MEDIA_TEST_REPORT.md).
+It is an opt-in internal preparation service with real local-engine tests. It does
+not yet enable video uploads or captionless imports through the web/API: those need
+02's new evidence contract and 04/05 integration. It creates no Gemini client or
+fake TranscriptResult and leaves the existing caption worker unchanged.
+
 Member ingestion now uses **02's native session/ownership flow and 04's authorized
 ExecutionContext**. The previous proposal-only backend and grants were removed.
 This requires the dependency branches/commits listed in [MEMBER_CONTRACT.md](MEMBER_CONTRACT.md);
