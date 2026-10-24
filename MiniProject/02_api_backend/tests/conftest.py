@@ -32,7 +32,9 @@ def env(tmp_path):
         adapter_mode="fixture",
         database_url=f"sqlite:///{(tmp_path / 'app.db').as_posix()}",
         job_retry_base_seconds=0,
-        job_lease_seconds=1,
+        # General integration work must not lose ownership under CI/browser load.
+        # Lease expiry and heartbeat cases override the clock/lease explicitly.
+        job_lease_seconds=30,
     )
     database = Database(settings.database_url)
     upgrade_database(database)
