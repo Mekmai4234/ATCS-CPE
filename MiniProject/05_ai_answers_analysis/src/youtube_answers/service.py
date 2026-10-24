@@ -16,6 +16,7 @@ from youtube_backend.urls import canonical_url
 from .authorization import MemberContext, guard_context
 from .models import GeneratedAnswer, error
 from .prompts import input_size, json_text, payload
+from .transcript import wants_transcript
 
 
 @dataclass
@@ -134,6 +135,8 @@ class AnswerService:
             run.context.conversation(request.get("conversation_id"))
             history = run.context.history(history)
         history = self._history(history, run)
+        if wants_transcript(request["question"]):
+            return await self._transcript(run)
         # Carry recent user context into retrieval without asking a model to change scope.
         query = request["question"]
         for item in reversed(history):
@@ -186,12 +189,8 @@ class AnswerService:
             groups.append(current)
         return groups
 
-    async def analyze(self, request, sources, context):
-        run = self._run(sources, context, {"analysis", "research"})
-        request = self._request(AnalysisRequest, request, run)
-        if request["type"] == "compare" and len(run.sources) < 2:
-            raise error("invalid_scope", "Comparison needs at least two videos", status=422)
-        nodes, cursors, cursor, expected, snapshot = [], set(), None, None, None
+    async def _read_all(self, run):
+        chunks, cursors, cursor, expected, snapshot = [], set(), None, None, None
         while True:
             page = await self._bounded(
                 run,
@@ -212,9 +211,10 @@ class AnswerService:
                     raise error(
                         "invalid_inventory", "Chunk enumeration returned duplicate evidence"
                     )
-                nodes.append(self._record(run, chunk.evidence()))
+                self._record(run, chunk.evidence())
+                chunks.append(chunk)
             if page.next_cursor is None:
-                if len(nodes) != page.total:
+                if len(chunks) != page.total:
                     raise error("invalid_inventory", "Chunk enumeration is incomplete")
                 break
             if page.next_cursor in cursors or not page.items:
@@ -223,6 +223,68 @@ class AnswerService:
             cursor = page.next_cursor
         if not page.inventory.complete:
             run.notes.append("Some selected videos have no available index; coverage is partial.")
+        return chunks, expected
+
+    async def _transcript(self, run):
+        chunks, expected = await self._read_all(run)
+        statements, size = [], 0
+        for source in run.sources:
+            selected = [chunk for chunk in chunks if chunk.video_id == source.video_id]
+            if not selected:
+                continue
+            segments = await self._bounded(
+                run, lambda _, source=source: self.knowledge.transcript(source, run.context)
+            )
+            refs = {}
+            for chunk in selected:
+                for segment_id in chunk.segment_ids:
+                    refs.setdefault(segment_id, []).append(chunk.chunk_id)
+            if set(refs) != {segment.segment_id for segment in segments}:
+                raise error("source_changed", "Transcript and indexed segment inventory differ")
+            # Use original segments once in stored order, preserving repeated verses.
+            # Overlapping/split RAG chunks are citation anchors, not display text.
+            text, citations = "", []
+            for segment in segments:
+                size += len(segment.text.encode("utf-8"))
+                if size > 1000000 or len(segment.text) > 11000:
+                    raise error("transcript_too_large", "Transcript exceeds the display budget")
+                if text and len(text) + len(segment.text) + 1 > 11000:
+                    statements.append(
+                        {"text": text, "citation_ids": list(dict.fromkeys(citations))}
+                    )
+                    text, citations = "", []
+                text += ("\n" if text else "") + segment.text
+                citations.extend(refs[segment.segment_id])
+            if text:
+                statements.append({"text": text, "citation_ids": list(dict.fromkeys(citations))})
+            if (
+                len(statements) > 100
+                or len({cid for statement in statements for cid in statement["citation_ids"]})
+                > 1000
+            ):
+                raise error("transcript_too_large", "Transcript exceeds the display budget")
+        run.processed.update(run.records)
+        run.notes.append(
+            "แสดงบทถอดเสียงทั้งหมดที่นำเข้าได้ตามลำดับเดิม คำบรรยายอัตโนมัติอาจคลาดเคลื่อนหรือขาดบางช่วงจากเสียงจริง"
+        )
+        output = GeneratedAnswer(
+            status="answered" if statements else "insufficient_evidence",
+            statements=statements,
+            message="" if statements else "ไม่พบบทถอดเสียงที่พร้อมแสดงในคลิปที่เลือก",
+        )
+        result = await self._finish(run, output, expected, full=True)
+        result.provider_metadata = ProviderMetadata(
+            provider="transcript", requested_model="none", latency_ms=0
+        )
+        return result
+
+    async def analyze(self, request, sources, context):
+        run = self._run(sources, context, {"analysis", "research"})
+        request = self._request(AnalysisRequest, request, run)
+        if request["type"] == "compare" and len(run.sources) < 2:
+            raise error("invalid_scope", "Comparison needs at least two videos", status=422)
+        chunks, expected = await self._read_all(run)
+        nodes = [self._record(run, chunk.evidence()) for chunk in chunks]
         if not nodes:
             return await self._finish(
                 run,
