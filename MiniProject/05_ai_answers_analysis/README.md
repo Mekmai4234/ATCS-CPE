@@ -155,6 +155,13 @@ image does not package this integration; the commands above use the local 05 env
   finish becomes `generation_output_truncated`; incomplete output is never published or
   automatically retried as a valid answer. Ask a narrower question or increase the configured
   cap deliberately for longer responses.
+- Provider HTTP 503 becomes `generation_provider_busy`; HTTP 429 becomes
+  `generation_rate_limited`. Both are retryable without exposing provider messages.
+  Module 02 spaces busy retries by at least 15 then 30 seconds, and quota retries by
+  at least 60 then 120 seconds, subject to the existing attempt cap and original job
+  deadline. A wait beyond that deadline is not queued. Other permanent provider
+  failures retain `generation_provider_error`. These retries cannot guarantee
+  recovery while the upstream service remains unavailable.
 
 ## Evaluation and limits
 

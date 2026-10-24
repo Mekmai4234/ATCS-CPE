@@ -677,12 +677,20 @@ class Repository(Ownership):
         with self.db.write() as connection:
             job = self._owned(connection, job_id, token, allow_cancel=True)
             cancelled = job["cancel_requested"] or error.code == "cancelled"
+            # Avoid consuming all durable attempts in a few seconds during a
+            # provider outage or quota window. Retain the original job deadline.
+            provider_floor = {
+                "generation_provider_busy": 15,
+                "generation_rate_limited": 60,
+            }.get(error.code, 0)
+            base_delay = max(self.settings.job_retry_base_seconds, provider_floor)
+            delay = min(300, base_delay * 2 ** (job["attempt_count"] - 1))
             retry = (
                 not cancelled
                 and not deadline_exhausted
                 and error.retryable
                 and job["attempt_count"] < job["max_attempts"]
-                and time.time() < job["deadline_at"]
+                and time.time() + delay < job["deadline_at"]
             )
             missing = not cancelled and error.code == "no_transcript" and job["kind"] == "import"
             state = (
@@ -695,7 +703,6 @@ class Repository(Ownership):
                 else "failed"
             )
             stage = "no_transcript" if missing else state
-            delay = min(300, self.settings.job_retry_base_seconds * 2 ** (job["attempt_count"] - 1))
             connection.execute(
                 db.jobs.update()
                 .where(db.jobs.c.job_id == job_id)
