@@ -12,6 +12,7 @@ import { BuddyLogo, ForestBackdrop } from './Forest';
 import HomeHero from './HomeHero';
 import FloatingBuddy from './FloatingBuddy';
 import { scopeFingerprint } from './buddyModel';
+import { UiIcon } from './Visuals';
 
 type WorkspaceView = 'home' | 'library' | 'chat' | 'learn';
 interface WorkspaceProps {
@@ -756,6 +757,18 @@ export default function App({
                 aria-current={tab === view ? 'page' : undefined}
                 onClick={() => navigateTab(view)}
               >
+                <UiIcon
+                  name={
+                    view === 'home'
+                      ? 'home'
+                      : view === 'library'
+                        ? 'library'
+                        : view === 'chat'
+                          ? 'chat'
+                          : 'learn'
+                  }
+                  size={20}
+                />
                 {label}
               </button>
             ))}
@@ -1319,16 +1332,30 @@ export default function App({
                   navigateTab('learn');
                 }}
               >
-                สรุปประเด็นสำคัญ ↗
+                <UiIcon name="library" />{' '}
+                <span>
+                  สรุปประเด็นสำคัญ<small>สรุปเนื้อหาจากคลิปที่เลือก</small>
+                </span>
+                <UiIcon name="arrow" size={18} />
               </button>
-              <button onClick={() => navigateTab('chat')}>ถามจากคลิป ↗</button>
+              <button onClick={() => navigateTab('chat')}>
+                <UiIcon name="chat" />
+                <span>
+                  ถามจากคลิป<small>สงสัยตรงไหน ถามได้เลย</small>
+                </span>
+                <UiIcon name="arrow" size={18} />
+              </button>
               <button
                 onClick={() => {
                   setTaskType('quiz');
                   navigateTab('learn');
                 }}
               >
-                สร้างแบบทดสอบ ↗
+                <UiIcon name="quiz" />
+                <span>
+                  สร้างแบบทดสอบ<small>เปลี่ยนสิ่งที่ดูเป็นคำถามให้ลองทำ</small>
+                </span>
+                <UiIcon name="arrow" size={18} />
               </button>
             </section>
           )}

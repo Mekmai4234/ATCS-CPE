@@ -7,4 +7,5 @@ import '@fontsource-variable/manrope';
 import '../src/styles.css';
 import '../src/theme.css';
 import '../src/mint.css';
+import '../src/polish.css';
 createRoot(document.getElementById('root')!).render(<App />);

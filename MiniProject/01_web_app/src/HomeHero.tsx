@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
 import { Mascot } from './Forest';
+import { LearningScene, UiIcon } from './Visuals';
 
 export default function HomeHero({
   name,
@@ -21,18 +22,24 @@ export default function HomeHero({
   return (
     <section className="home-hero" aria-labelledby="home-title">
       <div className="home-story">
-        <span className="forest-eyebrow">ยินดีต้อนรับกลับคุณ{name}</span>
+        <span className="forest-eyebrow">
+          <UiIcon name="spark" size={16} /> YOUR PERSONAL LEARNING BUDDY
+        </span>
         <h1 id="home-title">
-          เปลี่ยนคลิป
+          ดูน้อยลง
           <br />
-          ให้เป็นความรู้
+          เข้าใจมากขึ้น
           <span className="coral-stroke" />
         </h1>
         <p>
-          ถาม สรุป และเรียนรู้
-          <br className="mobile-only" /> พร้อมแหล่งอ้างอิงที่ตรวจสอบได้
+          เปลี่ยนคลิปโปรดให้เป็นความรู้
+          <br />
+          ถาม สรุป และเรียนรู้ไปกับ Buddy
         </p>
         <div className="hero-import-card">
+          <label className="hero-import-label" htmlFor="home-urls">
+            <UiIcon name="link" /> เริ่มจากลิงก์ YouTube
+          </label>
           <form onSubmit={submit}>
             <label className="visually-hidden" htmlFor="home-urls">
               วางลิงก์ YouTube
@@ -49,6 +56,7 @@ export default function HomeHero({
               {busy ? 'กำลังเพิ่ม…' : 'เพิ่มวิดีโอ'} <span aria-hidden="true">→</span>
             </button>
           </form>
+          <p className="hero-import-hint">นำเข้าแล้วถาม พร้อมอ้างอิงช่วงเวลาในคลิป</p>
           <div className="hero-shortcuts">
             <button onClick={openLibrary}>
               <span aria-hidden="true">▣</span> เปิดคลังวิดีโอ
@@ -59,14 +67,13 @@ export default function HomeHero({
             </button>
           </div>
         </div>
-        <span className="home-small-note">
-          บทถอดเสียงคือจุดเริ่มต้น · ทุกคำตอบเชื่อมกลับสู่คลิป
-        </span>
+        <span className="home-small-note">ยินดีต้อนรับคุณ{name} · เรียนรู้จากคลิปในคลังของคุณ</span>
       </div>
       <div className="home-mascot">
+        <LearningScene />
         <div className="mascot-halo" />
         <Mascot />
-        <span className="buddy-speech">พร้อมเรียนรู้ด้วยกันไหม?</span>
+        <span className="buddy-speech">ไปเรียนรู้กัน!</span>
       </div>
     </section>
   );

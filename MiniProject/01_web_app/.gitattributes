@@ -1,0 +1,6 @@
+# Match Prettier on Windows and Linux without depending on global core.autocrlf.
+* text=auto eol=lf
+*.png -text
+*.webp -text
+*.woff -text
+*.woff2 -text

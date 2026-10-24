@@ -166,7 +166,7 @@ export default function FloatingBuddy(props: Props) {
     : Math.max(
         view.left + 16,
         Math.min(
-          point.x > view.left + width + 16 ? point.x - width - 12 : point.x,
+          point.x > view.left + view.width / 2 ? point.x + 72 - width : point.x,
           view.left + view.width - width - 16,
         ),
       );
