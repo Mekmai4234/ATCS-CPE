@@ -1,0 +1,122 @@
+name: MiniProject actual checkout regression
+on:
+  pull_request:
+    branches: [develop]
+    paths: ['MiniProject/**', '.github/workflows/**']
+  push:
+    branches: [develop]
+    paths: ['MiniProject/**', '.github/workflows/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: miniproject-checkout-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  python:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: MiniProject
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.9'
+          python-version: '3.11'
+      - run: uv run --no-project python 07_testing_deployment/scripts/source.py record --record 07_testing_deployment/runtime/checkout-source.json
+      - run: uv lock --check --project 07_testing_deployment
+      - run: uv sync --locked --project 07_testing_deployment
+      - run: uv run --locked --project 07_testing_deployment python 07_testing_deployment/scripts/check.py
+      - run: uv run --locked --project 07_testing_deployment python 07_testing_deployment/scripts/check.py --group auth
+      - run: uv run --no-project python 07_testing_deployment/scripts/source.py verify --record 07_testing_deployment/runtime/checkout-source.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checkout-python-${{ matrix.os }}
+          path: |
+            MiniProject/07_testing_deployment/runtime/**/*.json
+            MiniProject/07_testing_deployment/runtime/**/*.xml
+            MiniProject/07_testing_deployment/runtime/**/*.log
+          retention-days: 7
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: MiniProject/01_web_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.9'
+          python-version: '3.11'
+      - run: uv run --no-project python ../07_testing_deployment/scripts/source.py record --record ../07_testing_deployment/runtime/checkout-source.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --global pnpm@11.25.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck && pnpm format:check && pnpm test && pnpm build
+      - run: pnpm run --if-present test:production
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright test --config ../07_testing_deployment/playwright.config.ts
+      - name: Capture current UI, bundle sizes and pending visual acceptance (fixture only)
+        run: node ../07_testing_deployment/scripts/ui_qa.mjs
+      - name: Real adapter E2E when implemented in this checkout
+        if: hashFiles('MiniProject/01_web_app/tests/identity_server.py') != ''
+        run: |
+          uv sync --locked --project ../07_testing_deployment
+          uv run --locked --project ../07_testing_deployment python ../07_testing_deployment/scripts/browser_identity.py --checkout
+      - name: Missing adapter is an acceptance blocker, not a passed E2E
+        if: hashFiles('MiniProject/01_web_app/tests/identity_server.py') == ''
+        run: echo 'BLOCKED - actual checkout has no real identity browser harness. No pinned fallback.' >> "$GITHUB_STEP_SUMMARY"
+      - run: uv run --no-project python ../07_testing_deployment/scripts/source.py verify --record ../07_testing_deployment/runtime/checkout-source.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checkout-browser
+          path: |
+            MiniProject/07_testing_deployment/runtime/checkout-source.json
+            MiniProject/07_testing_deployment/runtime/browser-report/
+            MiniProject/07_testing_deployment/runtime/browser-results/
+            MiniProject/07_testing_deployment/runtime/browser-identity-report/
+            MiniProject/07_testing_deployment/runtime/browser-identity-results/
+            MiniProject/07_testing_deployment/runtime/browser-identity-*/*.json
+            MiniProject/07_testing_deployment/runtime/browser-identity-*/*.log
+            MiniProject/07_testing_deployment/runtime/ui-qa/
+            MiniProject/01_web_app/runtime/screenshots/
+            MiniProject/runtime/screenshots/
+          retention-days: 7
+  packaging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: MiniProject
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.9'
+          python-version: '3.11'
+      - run: uv run --no-project python 07_testing_deployment/scripts/source.py record --record 07_testing_deployment/runtime/checkout-source.json
+      - run: uv sync --locked --project 07_testing_deployment
+      - run: docker build -f 07_testing_deployment/Dockerfile.web -t youtube-knowledge-team07-web:auth-check .
+      - run: docker compose -f 07_testing_deployment/compose.yaml build api
+      - run: uv run --locked --project 07_testing_deployment python 07_testing_deployment/scripts/docker_auth.py --checkout
+      - run: uv run --no-project python 07_testing_deployment/scripts/source.py verify --record 07_testing_deployment/runtime/checkout-source.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checkout-containers
+          path: |
+            MiniProject/07_testing_deployment/runtime/checkout-source.json
+            MiniProject/07_testing_deployment/runtime/yk07-auth-*/*.json
+            MiniProject/07_testing_deployment/runtime/yk07-auth-*/*.log
+          retention-days: 7

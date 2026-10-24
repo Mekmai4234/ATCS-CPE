@@ -23,7 +23,10 @@ youtube-knowledge-agent = { path = "../06_research_learning_agent", editable = t
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-markers = ["regression: release-blocking checks of existing module 03/04 defects"]
+markers = [
+  "regression: release-blocking checks of existing module 03/04 defects",
+  "auth: strict multi-account acceptance requiring the real backend auth contract",
+]
 
 [tool.ruff]
 line-length = 100
