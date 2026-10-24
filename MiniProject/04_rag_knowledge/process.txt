@@ -65,3 +65,13 @@ separate work. See TEST_REPORT.md for actual local/Docker/live checks.
 TIMESTAMP ROUND-TRIP COMPARISON (24 October 2026)
 Chroma metadata serialization can round decimal timestamps by a floating-point ULP. Compare only start/end seconds with absolute tolerance 1e-9 and zero relative tolerance.
 Keep video IDs, source versions, generations, vector IDs and authorization exact; reject non-finite, boolean and meaningfully changed timestamps. No reindex or source mutation is needed for representation noise.
+
+MEDIA / FREE TIER PIPELINE (24 October 2026)
+02-published snapshot -> live owner/lease/revision guard -> separate 04 media-v3 manifest.
+Local evidence -> permission-fenced SQLite substring search with semantic_complete=false.
+Optional embeddings -> private prepared-text cache -> brokered countTokens -> measured single-item
+embedContent REST request -> staging vectors -> expected-ID verification -> atomic active pointer.
+429/503 stop external dispatch and retain successful checkpoints; 02 owns queues/backoff/consent.
+Transcript v1 stays separate; explicit v2 transcript snapshots unwrap only actual transcript versions.
+No prepared sample count implies whole-video coverage. Original frame URLs always reauthorize in 02.
+Use FREE_TIER_MEDIA.md and FREE_TIER_TEST_REPORT.md for exact contracts, dependencies and results.

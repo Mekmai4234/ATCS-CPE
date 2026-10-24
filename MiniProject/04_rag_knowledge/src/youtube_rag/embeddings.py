@@ -3,6 +3,7 @@ import hashlib
 import math
 import re
 from typing import Protocol
+from uuid import uuid4
 
 import httpx
 from google import genai
@@ -75,47 +76,136 @@ def prepare_inputs(texts, *, purpose, titles=None):
 
 
 class GeminiEmbedder:
+    requires_execution = True
+
     """Gemini Developer API only; exact countTokens preflight, independent Content per chunk."""
 
-    def __init__(self, settings: RagSettings, *, client=None):
+    def __init__(self, settings: RagSettings, *, client=None, http_client=None):
         if settings.embedding_provider != "gemini":
             raise ValueError("GeminiEmbedder requires the gemini configuration")
-        if client is None and not settings.gemini_api_key.get_secret_value():
-            raise error("embedding_unavailable", "GEMINI_API_KEY is required", status=503)
         self.settings = settings
+        self._api_key = settings.gemini_api_key.get_secret_value()
         # Pin the async transport so optional aiohttp dependencies cannot change retry/
         # cancellation behavior. The SDK does not own an explicitly supplied HTTPX client.
         self._http_client = (
             httpx.AsyncClient(timeout=settings.rag_operation_timeout_seconds)
-            if client is None
+            if client is None and self._api_key
             else None
         )
-        self.client = client or genai.Client(
-            api_key=settings.gemini_api_key.get_secret_value(),
-            vertexai=False,
-            http_options=types.HttpOptions(
-                timeout=int(settings.rag_operation_timeout_seconds * 1000),
-                retry_options=types.HttpRetryOptions(attempts=1),
-                httpx_async_client=self._http_client,
-            ),
+        self.client = client or (
+            genai.Client(
+                api_key=self._api_key,
+                vertexai=False,
+                http_options=types.HttpOptions(
+                    timeout=int(settings.rag_operation_timeout_seconds * 1000),
+                    retry_options=types.HttpRetryOptions(attempts=1),
+                    httpx_async_client=self._http_client,
+                ),
+            )
+            if self._http_client is not None
+            else None
         )
+        self._embedding_http = http_client or self._http_client
         self.count_requests = 0
         self.embed_requests = 0
         self.counted_input_tokens = 0
 
-    async def embed(self, texts, timeout, *, purpose="document", titles=None):
+    @property
+    def credential_sha256(self):
+        return hashlib.sha256(self._api_key.encode()).hexdigest()
+
+    async def embed(self, texts, timeout, *, purpose="document", titles=None, execution=None):
         prepared = prepare_inputs(texts, purpose=purpose, titles=titles)
-        contents = [types.Content(parts=[types.Part(text=text)]) for text in prepared]
+        call = getattr(execution, "gemini_call", None)
+        if not callable(call):
+            raise error(
+                "gemini_broker_required", "A trusted execution broker is required", status=503
+            )
+        if self.client is None:
+            raise error("embedding_unavailable", "GEMINI_API_KEY is required", status=503)
+        from youtube_backend.provider_errors import provider_error
+        from youtube_backend.quota import ProviderReply
+
+        async def request(endpoint, content, tokens):
+            async def dispatch():
+                try:
+                    if endpoint == "countTokens":
+                        self.count_requests += 1
+                        response = await self.client.aio.models.count_tokens(
+                            model=self.settings.embedding_model, contents=content
+                        )
+                        usage = response.total_tokens
+                    else:
+                        self.embed_requests += 1
+                        if self._embedding_http is None:
+                            raise error(
+                                "embedding_unavailable",
+                                "Embedding HTTP transport is missing",
+                                status=503,
+                            )
+                        # google-genai 2.31 expands even one Content into the
+                        # synchronous batch endpoint. Use the official single-item
+                        # REST endpoint so the actual HTTP endpoint equals the grant.
+                        raw = await self._embedding_http.post(
+                            "https://generativelanguage.googleapis.com/v1beta/models/"
+                            + self.settings.embedding_model
+                            + ":embedContent",
+                            headers={"x-goog-api-key": self._api_key},
+                            json={
+                                "model": "models/" + self.settings.embedding_model,
+                                "content": content.model_dump(mode="json", exclude_none=True),
+                                "outputDimensionality": self.settings.embedding_dimensions,
+                            },
+                        )
+                        if raw.status_code >= 400:
+                            raise provider_error(
+                                503
+                                if raw.status_code >= 500 and raw.status_code != 504
+                                else raw.status_code,
+                                retry_after=raw.headers.get("retry-after"),
+                            )
+                        try:
+                            response = types.EmbedContentResponse(
+                                embeddings=[
+                                    types.ContentEmbedding.model_validate(raw.json()["embedding"])
+                                ]
+                            )
+                        except (ValueError, KeyError, TypeError):
+                            raise provider_error(502) from None
+                        usage = tokens
+                    return ProviderReply(response, usage, getattr(response, "model_version", None))
+                except errors.APIError as exc:
+                    raise provider_error(
+                        503
+                        if isinstance(exc.code, int) and exc.code >= 500 and exc.code != 504
+                        else exc.code
+                    ) from None
+                except (httpx.TimeoutException, TimeoutError):
+                    raise provider_error(504) from None
+                except httpx.TransportError:
+                    raise provider_error(503) from None
+
+            # One content per HTTP request: never account an SDK batch as one
+            # embedContent reservation. No SDK retries or alternate provider.
+            reply = await call(
+                dispatch,
+                model=self.settings.embedding_model,
+                endpoint=endpoint,
+                input_tokens=tokens,
+                call_key=f"04-{endpoint}-{uuid4().hex}",
+                input_hash=hashlib.sha256(content.parts[0].text.encode()).hexdigest(),
+                role="embedding",
+                credential_sha256=hashlib.sha256(self._api_key.encode()).hexdigest(),
+            )
+            return reply.value
+
+        vectors = []
         try:
-            # One deadline covers all count requests AND the actual embedding request.
             async with asyncio.timeout(timeout):
-                for content in contents:
-                    self.count_requests += 1
-                    response = await self.client.aio.models.count_tokens(
-                        model=self.settings.embedding_model,
-                        contents=content,
-                    )
-                    count = response.total_tokens
+                for text in prepared:
+                    content = types.Content(parts=[types.Part(text=text)])
+                    counted = await request("countTokens", content, len(text.encode()) + 128)
+                    count = counted.total_tokens
                     if type(count) is not int or count <= 0:
                         raise error(
                             "invalid_token_count",
@@ -129,42 +219,26 @@ class GeminiEmbedder:
                             status=422,
                         )
                     self.counted_input_tokens += count
-                self.embed_requests += 1
-                response = await self.client.aio.models.embed_content(
-                    model=self.settings.embedding_model,
-                    contents=contents,
-                    config=types.EmbedContentConfig(
-                        output_dimensionality=self.settings.embedding_dimensions,
-                    ),
-                )
-            # The SDK's batch endpoint returns one embedding per request, in request order.
-            vectors = [item.values for item in response.embeddings or []]
+                    response = await request("embedContent", content, count)
+                    vectors.extend(
+                        validate_vectors(
+                            [item.values for item in response.embeddings or []],
+                            1,
+                            self.settings.embedding_dimensions,
+                        )
+                    )
             return validate_vectors(vectors, len(texts), self.settings.embedding_dimensions)
-        except (httpx.TimeoutException, TimeoutError):
+        except TimeoutError:
             raise error(
                 "embedding_timeout",
                 "Gemini request exceeded its deadline",
                 retryable=True,
                 status=504,
             ) from None
-        except httpx.TransportError:
-            raise error(
-                "embedding_unavailable",
-                "Gemini transport is temporarily unavailable",
-                retryable=True,
-                status=503,
-            ) from None
-        except errors.APIError as exc:
-            status = exc.code
-            transient = status in {408, 429} or (isinstance(status, int) and status >= 500)
-            raise error(
-                "embedding_provider_error",
-                "Gemini rejected the embedding request",
-                retryable=transient,
-                status=503 if transient else 502,
-            ) from None
 
     async def close(self):
+        if self.client is None:
+            return
         try:
             await self.client.aio.aclose()
             self.client.close()

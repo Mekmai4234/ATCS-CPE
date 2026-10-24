@@ -55,3 +55,14 @@ C) Coverage, Replacement and Deletion
 15. Validate the actual consumer lock with the full pinned backend manifest, run
     uv sync --locked, then test the same candidate on host and in a freshly built image.
     Use the native 02/03 full-factory source contract; no separate member wrapper is enabled.
+
+D) OCR / Visual Evidence (24 October 2026)
+16. Apply the backed-up 02 schema-0003 upgrade, then additive stopped rag-init with matching settings.
+17. Consume published 02 v2 OCR/visual snapshots in the same live enrichment execution.
+18. index_snapshot(..., semantic=False) stores local evidence; search_snapshots uses literal SQLite
+    search until a complete semantic index exists. Report sample/time and semantic limitations.
+19. With an operator-approved policy, semantic indexing routes every count/embedding HTTP call
+    through 02. Successful item checkpoints survive quota waits; do not re-extract the source.
+20. Fetch original frames only through 02 authorized asset routes. Retain grant checks on cache hits.
+21. Use stopped GC for retired/staging vectors and durable 02 deletion for final generation cleanup.
+    Full visual-chat factory/UI wiring and mixed v2 scopes remain explicit upstream dependencies.
