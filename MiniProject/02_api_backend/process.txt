@@ -90,3 +90,7 @@ filtered to sources/versions permitted by the new turn. Removed sources are mark
 unavailable in owner-visible saved results/history, never used for new retrieval.
 See FLOATING_CHAT_CONTRACT.md and FLOATING_CHAT_TEST_REPORT.md for exact examples,
 errors, lifecycle rules and the boundaries of browser/provider verification.
+
+TEST LEASE ISOLATION
+The general test fixture uses a 30-second lease to avoid incidental expiry under shared CI load.
+Expiry and heartbeat tests retain explicit clock/short-lease scenarios. Production defaults are unchanged.
