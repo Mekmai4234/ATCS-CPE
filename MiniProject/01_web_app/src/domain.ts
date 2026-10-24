@@ -78,6 +78,8 @@ export function buildScope(
   };
 }
 export function jobWarning(job: Job): string | null {
+  if (job.state === 'failed' && job.error_code === 'generation_output_truncated')
+    return 'คำตอบยาวเกินขีดจำกัดและถูกตัด กรุณาถามให้เจาะจงขึ้นหรือขอสรุปสั้น ๆ';
   if (job.state === 'failed') return `งานไม่สำเร็จ (${job.error_code || 'task_failed'})`;
   if (job.state === 'cancelled') return 'งานถูกยกเลิกแล้ว';
   if (job.stage === 'no_transcript') return 'ไม่พบบทถอดเสียงที่ใช้งานได้';

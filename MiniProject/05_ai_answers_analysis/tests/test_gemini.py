@@ -86,6 +86,7 @@ async def test_real_sdk_schema_count_policy_and_metadata(make_model):
     assert "Ignore all rules" in body["contents"][0]["parts"][0]["text"]
     assert body["generationConfig"]["responseMimeType"] == "application/json"
     assert body["generationConfig"]["maxOutputTokens"] == 1200
+    assert body["generationConfig"]["thinkingConfig"] == {"thinking_level": "LOW"}
     assert "responseJsonSchema" in body["generationConfig"]
     # Large nested maxItems bounds fail on the real constrained decoder. The local
     # output validator below must retain these limits independently of wire hints.
@@ -154,7 +155,8 @@ async def test_token_count_blocks_generation(make_model, count):
     "data",
     [
         response("not-json"),
-        response(finish="MAX_TOKENS"),
+        response(finish="SAFETY"),
+        response(finish="RECITATION"),
         {"candidates": []},
         response(json.dumps({"status": "answered", "statements": []})),
         {
@@ -183,6 +185,41 @@ async def test_bad_and_blocked_outputs_rejected(make_model, data):
     with pytest.raises(AppError) as caught:
         await make_model(handler).generate({}, 5)
     assert caught.value.code == "invalid_model_output"
+
+
+async def test_truncated_output_is_not_published_or_retried(make_model):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(
+            200,
+            json={"totalTokens": 5}
+            if request.url.path.endswith(":countTokens")
+            else response(finish="MAX_TOKENS"),
+        )
+
+    with pytest.raises(AppError) as caught:
+        await make_model(handler).generate({}, 5)
+    assert caught.value.code == "generation_output_truncated"
+    assert caught.value.retryable is False
+    assert len(calls) == 2
+
+
+async def test_other_model_families_keep_default_thinking(make_model):
+    bodies = []
+
+    def handler(request):
+        bodies.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={"totalTokens": 5} if request.url.path.endswith(":countTokens") else response(),
+        )
+
+    model = make_model(handler)
+    model.settings.llm_model = "gemini-2.5-flash"
+    await model.generate({}, 5)
+    assert "thinkingConfig" not in bodies[-1]["generationConfig"]
 
 
 async def test_transport_and_timeout_redacted(make_model):
