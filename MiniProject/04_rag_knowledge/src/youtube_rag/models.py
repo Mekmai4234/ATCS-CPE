@@ -30,6 +30,20 @@ class Chunk(Evidence):
         return Evidence.model_validate(self.model_dump(include=set(Evidence.model_fields)))
 
 
+def transcript_source(snapshot):
+    """Unwrap 02's explicit v2 transcript snapshot; never synthesize speech/version."""
+    from youtube_backend.evidence_v2 import SourceSnapshotV2
+
+    value = SourceSnapshotV2.model_validate(snapshot)
+    if value.kind != "transcript":
+        raise ValueError("A transcript snapshot is required")
+    return Source(
+        video_id=value.video_id,
+        generation=value.generation,
+        transcript_version=value.evidence_version,
+    )
+
+
 class SearchHit(Schema):
     chunk: Chunk
     ranking_score: float

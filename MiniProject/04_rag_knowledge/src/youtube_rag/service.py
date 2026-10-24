@@ -7,7 +7,7 @@ from youtube_backend.schemas import IndexReceipt, Source, TranscriptResult
 from . import cursors
 from .binding import StoreBinding
 from .chunking import Chunker
-from .embeddings import validate_vectors
+from .embeddings import prepare_inputs, validate_vectors
 from .errors import error
 from .models import ChunkPage, CoverageInventory, SearchHit, digest
 from .vectors import ChromaStore
@@ -39,11 +39,51 @@ class RagService:
         execution.check()
         return min(self.settings.rag_operation_timeout_seconds, execution.remaining_seconds)
 
-    async def _embed(self, texts, execution, *, purpose="document", titles=None):
+    async def _embed(self, texts, execution, *, purpose="document", titles=None, cache_guard=None):
         timeout = self.timeout(execution)
         try:
             async with asyncio.timeout(timeout):
-                vectors = await self.embedder.embed(texts, timeout, purpose=purpose, titles=titles)
+                if getattr(self.embedder, "requires_execution", False):
+                    from .embedding_cache import EmbeddingCache
+
+                    cache = EmbeddingCache(self.manifest.database, self.settings)
+                    prepared = prepare_inputs(texts, purpose=purpose, titles=titles)
+                    vectors = []
+
+                    def guarded_scope():
+                        scope = cache_guard() if cache_guard else None
+                        if scope:
+                            scope = {
+                                **scope,
+                                "model_policy": execution.embedding_policy(
+                                    self.settings.embedding_model,
+                                    self.embedder.credential_sha256,
+                                ),
+                            }
+                        return scope
+
+                    for i, text in enumerate(texts):
+                        scope = guarded_scope()
+                        vector = cache.get(scope, prepared[i], purpose) if scope else None
+                        if vector is None:
+                            vector = (
+                                await self.embedder.embed(
+                                    [text],
+                                    self.timeout(execution),
+                                    purpose=purpose,
+                                    titles=[titles[i]] if titles else None,
+                                    execution=execution,
+                                )
+                            )[0]
+                            if scope:
+                                if guarded_scope() != scope:
+                                    raise error("source_changed", "Embedding scope changed")
+                                cache.put(scope, prepared[i], purpose, vector)
+                        vectors.append(vector)
+                else:
+                    vectors = await self.embedder.embed(
+                        texts, timeout, purpose=purpose, titles=titles
+                    )
         except TimeoutError:
             raise error(
                 "embedding_timeout",
@@ -109,7 +149,10 @@ class RagService:
         for offset in range(0, len(records), batch_size):
             batch = records[offset : offset + batch_size]
             vectors = await self._embed(
-                [chunk.text for chunk in batch], execution, titles=[chunk.title for chunk in batch]
+                [chunk.text for chunk in batch],
+                execution,
+                titles=[chunk.title for chunk in batch],
+                cache_guard=lambda: execution.cache_scope([source]),
             )
             await self.vectors.call(
                 "upsert",
@@ -187,7 +230,14 @@ class RagService:
             raise error("invalid_limit", "min_score must be a finite cosine score", status=422)
         sources, rows, _ = self._snapshot(sources, execution)
         await self.binding.ensure(execution)
-        query = (await self._embed([question], execution, purpose="query"))[0]
+        query = (
+            await self._embed(
+                [question],
+                execution,
+                purpose="query",
+                cache_guard=lambda: execution.cache_scope(sources),
+            )
+        )[0]
         run_ids = [r["run_id"] for r in rows]
         total = sum(r["chunk_count"] for r in rows)
         response = await self.vectors.call(
@@ -330,6 +380,7 @@ class RagService:
     async def cleanup(self, execution, *, source=None, include_staging=False):
         execution.authorize_cleanup(source=source, include_staging=include_staging)
         await self.binding.ensure(execution)
+        await self.media.cleanup(execution, source=source, include_staging=include_staging)
         # include_staging is only for explicit maintenance with all workers stopped.
         for row in self.manifest.garbage(include_staging=include_staging):
             if source is not None and (
@@ -347,13 +398,24 @@ class RagService:
                     raise
                 # A published replacement is valid; defer obsolete vectors until readers finish.
 
+    @property
+    def media(self):
+        if not hasattr(self, "_media"):
+            from .media import MediaRag
+
+            self._media = MediaRag(self)
+        return self._media
+
     async def delete(self, video_id, generation, execution):
         execution.check()
         await self.binding.ensure(execution, create=not self.manifest.all_runs())
+        await self.media.delete(video_id, generation, execution)
         for row in self.manifest.begin_delete(video_id, generation, execution):
             await self._remove_run(row, execution)
 
     async def close(self):
+        if hasattr(self, "_media"):
+            await self._media.close()
         await self.vectors.close()
         if self.embedder is not None:
             await self.embedder.close()

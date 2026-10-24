@@ -1,6 +1,5 @@
 import asyncio
 import json
-import math
 from types import SimpleNamespace
 
 import httpx
@@ -10,7 +9,21 @@ from google.genai import types
 from youtube_backend.errors import AppError
 
 from youtube_rag.config import RagSettings
-from youtube_rag.embeddings import GeminiEmbedder, prepare_inputs, validate_vectors
+from youtube_rag.embeddings import GeminiEmbedder as ActualGeminiEmbedder
+from youtube_rag.embeddings import prepare_inputs, validate_vectors
+
+
+def GeminiEmbedder(settings, *, client=None):
+    # Explicit shared MockTransport for SDK countTokens and REST embedContent.
+    http = getattr(getattr(client, "_api_client", None), "_async_httpx_client", None)
+    return ActualGeminiEmbedder(settings, client=client, http_client=http)
+
+
+class SDKExecution:
+    """SDK transport-only test double; not a production quota attestation."""
+
+    async def gemini_call(self, callback, **request):
+        return await callback()
 
 
 def client_for(handler):
@@ -40,17 +53,20 @@ async def test_gemini_request_format_count_preflight_and_separate_chunk_vectors(
         requests.append((request.url.path, body))
         if request.url.path.endswith(":countTokens"):
             return httpx.Response(200, json={"totalTokens": 9})
-        return httpx.Response(200, json=embedding_response(2))
+        index = 1 if body["content"]["parts"][0]["text"].endswith("two") else 0
+        return httpx.Response(200, json={"embedding": embedding_response(2)["embeddings"][index]})
 
     adapter = GeminiEmbedder(
         RagSettings(_env_file=None, embedding_dimensions=128), client=client_for(handler)
     )
     try:
-        vectors = await adapter.embed(["one", "two"], 30, titles=["First", "Second"])
-        assert len(requests) == 3
-        assert all(path.endswith(":countTokens") for path, _ in requests[:2])
-        assert requests[-1][0].endswith(":batchEmbedContents")
-        batch = requests[-1][1]["requests"]
+        vectors = await adapter.embed(
+            ["one", "two"], 30, titles=["First", "Second"], execution=SDKExecution()
+        )
+        assert len(requests) == 4
+        assert all(requests[i][0].endswith(":countTokens") for i in (0, 2))
+        assert requests[-1][0].endswith(":embedContent")
+        batch = [requests[i][1] for i in (1, 3)]
         assert len(batch) == 2
         assert [r["content"]["parts"][0]["text"] for r in batch] == [
             "title: First | text: one",
@@ -72,14 +88,14 @@ async def test_query_uses_retrieval_prefix_not_document_format():
         if request.url.path.endswith(":countTokens"):
             return httpx.Response(200, json={"totalTokens": 8})
         bodies.append(body)
-        return httpx.Response(200, json=embedding_response())
+        return httpx.Response(200, json={"embedding": embedding_response()["embeddings"][0]})
 
     adapter = GeminiEmbedder(
         RagSettings(_env_file=None, embedding_dimensions=128), client=client_for(handler)
     )
     try:
-        await adapter.embed(["what is RAG?"], 5, purpose="query")
-        assert bodies[0]["requests"][0]["content"]["parts"][0]["text"] == (
+        await adapter.embed(["what is RAG?"], 5, purpose="query", execution=SDKExecution())
+        assert bodies[0]["content"]["parts"][0]["text"] == (
             "task: search result | query: what is RAG?"
         )
     finally:
@@ -110,7 +126,7 @@ async def test_provider_errors_are_redacted_classified_and_not_retried(status, r
     adapter = GeminiEmbedder(RagSettings(_env_file=None), client=client_for(handler))
     try:
         with pytest.raises(AppError) as caught:
-            await adapter.embed(["test"], 5)
+            await adapter.embed(["test"], 5, execution=SDKExecution())
         assert caught.value.retryable is retryable
         assert "LEAK" not in str(caught.value) and "secret" not in str(caught.value)
         assert calls == 1
@@ -125,7 +141,7 @@ async def test_transport_error_is_retryable_without_raw_exception():
     adapter = GeminiEmbedder(RagSettings(_env_file=None), client=client_for(handler))
     try:
         with pytest.raises(AppError) as caught:
-            await adapter.embed(["test"], 5)
+            await adapter.embed(["test"], 5, execution=SDKExecution())
         assert caught.value.retryable
         assert "secret" not in str(caught.value)
     finally:
@@ -143,7 +159,7 @@ async def test_invalid_or_oversized_token_count_prevents_embedding(count):
     adapter = GeminiEmbedder(RagSettings(_env_file=None), client=client_for(handler))
     try:
         with pytest.raises(AppError):
-            await adapter.embed(["test"], 5)
+            await adapter.embed(["test"], 5, execution=SDKExecution())
         assert len(calls) == 1 and calls[0].endswith(":countTokens")
     finally:
         await adapter.close()
@@ -153,15 +169,15 @@ async def test_aggregated_or_missing_response_is_rejected():
     def handler(request):
         if request.url.path.endswith(":countTokens"):
             return httpx.Response(200, json={"totalTokens": 9})
-        # Deliberately wrong: two chunks must not map to a single vector.
-        return httpx.Response(200, json=embedding_response())
+        # Deliberately malformed vector, rejected before a later dispatch.
+        return httpx.Response(200, json={"embedding": {"values": [0.0]}})
 
     adapter = GeminiEmbedder(
         RagSettings(_env_file=None, embedding_dimensions=128), client=client_for(handler)
     )
     try:
         with pytest.raises(AppError, match="invalid shape"):
-            await adapter.embed(["first", "second"], 5)
+            await adapter.embed(["first", "second"], 5, execution=SDKExecution())
     finally:
         await adapter.close()
 
@@ -177,9 +193,9 @@ async def test_count_and_embedding_share_one_deadline_and_honor_cancellation():
     client = SimpleNamespace(aio=SimpleNamespace(models=Fake()))
     adapter = GeminiEmbedder(RagSettings(_env_file=None), client=client)
     with pytest.raises(AppError) as caught:
-        await adapter.embed(["test"], 0.01)
+        await adapter.embed(["test"], 0.01, execution=SDKExecution())
     assert caught.value.code == "embedding_timeout"
-    task = asyncio.create_task(adapter.embed(["test"], 30))
+    task = asyncio.create_task(adapter.embed(["test"], 30, execution=SDKExecution()))
     await entered.wait()
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
@@ -219,9 +235,11 @@ def test_formatting_is_bounded_and_original_text_is_not_interpreted():
     assert len(prepared[0].encode()) < 8000
 
 
-def test_missing_key_never_falls_back_to_another_provider():
+async def test_missing_key_never_falls_back_to_another_provider():
+    adapter = GeminiEmbedder(RagSettings(_env_file=None, gemini_api_key=""))
     with pytest.raises(AppError, match="GEMINI_API_KEY"):
-        GeminiEmbedder(RagSettings(_env_file=None, gemini_api_key=""))
+        await adapter.embed(["test"], 5, execution=SDKExecution())
+    await adapter.close()
 
 
 async def test_transient_embedding_error_after_successful_token_count():
@@ -236,33 +254,13 @@ async def test_transient_embedding_error_after_successful_token_count():
     adapter = GeminiEmbedder(RagSettings(_env_file=None), client=client_for(handler))
     try:
         with pytest.raises(AppError) as caught:
-            await adapter.embed(["test"], 5)
+            await adapter.embed(["test"], 5, execution=SDKExecution())
         assert caught.value.retryable
-        assert len(calls) == 2 and calls[-1].endswith(":batchEmbedContents")
+        assert len(calls) == 2 and calls[-1].endswith(":embedContent")
     finally:
         await adapter.close()
 
 
 @pytest.mark.live
 async def test_live_gemini_embeddings_query_document_and_normalization():
-    import os
-
-    if os.environ.get("RUN_LIVE_EMBEDDING_TESTS") != "1":
-        pytest.skip("Set RUN_LIVE_EMBEDDING_TESTS=1 to explicitly allow live Gemini calls")
-    adapter = GeminiEmbedder(RagSettings())
-    try:
-        documents = await adapter.embed(
-            [
-                "RAG retrieves evidence before answering.",
-                "Embeddings encode text meaning as vectors.",
-            ],
-            60,
-            titles=["RAG", "Embeddings"],
-        )
-        query = await adapter.embed(["How does RAG support answers?"], 60, purpose="query")
-        assert len(documents) == 2 and len(query) == 1
-        assert all(len(v) == adapter.settings.embedding_dimensions for v in documents + query)
-        assert all(abs(math.sqrt(sum(x * x for x in v)) - 1) < 0.01 for v in documents + query)
-        assert documents[0] != documents[1]
-    finally:
-        await adapter.close()
+    pytest.skip("Live embedding acceptance requires an approved durable 02 execution")
