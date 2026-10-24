@@ -19,9 +19,12 @@ export function BuddyLogo({ onClick }: { onClick?: () => void }) {
           : undefined
       }
     >
-      <span aria-hidden="true">▶</span>
+      <span className="brand-buddy" aria-hidden="true">
+        <InteractiveBuddy headOnly active={false} decorative />
+      </span>
       <span>
-        RAG BUDDY<small>YOUTUBE KNOWLEDGE</small>
+        RAG <b>Buddy</b>
+        <small>YouTube Knowledge</small>
       </span>
     </a>
   );

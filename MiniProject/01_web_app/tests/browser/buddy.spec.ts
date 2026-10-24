@@ -7,7 +7,7 @@ const launcher = (page: Page) => page.locator('.buddy-launcher');
 async function login(page: Page) {
   await page.goto(`${base}/login?demo=1`);
   await page.getByRole('button', { name: 'ทดลองด้วยบัญชี A' }).click();
-  await expect(page.getByRole('heading', { name: /เปลี่ยนคลิป/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
 }
 async function open(page: Page) {
   await launcher(page).click();
