@@ -1,5 +1,9 @@
 # Module 04 — Maintenance/store-pair verification
 
+For the 2026-10-24 media/Free Tier extension and current backend dependency,
+see [FREE_TIER_MEDIA.md](FREE_TIER_MEDIA.md) and
+[FREE_TIER_TEST_REPORT.md](FREE_TIER_TEST_REPORT.md).
+
 Latest 2026-10-22 locked-candidate evidence:
 [LOCK_HANDOFF_TEST_REPORT.md](LOCK_HANDOFF_TEST_REPORT.md).
 

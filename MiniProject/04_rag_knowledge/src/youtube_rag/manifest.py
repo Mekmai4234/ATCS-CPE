@@ -72,6 +72,11 @@ def initialize(database):
     """Explicit, additive module-04 schema v1 setup; never alter backend migrations."""
     with database.write() as connection:
         metadata.create_all(connection)
+        from .embedding_cache import cache_metadata
+        from .media_manifest import media_metadata
+
+        cache_metadata.create_all(connection)
+        media_metadata.create_all(connection)
         version = connection.scalar(sa.select(schema.c.version).where(schema.c.id == 1))
         if version is not None and version != 1:
             raise error("index_schema_mismatch", "Unsupported module 04 schema version")
@@ -139,6 +144,41 @@ class BackendExecution:
                     "authorization_unavailable", "Trusted source authorizer is required", status=503
                 )
             authorize(sources)
+
+    async def gemini_call(self, callback, *, credential_sha256=None, **request):
+        if credential_sha256 is None:
+            raise error(
+                "gemini_broker_required", "A bound embedding credential is required", status=503
+            )
+        self.embedding_policy(request["model"], credential_sha256)
+        call = getattr(self.context, "gemini_call", None)
+        if not callable(call):
+            raise error(
+                "gemini_broker_required", "Install the execution-bound 02 broker", status=503
+            )
+        return await call(callback, **request)
+
+    def cache_scope(self, sources):
+        self.authorize(sources)
+        self.permission_scope(sources)
+        job = self.context.repository.check_execution(self.context.job_id, self.context.lease_token)
+        return {"owner": job.get("owner_id"), "sources": [s.model_dump() for s in sources]}
+
+    def embedding_policy(self, model, credential_sha256):
+        from youtube_backend.quota import QuotaBroker
+
+        broker = QuotaBroker(self.context.repository)
+        policy, _ = broker.access(model, "embedContent", "embedding")
+        broker.access(model, "countTokens", "embedding")
+        if credential_sha256 != policy.key_sha256:
+            raise error(
+                "free_tier_unverified",
+                "Embedding credential differs from the approved project",
+                status=503,
+            )
+        # An alias/returned-model review or policy renewal invalidates checkpoints.
+        # Public model names alone cannot establish identical embedding semantics.
+        return broker.fingerprint(policy)
 
     def _import_version(self, video_id):
         with self.context.repository.db.read() as connection:
@@ -216,6 +256,20 @@ class Manifest:
                 ) from None
         if version != 1:
             raise error("index_schema_mismatch", "Unsupported module 04 schema version")
+
+    def has_published_media(self):
+        from .media_manifest import media_runs
+
+        with self.database.read() as connection:
+            if not sa.inspect(connection).has_table(media_runs.name):
+                return False
+            return bool(
+                connection.scalar(
+                    sa.select(media_runs.c.run_id)
+                    .where(media_runs.c.state.in_(["published", "retired"]))
+                    .limit(1)
+                )
+            )
 
     def binding(self):
         with self.database.read() as connection:

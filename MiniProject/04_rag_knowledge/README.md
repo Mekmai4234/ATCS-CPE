@@ -1,5 +1,12 @@
 # Module 04 — Gemini RAG Knowledge
 
+Latest (2026-10-24): [media/Free Tier contract](FREE_TIER_MEDIA.md) and
+[current verification report](FREE_TIER_TEST_REPORT.md). OCR and visual text use
+separate versioned indexes, local SQLite fallback and execution-brokered embeddings.
+**This release requires 02 PR #27's media/quota contract before deployment.**
+Its current v2 scope is one enrichment execution, not general visual chat. The
+older authorization/lock reports below describe historical checks.
+
 Timestamp-preserving chunks, Gemini embeddings, persistent local Chroma, authorized
 retrieval, complete chunk enumeration, replacement and deletion. Gemini is the only
 live AI provider in 04; a deterministic fixture adapter supports offline tests.
