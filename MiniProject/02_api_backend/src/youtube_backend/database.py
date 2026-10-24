@@ -5,8 +5,10 @@ import sqlalchemy as sa
 from sqlalchemy import event
 from sqlalchemy.engine import make_url
 
+from .extension_schema import create_tables
+
 metadata = sa.MetaData()
-SCHEMA_REVISION = "0002"
+SCHEMA_REVISION = "0003"
 
 users = sa.Table(
     "users",
@@ -201,6 +203,9 @@ fixture_chunks = sa.Table(
     sa.Column("chunk_id", sa.String(200), primary_key=True),
     sa.Column("data", sa.JSON, nullable=False),
 )
+
+
+v2 = create_tables(metadata)
 
 
 class Database:

@@ -113,6 +113,10 @@ class FullSettings(Settings):
 
 
 def command_arguments(args):
+    if args.command == "quota-policy":
+        return [sys.executable, "-m", "youtube_backend.quota", "--workers-stopped"] + (
+            ["--review-model-changes"] if args.review_model_changes else []
+        )
     if args.command == "rag-init":
         # Additive 04 setup on an already verified pair, using this launcher's
         # resolved environment rather than independently selected module dotenvs.
@@ -142,6 +146,9 @@ def main():
         commands.add_parser(name)
     rag_init = commands.add_parser("rag-init")
     rag_init.add_argument("--workers-stopped", action="store_true", required=True)
+    quota_policy = commands.add_parser("quota-policy")
+    quota_policy.add_argument("--workers-stopped", action="store_true", required=True)
+    quota_policy.add_argument("--review-model-changes", action="store_true")
     migration = commands.add_parser("migrate")
     migration.add_argument("--workers-stopped", action="store_true", required=True)
     migration.add_argument("--backup-dir", type=Path, required=True)

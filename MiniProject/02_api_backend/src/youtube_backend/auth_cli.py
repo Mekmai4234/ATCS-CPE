@@ -107,12 +107,19 @@ def claim_legacy(database, *, admin_sub, owner_sub):
 
 
 def paired_backup(settings, destination):
+    import hashlib
+
+    from .media import asset_root
+
     source = Path(make_url(settings.database_url).database).resolve()
+    media = asset_root(settings)
     chroma = Path(settings.chroma_persist_dir)
     chroma = (chroma if chroma.is_absolute() else PROJECT_ROOT / chroma).resolve()
     destination = destination.resolve()
     if destination == chroma or chroma in destination.parents:
         raise ValueError("Backup must be outside the Chroma directory")
+    if destination == media or media in destination.parents:
+        raise ValueError("Backup must be outside the media directory")
     if not source.is_file():
         raise ValueError("Existing database is required for legacy migration")
     with sqlite3.connect(source) as connection:
@@ -120,6 +127,21 @@ def paired_backup(settings, destination):
             row[0]
             for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
+        media_present = False
+        if "media_assets" in names:
+            for relative, content_hash, size in connection.execute(
+                "SELECT path, sha256, size FROM media_assets"
+            ):
+                path = (media / relative).resolve()
+                if (
+                    not path.is_relative_to(media)
+                    or not path.is_file()
+                    or path.stat().st_size != size
+                ):
+                    raise ValueError("Referenced media asset is missing or invalid")
+                if hashlib.sha256(path.read_bytes()).hexdigest() != content_hash:
+                    raise ValueError("Referenced media asset hash does not match")
+                media_present = True
         if (
             "videos" in names
             and connection.execute(
@@ -154,12 +176,16 @@ def paired_backup(settings, destination):
             connection.backup(target)
     if chroma.exists():
         shutil.copytree(chroma, destination / "chroma")
+    if media_present:
+        shutil.copytree(media, destination / "media-assets")
     (destination / "backup.json").write_text(
         json.dumps(
             {
                 "database_source": str(source),
                 "chroma_source": str(chroma),
                 "chroma_present": chroma.exists(),
+                "media_source": str(media),
+                "media_present": media_present,
                 "created_at": time.time(),
             },
             indent=2,
