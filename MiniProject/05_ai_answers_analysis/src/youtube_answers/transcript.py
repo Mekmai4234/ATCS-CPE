@@ -1,6 +1,42 @@
-"""Explicit transcript requests use stored captions, never generated replacement text."""
+"""Transcript/performer intents and possible explicit caption attribution cues."""
 
 import re
+
+
+def wants_performer_attribution(question):
+    text = question.casefold()
+    return bool(
+        re.search(r"(?:ร้อง|แรป).*(?:ท่อนไหน|ช่วงไหน|ตอนไหน)|ใคร.*(?:ร้อง|แรป)", text)
+        or re.search(r"\bwho\b.*\b(?:sings?|sang|raps?|rapped)\b", text)
+        or re.search(r"\b(?:which|what)\b.*\b(?:verse|part|section)\b.*\b(?:sing|sang|rap)", text)
+        or re.search(r"\b(?:sings?|sang|raps?|rapped)\b.*\b(?:which|what)\b", text)
+    )
+
+
+def has_performer_cues(text):
+    """Recognize possible explicit attributions, never infer identities from voices."""
+    return bool(
+        re.search(r"(?:^|\n)\s*[^\n:：\[\]]{1,80}[:：]\s*\S", text)
+        or re.search(r"(?:^|\n)\s*\[[^\]\n]{1,80}[:：][^\]\n]+\]", text)
+        or re.search(r"ร้องโดย|แรปโดย|ผู้ร้อง|vocals? by|performed by", text, re.I)
+        or any(
+            name.casefold()
+            not in {
+                "music",
+                "instrumental",
+                "applause",
+                "laughter",
+                "fixture",
+                "chorus",
+                "verse",
+                "intro",
+                "outro",
+                "ดนตรี",
+                "เสียงดนตรี",
+            }
+            for name in re.findall(r"(?:^|\n)\s*\[([^\]\n]{1,80})\]\s*\S", text)
+        )
+    )
 
 
 def wants_transcript(question):

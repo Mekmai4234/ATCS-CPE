@@ -16,7 +16,7 @@ from youtube_backend.urls import canonical_url
 from .authorization import MemberContext, guard_context
 from .models import GeneratedAnswer, error
 from .prompts import input_size, json_text, payload
-from .transcript import wants_transcript
+from .transcript import has_performer_cues, wants_performer_attribution, wants_transcript
 
 
 @dataclass
@@ -134,9 +134,11 @@ class AnswerService:
         if isinstance(run.context, MemberContext):
             run.context.conversation(request.get("conversation_id"))
             history = run.context.history(history)
-        history = self._history(history, run)
+        if wants_performer_attribution(request["question"]):
+            return await self._performer_attribution(run, request)
         if wants_transcript(request["question"]):
             return await self._transcript(run)
+        history = self._history(history, run)
         # Carry recent user context into retrieval without asking a model to change scope.
         query = request["question"]
         for item in reversed(history):
@@ -278,6 +280,45 @@ class AnswerService:
         )
         return result
 
+    async def _performer_attribution(self, run, request):
+        chunks, expected = await self._read_all(run)
+        nodes = [self._record(run, chunk.evidence()) for chunk in chunks]
+        statements = []
+        # Inspect the entire selected caption inventory, not just top-k hits.
+        # Only caption passages with possible explicit speaker/performer cues go
+        # to the model. Titles/history cannot supply a missing attribution.
+        candidates = [node for node in nodes if has_performer_cues(node["text"])]
+        for group in self._groups("performer_attribution", request, candidates):
+            output = await self._generate(run, payload("performer_attribution", request, group))
+            statements.extend(output.statements)
+            if len(statements) > 100:
+                raise error(
+                    "analysis_budget_exceeded", "Attribution output exceeds statement limit"
+                )
+        run.processed.update(run.records)
+        run.notes.append(
+            "ตรวจจากบทถอดเสียงและเวลาของทุกส่วนที่นำเข้าได้ "
+            "ไม่ได้ระบุตัวบุคคลจากเสียงหรือภาพ และชื่อศิลปินอย่างเดียวไม่ยืนยันว่าใครร้องท่อนไหน"
+        )
+        output = GeneratedAnswer(
+            status="answered" if statements else "insufficient_evidence",
+            statements=statements,
+            message=""
+            if statements
+            else (
+                "ยังระบุท่อนของผู้ร้องที่ถามไม่ได้จากข้อมูลที่นำเข้า "
+                "ระบบตรวจบทถอดเสียงพร้อมเวลาแล้ว แต่ยังไม่มีหลักฐานระบุชื่อผู้ร้องกับช่วงนั้นอย่างชัดเจน "
+                "ต้องมีคำบรรยายที่ติดชื่อผู้ร้อง หรือข้อมูลจากเจ้าของคลิปที่ระบุว่าใครร้องช่วงเวลาใด"
+            ),
+        )
+        return await self._finish(
+            run,
+            output,
+            expected,
+            full=True,
+            checked_ids=list(run.records) if not statements else None,
+        )
+
     async def analyze(self, request, sources, context):
         run = self._run(sources, context, {"analysis", "research"})
         request = self._request(AnalysisRequest, request, run)
@@ -355,7 +396,7 @@ class AnswerService:
             nodes.append(node)
         return nodes
 
-    async def _finish(self, run, output, expected, *, full):
+    async def _finish(self, run, output, expected, *, full, checked_ids=None):
         # Recheck ALL processed original records, including those not retained as final citations.
         ids = sorted(run.processed)
         for offset in range(0, len(ids), 1000):
@@ -367,6 +408,8 @@ class AnswerService:
             if any(by_id.get(cid) != run.records[cid] for cid in batch):
                 raise error("source_changed", "Evidence changed before answer finalization")
         cited_ids = list(dict.fromkeys(c for s in output.statements for c in s.citation_ids))
+        if checked_ids is not None:
+            cited_ids = list(dict.fromkeys(checked_ids))
         if len(cited_ids) > 1000:
             raise error("analysis_budget_exceeded", "Final citations exceed backend limit")
         labels = {cid: str(i + 1) for i, cid in enumerate(cited_ids)}

@@ -39,12 +39,22 @@ export function Citations({
     </div>
   );
 }
-export function CoverageNotice({ coverage }: { coverage?: Coverage }) {
+export function CoverageNotice({
+  coverage,
+  insufficient = false,
+}: {
+  coverage?: Coverage;
+  insufficient?: boolean;
+}) {
   if (!coverage) return null;
   return (
     <div className={`coverage ${coverage.complete ? '' : 'warning'}`}>
       <strong>
-        {coverage.complete ? 'ตรวจสอบแหล่งข้อมูลแล้ว' : 'ข้อมูลยังไม่ครอบคลุมทั้งหมด'}
+        {coverage.complete
+          ? insufficient
+            ? 'ตรวจข้อมูลครบแล้ว แต่ยังยืนยันคำตอบไม่ได้'
+            : 'ตรวจสอบแหล่งข้อมูลแล้ว'
+          : 'ข้อมูลยังไม่ครอบคลุมทั้งหมด'}
       </strong>
       <span>
         คลิป {coverage.processed_videos}/{coverage.expected_videos}
@@ -130,11 +140,16 @@ export function ResultView({ result, partial = false }: { result: TaskResult; pa
       </p>
       {!!result.citations?.length && (
         <>
-          <h4>หลักฐานจากคลิป</h4>
+          <h4>
+            {result.status === 'insufficient_evidence' ? 'แหล่งข้อมูลที่ตรวจสอบ' : 'หลักฐานจากคลิป'}
+          </h4>
           <Citations citations={result.citations} available={result.sources_available !== false} />
         </>
       )}
-      <CoverageNotice coverage={result.coverage} />
+      <CoverageNotice
+        coverage={result.coverage}
+        insufficient={result.status === 'insufficient_evidence'}
+      />
       {result.artifacts?.map((artifact, i) => (
         <ArtifactView artifact={artifact} key={artifact.artifact_id || i} />
       ))}
