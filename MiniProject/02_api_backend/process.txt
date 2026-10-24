@@ -78,6 +78,21 @@ Explicit init and startup/maintenance checks do not rebind or migrate legacy dat
 The full Docker image is separate from the 04/06-only integration image.
 See full/README.md and FULL_TEST_REPORT.md for deployment and verification limits.
 
+Free-only provider admission and media v2
+----------------------------------------
+Revision 0003 adds media and quota tables without rewriting transcript/history v1.
+Publication and GC share durable owner/lease/generation/deadline writer fences.
+Images, OCR/visual revisions and private analysis cache never confer permission by ID.
+Local adapters may operate without a Gemini policy; every external request in a
+broker-aware adapter requires an operator-attested model/endpoint and atomic project
+reservation. Independent workers serialize RPM/input-TPM/local-24h-RPD and concurrency
+decisions in the same SQLite database, with per-member caps and interactive priority.
+Sent failures retain estimated charges; observed usage reconciles them. 429 and 503
+remain distinct, provider retry hints are filtered, and long enrichment waits pause
+durably without a lease. Member consent to retry creates one new bounded job.
+Never enable billing, rotate keys to bypass limits, invent transcript versions or
+claim account Free Tier verification from local counters. See FREE_TIER_MEDIA.md.
+
 Floating chat HTTP/session contract
 -----------------------------------
 The floating and full-page interfaces reuse chat, job polling and paginated history.

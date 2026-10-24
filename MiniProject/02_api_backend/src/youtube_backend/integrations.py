@@ -28,6 +28,11 @@ class ExecutionContext:
     deadline_at: float
     settings: Settings
 
+    async def gemini_call(self, callback, **request):
+        from .quota import QuotaBroker
+
+        return await QuotaBroker(self.repository).call(self, callback, **request)
+
     @property
     def user_id(self):
         """Trusted durable owner, never a client-supplied request/payload field."""

@@ -135,7 +135,9 @@ For a lightweight backend, `yk-auth bootstrap-admin` uses its configured Setting
 
 Stop API **and** workers, including other hosts sharing the store. The operator's
 `--workers-stopped` assertion is required; it is not an inter-process stop mechanism.
-On a fresh pair, `yk-full init` creates revision **0002** directly. For existing 0001:
+On a fresh pair, `yk-full init` creates revision **0003**, including identity revision
+0002. For existing 0001 or 0002, use the backed-up operator workflow below. See
+[FREE_TIER_MEDIA.md](FREE_TIER_MEDIA.md) for media/quota upgrade and restore details:
 
 ```powershell
 uv run --project 02_api_backend/full --locked yk-full migrate --workers-stopped --backup-dir C:/backups/yk-before-auth
@@ -144,7 +146,7 @@ uv run --project 02_api_backend/full --locked yk-full migrate --workers-stopped 
 The full launcher exports the same selected settings to operator commands, so they
 cannot silently read a different root/module dotenv. `yk-auth migrate` is the direct
 lightweight equivalent. Ordinary `yk-db upgrade head` and initializer functions refuse
-an unbacked upgrade from 0001.
+an unbacked upgrade from 0001 or 0002.
 
 Migration first writes a consistent SQLite backup and copies the stopped Chroma tree
 to a **new** backup directory outside Chroma, with source paths in backup.json.

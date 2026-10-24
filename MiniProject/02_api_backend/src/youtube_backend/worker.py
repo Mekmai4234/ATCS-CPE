@@ -38,6 +38,14 @@ class Worker:
         if kind == "attach":
             self.repo.finish(job_id, token, {"video_id": job["video_id"]})
             return
+        if kind == "enrich":
+            from .media import MediaStore
+
+            self.repo.stage(job_id, token, "enriching")
+            result = await self.adapters.enrich(job["video_id"], context)
+            published = MediaStore(self.repo).publish(context, result)
+            self.repo.finish(job_id, token, published)
+            return
         if kind == "import":
             self.repo.stage(job_id, token, "fetching_transcript")
             transcript = TranscriptResult.model_validate(
@@ -65,6 +73,9 @@ class Worker:
             self.repo.stage(job_id, token, "deleting")
             await self.adapters.delete(job["video_id"], job["generation"], context)
             context.check()
+            from .media import MediaStore
+
+            MediaStore(self.repo).gc(context)
             self.repo.finish(job_id, token, {"video_id": job["video_id"], "deleted": True})
             return
         payload = job["payload"]
