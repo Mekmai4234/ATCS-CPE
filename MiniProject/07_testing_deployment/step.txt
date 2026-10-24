@@ -28,3 +28,8 @@ Module 07: Workflow
     source. Historical pinned integration is manual-only and cannot replace this gate.
 
 No PR, commit, public deployment or live provider call is implicit in offline verification.
+
+INTEGRATED DEVELOP
+Use INTEGRATED_SYSTEM.md for the current combined frontend/backend workflow.
+The strict floating config runs delivered module-01 controls on the session-test harness.
+ui_qa.mjs --require-floating checks surface readiness only; production acceptance remains separate.
