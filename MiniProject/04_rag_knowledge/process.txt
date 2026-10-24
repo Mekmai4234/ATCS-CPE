@@ -61,3 +61,7 @@ Fixture tests do not establish semantic quality; live results use a small synthe
 Transcript/title text is untrusted evidence and cannot authorize tools or change instructions.
 Live ingestion, generation, research, multi-user ownership and production deployment remain
 separate work. See TEST_REPORT.md for actual local/Docker/live checks.
+
+TIMESTAMP ROUND-TRIP COMPARISON (24 October 2026)
+Chroma metadata serialization can round decimal timestamps by a floating-point ULP. Compare only start/end seconds with absolute tolerance 1e-9 and zero relative tolerance.
+Keep video IDs, source versions, generations, vector IDs and authorization exact; reject non-finite, boolean and meaningfully changed timestamps. No reindex or source mutation is needed for representation noise.
