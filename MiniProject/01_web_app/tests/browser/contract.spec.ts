@@ -295,7 +295,9 @@ test('retryable import follows replacement job and refreshes readiness', async (
       .getByText('พร้อมใช้งาน', { exact: true }),
   ).toBeVisible();
 });
-test('chat error with durable job ID resumes by GET without resubmitting', async ({ page }) => {
+test('chat error with a completed durable job resolves by GET without resubmitting', async ({
+  page,
+}) => {
   let submissions = 0;
   let reads = 0;
   await setup(page, (route) => {
@@ -325,8 +327,46 @@ test('chat error with durable job ID resumes by GET without resubmitting', async
     });
   });
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
-  await page.getByRole('button', { name: 'ติดตามผลอีกครั้ง', exact: true }).click();
   await expect(page.getByText('คำตอบจาก API', { exact: true })).toBeVisible();
   expect(submissions).toBe(1);
   expect(reads).toBe(1);
+});
+
+test('a failed durable chat job unlocks the form and allows a new question', async ({ page }) => {
+  let submissions = 0;
+  await setup(page, (route) => {
+    submissions++;
+    return submissions === 1
+      ? fulfill(
+          route,
+          {
+            error: {
+              code: 'incomplete_index',
+              message: 'Chat failed',
+              retryable: false,
+              job_id: 'failed-chat',
+            },
+          },
+          502,
+        )
+      : fulfill(route, final);
+  });
+  await page.route('**/api/jobs/failed-chat', (route) =>
+    fulfill(route, {
+      job_id: 'failed-chat',
+      kind: 'chat',
+      state: 'failed',
+      stage: 'failed',
+      error_code: 'incomplete_index',
+      retryable: false,
+    }),
+  );
+  await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'incomplete_index' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'ส่งคำถาม', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'เริ่มบทสนทนาใหม่', exact: true })).toBeEnabled();
+  await page.getByLabel('คำถามของคุณ').fill('คำถามใหม่');
+  await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
+  await expect(page.getByText('คำตอบจาก API', { exact: true })).toBeVisible();
+  expect(submissions).toBe(2);
 });

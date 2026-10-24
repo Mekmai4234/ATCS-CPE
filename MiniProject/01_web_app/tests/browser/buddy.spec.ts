@@ -56,10 +56,11 @@ test('drag is clamped, does not click, persists only coordinates and survives re
     })
     .toBe(true);
 });
-test('pointercancel restores the origin and presets/reset/hide work with keyboard', async ({
+test('Buddy is always present and pointercancel, presets and reset work with keyboard', async ({
   page,
 }) => {
   await login(page);
+  await expect(page.getByRole('button', { name: 'เปิดแชต Buddy', exact: true })).toHaveCount(0);
   const origin = (await launcher(page).boundingBox())!;
   await page.mouse.move(origin.x + 30, origin.y + 30);
   await page.mouse.down();
@@ -76,9 +77,10 @@ test('pointercancel restores the origin and presets/reset/hide work with keyboar
   await launcher(page).focus();
   await page.keyboard.press('Enter');
   await expect(dialog(page)).toBeVisible();
-  await dialog(page).getByRole('button', { name: 'ซ่อนแชตและปุ่ม Buddy' }).click();
-  await expect(launcher(page)).toHaveCount(0);
-  await page.getByRole('button', { name: 'เปิดแชต Buddy', exact: true }).click();
+  await dialog(page).getByRole('button', { name: 'ปิดหน้าต่างแชต' }).click();
+  await expect(launcher(page)).toBeVisible();
+  await expect(dialog(page)).toHaveCount(0);
+  await launcher(page).click();
   await expect(dialog(page)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(launcher(page)).toBeFocused();
@@ -310,9 +312,7 @@ test('mobile dialog traps focus, desktop does not make the workspace inert, and 
   );
   await dialog(page).getByRole('button', { name: 'ย่อหน้าต่างแชต' }).focus();
   await page.keyboard.press('Shift+Tab');
-  await expect(
-    dialog(page).getByRole('button', { name: 'ซ่อนแชตและปุ่ม Buddy' }),
-  ).not.toBeFocused();
+  await expect(dialog(page).getByRole('button', { name: 'ปิดหน้าต่างแชต' })).not.toBeFocused();
   await page.keyboard.press('Escape');
   await expect(launcher(page)).toBeFocused();
   await page.setViewportSize({ width: 1440, height: 1000 });

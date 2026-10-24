@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { FormEvent, RefObject } from 'react';
+import type { FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import InteractiveBuddy from './InteractiveBuddy';
 import type { BuddyState } from './InteractiveBuddy';
@@ -18,10 +18,7 @@ export interface BuddyTurn {
 }
 interface Props {
   open: boolean;
-  hidden: boolean;
   onOpen: (value: boolean) => void;
-  onHide: (value: boolean) => void;
-  restoreRef: RefObject<HTMLButtonElement | null>;
   videos: Video[];
   selected: string[];
   select: (id: string) => void;
@@ -59,7 +56,7 @@ function storage() {
   }
 }
 export default function FloatingBuddy(props: Props) {
-  const { open, hidden, onOpen, onHide } = props;
+  const { open, onOpen } = props;
   const [view, setView] = useState(viewport);
   const [point, setPoint] = useState(() => readPosition(storage(), viewport()));
   const current = useRef(point);
@@ -104,7 +101,6 @@ export default function FloatingBuddy(props: Props) {
     requestAnimationFrame(() => launcher.current?.focus());
   }
   useEffect(() => {
-    if (hidden) return;
     const resize = () => {
       const next = viewport();
       setView(next);
@@ -134,9 +130,9 @@ export default function FloatingBuddy(props: Props) {
       window.visualViewport?.removeEventListener('scroll', resize);
       document.removeEventListener('focusin', avoidFocus);
     };
-  }, [hidden]);
+  }, []);
   useEffect(() => {
-    if (!open || hidden) return;
+    if (!open) return;
     panel.current?.querySelector<HTMLButtonElement>('button')?.focus();
     if (!mobile) return;
     const roots = [...document.querySelectorAll<HTMLElement>('.app-shell')];
@@ -147,7 +143,7 @@ export default function FloatingBuddy(props: Props) {
       roots.forEach((node) => {
         node.inert = false;
       });
-  }, [open, hidden, mobile]);
+  }, [open, mobile]);
   useLayoutEffect(() => {
     if (!open || !scroller.current) return;
     const incoming = props.turns.length > observedCount.current;
@@ -158,7 +154,6 @@ export default function FloatingBuddy(props: Props) {
       if (incoming) setNewMessage(true);
     }
   }, [props.turns.length, props.status, open]);
-  if (hidden) return null;
   const width = Math.min(400, view.width - 24);
   const height = Math.min(650, view.height - (mobile ? 24 : 112));
   const x = mobile
@@ -294,15 +289,6 @@ export default function FloatingBuddy(props: Props) {
           >
             คืนตำแหน่ง
           </button>
-          <button
-            onClick={() => {
-              onOpen(false);
-              onHide(true);
-              props.restoreRef.current?.focus();
-            }}
-          >
-            ซ่อนปุ่มแชต
-          </button>
         </div>
       )}
       {open && (
@@ -349,14 +335,7 @@ export default function FloatingBuddy(props: Props) {
               <button aria-label="ย่อหน้าต่างแชต" onClick={close}>
                 −
               </button>
-              <button
-                aria-label="ซ่อนแชตและปุ่ม Buddy"
-                onClick={() => {
-                  onOpen(false);
-                  onHide(true);
-                  requestAnimationFrame(() => props.restoreRef.current?.focus());
-                }}
-              >
+              <button aria-label="ปิดหน้าต่างแชต" onClick={close}>
                 ×
               </button>
             </header>
