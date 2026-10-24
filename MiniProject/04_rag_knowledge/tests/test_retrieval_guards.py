@@ -1,5 +1,6 @@
 import base64
 import json
+import math
 from types import SimpleNamespace
 
 import pytest
@@ -29,6 +30,7 @@ def test_missing_or_disabled_production_authorization_fails_closed(settings):
         "generation",
         "transcript_version",
         "start_seconds",
+        "end_seconds",
         "vector_id",
         "distance",
     ],
@@ -53,6 +55,31 @@ async def test_forged_vector_candidate_never_returns_evidence(env, monkeypatch, 
     with pytest.raises(AppError) as caught:
         await env.rag.search("Embeddings", task.sources, task.execution)
     assert caught.value.code == "incomplete_index"
+
+
+@pytest.mark.parametrize("field", ["start_seconds", "end_seconds"])
+@pytest.mark.parametrize("changed", [False, True])
+async def test_vector_timestamp_roundtrip_noise_is_not_a_changed_interval(
+    env, monkeypatch, field, changed
+):
+    await env.ready()
+    task = env.query(VIDEO_A)
+    original = env.rag.vectors.call
+
+    async def rounded(command, *args, **kwargs):
+        response = await original(command, *args, **kwargs)
+        if command == "query":
+            meta = response["metadatas"][0][0]
+            meta[field] = meta[field] + 0.0001 if changed else math.nextafter(meta[field], math.inf)
+        return response
+
+    monkeypatch.setattr(env.rag.vectors, "call", rounded)
+    if changed:
+        with pytest.raises(AppError) as caught:
+            await env.rag.search("Embeddings", task.sources, task.execution)
+        assert caught.value.code == "incomplete_index"
+    else:
+        assert await env.rag.search("Embeddings", task.sources, task.execution)
 
 
 @pytest.mark.parametrize("kind", ["unsigned", "offset", "signature"])

@@ -13,6 +13,17 @@ from .models import ChunkPage, CoverageInventory, SearchHit, digest
 from .vectors import ChromaStore
 
 
+def same_timestamp(value, expected):
+    # Chroma's JSON round trip can turn 60.800000000000004 into 60.8. Permit
+    # sub-nanosecond representation noise only; identifiers and scope stay exact.
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and math.isclose(value, expected, rel_tol=0, abs_tol=1e-9)
+    )
+
+
 class RagService:
     def __init__(self, settings, manifest, embedder, vectors=None):
         if embedder is not None and embedder.settings.fingerprint != settings.fingerprint:
@@ -226,9 +237,11 @@ class RagService:
                         "video_id",
                         "generation",
                         "transcript_version",
-                        "start_seconds",
-                        "end_seconds",
                     )
+                )
+                or any(
+                    not same_timestamp(meta.get(field), getattr(chunk, field))
+                    for field in ("start_seconds", "end_seconds")
                 )
                 or not isinstance(distance, (int, float))
                 or not math.isfinite(distance)
