@@ -963,3 +963,95 @@ body .help-link {
     min-height: 55px;
   }
 }
+.evidence-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 7px 0;
+  font-size: 11px;
+}
+.evidence-kind {
+  border: 1px solid #b8dacd;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #155541;
+  background: #edf9f1;
+}
+.evidence-kind.ocr {
+  color: #514512;
+  background: #fff8dc;
+  border-color: #dfd39a;
+}
+.evidence-kind.visual {
+  color: #274b79;
+  background: #edf4ff;
+  border-color: #c6d7ee;
+}
+.evidence-limitation {
+  width: 100%;
+  margin: 4px 0;
+  color: #526657;
+  font-size: 11px;
+}
+.frame-evidence {
+  flex-basis: 100%;
+  min-width: 0;
+  background: #f7fcf9;
+  border: 1px solid #d1e7dc;
+  border-radius: 12px;
+  padding: 12px;
+}
+.frame-evidence img {
+  max-width: 100%;
+  max-height: 260px;
+  display: block;
+  object-fit: contain;
+  border-radius: 8px;
+  margin: 0 auto 12px;
+}
+.evidence-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #294b3f;
+  font-size: 12px;
+}
+.frame-evidence strong {
+  font-size: 12px;
+}
+.visual-coverage {
+  border: 1px solid #d5e1b5;
+  background: #fbffec;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 12px;
+  color: #455124;
+}
+.visual-coverage p {
+  margin: 6px 0;
+}
+.deferred-jobs {
+  background: #fffbe9;
+  border: 1px solid #e5d4a1;
+  border-radius: 14px;
+  padding: 14px;
+  margin: 12px 0;
+  font-size: 12px;
+  color: #514816;
+}
+.deferred-jobs article {
+  padding: 10px 0;
+}
+.deferred-jobs button {
+  border: 1px solid #b7b27f;
+  background: white;
+  color: #4c4a21;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: 4px;
+}
+.citation:has(.frame-evidence) {
+  flex-wrap: wrap;
+}
+.buddy-panel .frame-evidence {
+  padding: 8px;
+}

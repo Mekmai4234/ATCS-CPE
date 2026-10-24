@@ -75,9 +75,10 @@ uses its real HTTP/API/worker and a new fixture DB, then stops its own processes
 This validates integration mechanics without claiming live YouTube/model quality.
 See TEST_REPORT.md for actual commands/results, not assumed acceptance.
 
-No authentication, reload/session restoration, animated mascot or embedded player is
-implemented. External YouTube playback and timestamp links are provided. Deployment
-is outside the verified frontend runtime; delivery is tracked through Git and PR history.
+Authentication/session restoration uses module-02 auth and private member APIs;
+an animated layered Buddy is implemented. Current workspace turns/pending job UI
+are not restored after reload. External YouTube playback and timestamp links are
+provided. Deployment is outside the verified frontend runtime.
 
 INTEGRATED MINT UI (24 October 2026)
 Use the shared SessionShell/API and conversation state for full and floating chat.
@@ -87,3 +88,6 @@ Keep decorative overflow inside its scene, preserve reduced-motion behavior and 
 PERSISTENT BUDDY AND TERMINAL JOB RECOVERY (24 October 2026)
 The floating mascot stays mounted for every signed-in workspace route. Closing the panel minimizes it; there is no separate top-bar restore button or hide action.
 After an HTTP task error with a durable job ID, reconcile its state. Terminal failed/cancelled jobs unlock the composer; ambiguous or active jobs remain recoverable without duplicate POSTs.
+
+VISUAL EVIDENCE AND PROVIDER QUEUES (24 October 2026)
+EvidenceBridge is an internal UI seam only; production remains transcript-based until module 02 publishes the contract. Shared evidence rendering escapes OCR, separates AI descriptions and reports sampled frames. Known queued provider-limit/outage jobs release the UI and resume by explicit GET; backend alone retries. See EVIDENCE_HANDOFF.md.
