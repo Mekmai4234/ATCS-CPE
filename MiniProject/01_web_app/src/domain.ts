@@ -78,6 +78,10 @@ export function buildScope(
   };
 }
 export function jobWarning(job: Job): string | null {
+  if (job.state === 'failed' && job.error_code === 'generation_provider_busy')
+    return 'Gemini ไม่พร้อมให้บริการชั่วคราว จึงยังสร้างคำตอบไม่ได้ กรุณารอสักครู่แล้วส่งคำถามอีกครั้ง';
+  if (job.state === 'failed' && job.error_code === 'generation_rate_limited')
+    return 'Gemini จำกัดจำนวนคำขอหรือโทเคน กรุณาตรวจสอบโควตาและส่งคำถามอีกครั้งเมื่อใช้งานได้';
   if (job.state === 'failed' && job.error_code === 'transcript_too_large')
     return 'บทถอดเสียงยาวเกินขีดจำกัดการแสดงผล กรุณาเลือกคลิปเดียวหรือถามเฉพาะช่วงที่ต้องการ';
   if (job.state === 'failed' && job.error_code === 'transcript_unavailable')

@@ -136,6 +136,10 @@ async def test_provider_errors_redacted_with_no_retry(make_model, status, retrya
         await make_model(handler).generate({}, 5)
     assert caught.value.retryable is retryable
     assert "LEAK" not in str(caught.value) and len(calls) == 1
+    assert caught.value.code == {
+        429: "generation_rate_limited",
+        503: "generation_provider_busy",
+    }.get(status, "generation_provider_error")
 
 
 @pytest.mark.parametrize("count", [None, 0, -1, 24000])

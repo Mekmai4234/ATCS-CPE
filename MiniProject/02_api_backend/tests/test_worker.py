@@ -79,6 +79,47 @@ async def test_caption_import_succeeds_without_optional_metadata(env, monkeypatc
     assert answer.json()["citations"][0]["title"] == f"YouTube {VIDEO_A}"
 
 
+@pytest.mark.parametrize(
+    "code,seconds",
+    [
+        ("generation_provider_busy", 15),
+        ("generation_rate_limited", 60),
+    ],
+)
+def test_provider_retry_spacing_is_bounded_and_does_not_reset_deadline(
+    env, monkeypatch, code, seconds
+):
+    now = time.time()
+    monkeypatch.setattr("youtube_backend.repository.time.time", lambda: now)
+    job_id = queue_import(env)
+    first = env.repo.claim(job_id)
+    original_deadline = first["deadline_at"]
+    env.repo.fail(job_id, first["lease_token"], AppError(code, "Provider unavailable", 503, True))
+    queued = env.repo.get_job(job_id)
+    assert queued["state"] == "queued" and queued["available_at"] == now + seconds
+    assert env.repo.claim(job_id) is None
+    now += seconds + 1
+    second = env.repo.claim(job_id)
+    env.repo.fail(job_id, second["lease_token"], AppError(code, "Provider unavailable", 503, True))
+    after = env.repo.get_job(job_id)
+    assert after["deadline_at"] == original_deadline
+    # A 60+120 second wait no longer fits the original 180 second deadline.
+    assert after["state"] == ("failed" if seconds == 60 else "queued")
+    assert after["attempt_count"] == 2
+    if after["state"] == "queued":
+        assert after["available_at"] == now + seconds * 2
+
+
+def test_provider_retry_not_queued_past_original_deadline(env):
+    env.settings.job_timeout_seconds = 10
+    job_id = queue_import(env)
+    job = env.repo.claim(job_id)
+    env.repo.fail(
+        job_id, job["lease_token"], AppError("generation_provider_busy", "Unavailable", 503, True)
+    )
+    assert env.repo.get_job(job_id)["state"] == "failed"
+
+
 async def test_restart_recovery_rejects_stale_execution(env):
     job_id = queue_import(env)
     old = env.repo.claim(job_id)
