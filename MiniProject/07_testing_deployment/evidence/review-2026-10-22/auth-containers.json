@@ -1,0 +1,92 @@
+{
+  "passed": true,
+  "real_google_verified": false,
+  "public_https_verified": false,
+  "release_attestation_created": false,
+  "candidate": {
+    "base": "69f534730669f59051a453d9833a0be88695f263",
+    "modules": {
+      "01_web_app": "2b43754e1313da9afbb72bbfc4d14193fe26e083",
+      "02_api_backend": "b047e809f983ffb2e4f3f9d3e3f074b8976cd6da",
+      "03_video_ingestion": "c3c7c598ae2f6692d360c8cd5d8d6aacc1e6fc04",
+      "04_rag_knowledge": "1c1c536de3d2a316cc239b8f21b186cd8169aff8",
+      "05_ai_answers_analysis": "144d2b14848bec0085f2ff9d0cee6453e9ba1391",
+      "06_research_learning_agent": "fafece3e5a24229628c8616a463a042af96b974d"
+    },
+    "status": "candidate only; not merged develop",
+    "live_google_verified": false,
+    "tooling_commit": "04c835211ce44f3e914348b302324c351479f41b",
+    "lock_profile": "auth-candidate",
+    "lock_sha256": "6df9adddf453a4751d0e75118b8dffaa25faa066417f7f7c3697000baeb2d6fa",
+    "tooling_dirty": true
+  },
+  "health": {
+    "status": "ok",
+    "schema_revision": "0002",
+    "mode": "custom",
+    "adapters_configured": true,
+    "live_provider_verified": false,
+    "full_pair_preflight": true,
+    "single_user": false,
+    "authentication_required": true,
+    "capabilities": {
+      "ingest": "available",
+      "index": "available",
+      "delete": "available",
+      "evidence": "available",
+      "inventory": "available",
+      "answer": "available",
+      "analyze": "available",
+      "research": "available",
+      "artifact": "available"
+    },
+    "integration_profile": "live",
+    "synthetic_data": false
+  },
+  "tls_proxy_verified": true,
+  "secure_login_cookie_verified": true,
+  "unauthorized_api_verified": true,
+  "images": [
+    {
+      "ID": "sha256:b83ef1d1124e654595274891e6611b37fba4218d336dddb27d1bbbfe39e629ad",
+      "ContainerName": "yk07-auth-9f71fe4d27-initialize-1",
+      "Repository": "youtube-knowledge-team07",
+      "Tag": "local",
+      "Platform": "linux/amd64",
+      "Size": 790706175,
+      "Created": "2026-10-22T03:24:43.631828061Z",
+      "LastTagTime": "2026-10-22T03:25:07.899210194Z"
+    },
+    {
+      "ID": "sha256:b83ef1d1124e654595274891e6611b37fba4218d336dddb27d1bbbfe39e629ad",
+      "ContainerName": "yk07-auth-9f71fe4d27-api-1",
+      "Repository": "youtube-knowledge-team07",
+      "Tag": "local",
+      "Platform": "linux/amd64",
+      "Size": 790706175,
+      "Created": "2026-10-22T03:24:43.631828061Z",
+      "LastTagTime": "2026-10-22T03:25:07.899210194Z"
+    },
+    {
+      "ID": "sha256:e2a8846e39e8200d9edc189b9b1b63e0c4d93c2c904db25fd85e9c51db6a87a3",
+      "ContainerName": "yk07-auth-9f71fe4d27-web-1",
+      "Repository": "youtube-knowledge-team07-web",
+      "Tag": "auth-check",
+      "Platform": "linux/amd64",
+      "Size": 97458361,
+      "Created": "2026-10-22T03:25:07.872566729Z",
+      "LastTagTime": "2026-10-22T03:25:08.224080301Z"
+    },
+    {
+      "ID": "sha256:b83ef1d1124e654595274891e6611b37fba4218d336dddb27d1bbbfe39e629ad",
+      "ContainerName": "yk07-auth-9f71fe4d27-worker-1",
+      "Repository": "youtube-knowledge-team07",
+      "Tag": "local",
+      "Platform": "linux/amd64",
+      "Size": 790706175,
+      "Created": "2026-10-22T03:24:43.631828061Z",
+      "LastTagTime": "2026-10-22T03:25:07.899210194Z"
+    }
+  ],
+  "cleanup_passed": true
+}

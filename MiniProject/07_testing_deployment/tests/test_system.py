@@ -89,6 +89,24 @@ class AnswerModel:
 
 
 class ResearchModel:
+    async def generate(self, request, records, schema, timeout):
+        from youtube_agent.models import Generated as AgentGenerated
+
+        assert request["type"] == "quiz" and records
+        content = schema.model_validate(
+            dict(
+                questions=[
+                    dict(
+                        question="[FIXTURE07] What does RAG retrieve?",
+                        answer="Evidence",
+                        explanation=records[0].text,
+                        citations=[records[0].chunk_id],
+                    )
+                ]
+            )
+        )
+        return AgentGenerated(content, metadata())
+
     async def decide(self, history, timeout):
         observations = [entry for entry in history if entry["role"] == "tool"]
         if not observations:
@@ -108,7 +126,12 @@ class ResearchModel:
 
 
 @asynccontextmanager
-async def system(state):
+async def system(state, *, auth=False, configure_app=None):
+    identity_settings = {}
+    if "auth_enabled" in Settings.model_fields:
+        identity_settings = dict(
+            auth_enabled=auth, session_cookie_secure=False, google_client_id="fixture07-client"
+        )
     settings = Settings(
         _env_file=None,
         app_env="test",
@@ -118,6 +141,7 @@ async def system(state):
         database_url=f"sqlite:///{(state / 'app.db').as_posix()}",
         job_lease_seconds=120,
         job_retry_base_seconds=0,
+        **identity_settings,
     )
     database = Database(settings.database_url)
     upgrade_database(database)
@@ -150,9 +174,12 @@ async def system(state):
         analyzer=answers.analyze,
     )
     adapters = TeamAdapters(answers, ingestion, agent)
+    app = create_app(settings, database, adapters)
+    if configure_app:
+        configure_app(app)
     try:
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=create_app(settings, database, adapters)),
+            transport=httpx.ASGITransport(app=app),
             base_url="http://test",
         ) as client:
             yield client, Worker(repo, adapters, settings)

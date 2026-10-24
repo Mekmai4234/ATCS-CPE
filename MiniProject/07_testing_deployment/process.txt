@@ -2,6 +2,10 @@ Module 07: Process and boundaries
 
 Inputs: existing 02-06 implementations/tests, reference fixtures and acceptance criteria.
 The 07 lockfile composes dependencies without changing other manifests.
+Default PR/push CI tests the merge-test/current checkout directly and publishes verified
+before/after source fingerprints. Changed source is tested or provenance fails. The
+integration.json workflow is now separately named and manual-only; candidate green cannot
+certify current develop. Updating a pin requires lock/check/test only for that optional job.
 
 Offline: separate suite processes -> real domain-service integration -> cold recovery ->
 known-defect assertions -> lint/format -> logs/JUnit/JSON -> readiness report.
@@ -16,6 +20,10 @@ Recovery: acknowledged stopped services -> integrity/pending-job checks -> paire
 bundle -> SHA-256 verification -> new restore destination -> retrieval/source checks.
 No online Chroma backup, automatic destructive rollback or overwrite is provided.
 
-Outputs: runner, integration/regression/recovery tests, reports, Docker/Compose, passive
-CI template and operational guides. All edits remain inside 07. Active CI/root docs and
-03/04 fixes belong to their owners. Missing frontend/live/container evidence stays pending.
+Outputs: runner, strict auth/ownership fixtures, candidate provenance, browser configuration,
+reports, Docker/Caddy/Compose, active GitHub CI and operational guides. Edits remain in
+07 plus the explicitly authorized root workflow. Module 01-06 production fixes belong
+to their owners. Auth release stays blocked until real integration and Google smoke pass.
+Browser identity acceptance uses the real HTTP adapter/API/worker with external GIS
+fixtures. Production-container acceptance verifies local HTTPS, secure cookies and
+unauthenticated API denial on an internal network, without release attestation or paid calls.
