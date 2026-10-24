@@ -66,6 +66,8 @@ jobs:
       - run: pnpm run --if-present test:production
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm exec playwright test --config ../07_testing_deployment/playwright.config.ts
+      - name: Floating Buddy interaction contract
+        run: pnpm exec playwright test --config ../07_testing_deployment/playwright.floating.config.ts
       - name: Capture current UI, bundle sizes and pending visual acceptance (fixture only)
         run: node ../07_testing_deployment/scripts/ui_qa.mjs
       - name: Real adapter E2E when implemented in this checkout
@@ -90,6 +92,8 @@ jobs:
             MiniProject/07_testing_deployment/runtime/browser-identity-*/*.json
             MiniProject/07_testing_deployment/runtime/browser-identity-*/*.log
             MiniProject/07_testing_deployment/runtime/ui-qa/
+            MiniProject/07_testing_deployment/runtime/floating-report/
+            MiniProject/07_testing_deployment/runtime/floating-results/
             MiniProject/01_web_app/runtime/screenshots/
             MiniProject/runtime/screenshots/
           retention-days: 7
