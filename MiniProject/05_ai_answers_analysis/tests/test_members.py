@@ -78,7 +78,7 @@ async def test_two_members_same_key_isolated_jobs_history_followups_and_polling(
             )
 
 
-@pytest.mark.parametrize("kind", ["chat", "summary", "compare"])
+@pytest.mark.parametrize("kind", ["chat", "transcript", "summary", "compare"])
 async def test_foreign_scope_denied_before_retrieval_or_generation(integrated, kind):
     env = integrated
     async with httpx.AsyncClient(
@@ -86,8 +86,9 @@ async def test_foreign_scope_denied_before_retrieval_or_generation(integrated, k
     ) as b:
         await login(b, env.app, "member-b")
         before = len(env.model.payloads)
-        if kind == "chat":
-            response = await b.post("/api/chat", json=body())
+        if kind in {"chat", "transcript"}:
+            question = "ขอเนื้อเพลงทั้งหมด" if kind == "transcript" else "RAG"
+            response = await b.post("/api/chat", json=body(question))
         else:
             response = await b.post(
                 "/api/analysis",

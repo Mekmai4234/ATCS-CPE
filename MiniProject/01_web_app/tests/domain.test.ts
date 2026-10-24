@@ -88,4 +88,12 @@ describe('source scope', () => {
     expect(jobWarning({ ...job, state: 'completed' })).toBeNull();
     expect(jobWarning({ ...job, error_code: 'invalid_citation' })).toContain('invalid_citation');
   });
+  it('explains transcript size and availability failures', () => {
+    expect(jobWarning({ state: 'failed', error_code: 'transcript_too_large' } as Job)).toContain(
+      'ยาวเกินขีดจำกัด',
+    );
+    expect(jobWarning({ state: 'failed', error_code: 'transcript_unavailable' } as Job)).toContain(
+      'ไม่พบบทถอดเสียง',
+    );
+  });
 });

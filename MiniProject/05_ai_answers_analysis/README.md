@@ -158,6 +158,25 @@ image does not package this integration; the commands above use the local 05 env
 
 ## Evaluation and limits
 
+### Full transcript requests
+
+Explicit requests such as `ขอเนื้อเพลงทั้งหมด`, `เพลงร้องว่าอย่างไร`, or
+`show full lyrics` display the entire stored transcript in original caption order.
+The service paginates all authorized index chunks, checks their segment IDs against
+the frozen original transcript version, and uses those chunks as timestamp citations.
+It renders each original segment once, preserving intentional repeated verses while
+avoiding duplication caused by RAG chunk overlap. No model generation or embedding
+search is used for this display operation (`provider=transcript`, model `none`).
+
+Coverage refers to imported captions, not proof that every audible word or official
+lyric is present. Missing indexes remain explicit partial coverage; mismatched segment
+inventories fail closed. Meaning, summary, translation and specific-verse questions
+continue to use ordinary grounded RAG. Existing account, lease, cancellation, version
+and publication checks still apply. To bound response size, displays are limited to
+1,000,000 UTF-8 caption bytes, 100 statement blocks and 1,000 final citation anchors;
+an individual caption must fit 11,000 characters. Oversized requests fail with
+`transcript_too_large` rather than silently publishing an incomplete transcript.
+
 `fixtures/evaluation.json` includes supported Thai, unsupported, conflicting cross-video,
 follow-up and transcript-injection cases with manual review criteria. An optional live
 smoke check makes paid generation requests on this small synthetic corpus only:

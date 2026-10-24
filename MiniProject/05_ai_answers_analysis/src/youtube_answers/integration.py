@@ -1,11 +1,15 @@
 """05-owned composition of 02/04 boundaries, without changing other modules."""
 
+import sqlalchemy as sa
+from youtube_backend import database as db
+from youtube_backend.schemas import Segment
 from youtube_rag.integration import RagAdapters
 from youtube_rag.manifest import BackendExecution
 
 from .config import AnswerSettings
 from .configuration import resolved_service
 from .gemini import GeminiModel
+from .models import error
 from .service import AnswerService
 
 
@@ -21,6 +25,37 @@ class RagKnowledge:
 
     async def read(self, sources, context, **kwargs):
         return await self.rag.read_video_chunks(sources, BackendExecution(context), **kwargs)
+
+    async def transcript(self, source, context):
+        """Read the frozen version under the durable job's existing authorization."""
+        context.check()
+        context.authorize_sources([source])
+        with context.repository.db.read() as connection:
+            condition = sa.and_(
+                db.segments.c.video_id == source.video_id,
+                db.segments.c.version == source.transcript_version,
+            )
+            count, size = connection.execute(
+                sa.select(
+                    sa.func.count(),
+                    sa.func.sum(sa.func.length(sa.cast(db.segments.c.text, sa.LargeBinary))),
+                ).where(condition)
+            ).one()
+            if count > 100000 or (size or 0) > 1000000:
+                raise error("transcript_too_large", "Transcript exceeds the display budget")
+            rows = (
+                connection.execute(
+                    sa.select(db.segments).where(condition).order_by(db.segments.c.position)
+                )
+                .mappings()
+                .all()
+            )
+        context.check()
+        if not rows:
+            raise error("transcript_unavailable", "The frozen transcript has no segments")
+        return [
+            Segment.model_validate({key: row[key] for key in Segment.model_fields}) for row in rows
+        ]
 
     async def evidence(self, sources, ids, context):
         execution = BackendExecution(context)
