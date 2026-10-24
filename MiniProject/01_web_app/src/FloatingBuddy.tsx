@@ -7,7 +7,8 @@ import { ResultView } from './Results';
 import { clampPoint, cornerPoint, isDrag, readPosition, shouldSend } from './buddyModel';
 import type { Point, Viewport } from './buddyModel';
 import type { TaskResult, Video } from './types';
-import { statusLabels } from './domain';
+import { statusLabels, videoQueryable } from './domain';
+import { SourceBadges } from './Evidence';
 
 export interface BuddyTurn {
   id: string;
@@ -30,6 +31,7 @@ interface Props {
   busy: boolean;
   status: string;
   error: string;
+  waiting?: { id: string; label: string; status: string; follow: () => void }[];
   scopeNotice: string;
   newConversation: () => void;
   cancel?: () => void;
@@ -362,17 +364,18 @@ export default function FloatingBuddy(props: Props) {
                       type="checkbox"
                       aria-label={`ใช้คลิป ${video.title || video.video_id}`}
                       checked={props.selected.includes(video.video_id)}
-                      disabled={video.status !== 'ready'}
+                      disabled={!videoQueryable(video)}
                       onChange={() => props.select(video.video_id)}
                     />
-                    <span>
+                    <div>
                       {video.title || video.video_id}
+                      <SourceBadges video={video} />
                       <small>
-                        {video.status === 'ready'
+                        {videoQueryable(video)
                           ? 'พร้อมถามตอบ'
                           : statusLabels[video.status] || 'ยังไม่พร้อม'}
                       </small>
-                    </span>
+                    </div>
                   </label>
                 ))}
                 {!props.videos.length && <p>ยังไม่มีคลิปในคลัง เพิ่มคลิปก่อนเริ่มถามได้เลย</p>}
@@ -426,6 +429,15 @@ export default function FloatingBuddy(props: Props) {
                 </p>
               )}
               {props.scopeNotice && <p className="notice">{props.scopeNotice}</p>}
+              {props.waiting?.map((item) => (
+                <article className="deferred-jobs" key={item.id}>
+                  <strong>{item.label}</strong>
+                  <p role="status">{item.status}</p>
+                  <button disabled={props.locked} onClick={item.follow}>
+                    ติดตามงานเดิมอีกครั้ง
+                  </button>
+                </article>
+              ))}
               {props.error && (
                 <p role="alert" className="notice error">
                   {props.error}

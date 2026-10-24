@@ -272,8 +272,12 @@ test('real touch drag/cancel/tap and keyboard-sized viewport remain usable', asy
     await page.touchscreen.tap(box.x + 36, box.y + 36);
     await expect(dialog(page)).toBeVisible();
     await page.setViewportSize({ width: 375, height: 330 });
-    const rect = (await dialog(page).boundingBox())!;
-    expect(rect.y + rect.height).toBeLessThanOrEqual(330);
+    await expect
+      .poll(async () => {
+        const rect = (await dialog(page).boundingBox())!;
+        return rect.y + rect.height;
+      })
+      .toBeLessThanOrEqual(330);
     await expect(dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true })).toBeInViewport();
   } finally {
     await context.close();
