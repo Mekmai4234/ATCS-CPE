@@ -83,3 +83,7 @@ INTEGRATED MINT UI (24 October 2026)
 Use the shared SessionShell/API and conversation state for full and floating chat.
 polish.css refines the reference layout; Visuals.tsx supplies decorative learning objects and consistent icons.
 Keep decorative overflow inside its scene, preserve reduced-motion behavior and clamp the launcher/panel.
+
+PERSISTENT BUDDY AND TERMINAL JOB RECOVERY (24 October 2026)
+The floating mascot stays mounted for every signed-in workspace route. Closing the panel minimizes it; there is no separate top-bar restore button or hide action.
+After an HTTP task error with a durable job ID, reconcile its state. Terminal failed/cancelled jobs unlock the composer; ambiguous or active jobs remain recoverable without duplicate POSTs.
