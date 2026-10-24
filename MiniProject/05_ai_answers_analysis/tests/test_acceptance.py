@@ -337,18 +337,20 @@ async def test_real_http_read_budget_allows_slow_response_within_configured_limi
         task = asyncio.current_task()
         tasks.add(task)
         try:
-            await reader.readuntil(b"\r\n\r\n")
+            # The client can time out before sending headers on a loaded Windows
+            # host. Do not leave an accepted test socket waiting forever.
+            await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), 1)
             await asyncio.sleep(0.1)
             writer.write(
                 b'HTTP/1.1 200 OK\r\nContent-Length: 11\r\nConnection: close\r\n\r\n{"ok":true}'
             )
             await writer.drain()
-        except ConnectionError:
+        except (ConnectionError, asyncio.IncompleteReadError, TimeoutError):
             pass
         finally:
             writer.close()
-            with suppress(ConnectionError):
-                await writer.wait_closed()
+            with suppress(ConnectionError, TimeoutError):
+                await asyncio.wait_for(writer.wait_closed(), 1)
             tasks.discard(task)
 
     server = await asyncio.start_server(respond, "127.0.0.1", 0)
@@ -368,7 +370,10 @@ async def test_real_http_read_budget_allows_slow_response_within_configured_limi
         server.close()
         await server.wait_closed()
         if tasks:
-            await asyncio.gather(*tasks)
+            pending = list(tasks)
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
 
 
 @pytest.mark.parametrize(
