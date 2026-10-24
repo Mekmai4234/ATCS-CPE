@@ -126,6 +126,20 @@ class GeminiModel:
             ) from None
         except errors.APIError as exc:
             transient = exc.code in {408, 429} or (isinstance(exc.code, int) and exc.code >= 500)
+            if exc.code == 503:
+                raise error(
+                    "generation_provider_busy",
+                    "Gemini is temporarily unavailable; try again later",
+                    status=503,
+                    retryable=True,
+                ) from None
+            if exc.code == 429:
+                raise error(
+                    "generation_rate_limited",
+                    "Gemini request or token quota is temporarily limiting this request",
+                    status=503,
+                    retryable=True,
+                ) from None
             raise error(
                 "generation_provider_error",
                 "Gemini rejected the request",

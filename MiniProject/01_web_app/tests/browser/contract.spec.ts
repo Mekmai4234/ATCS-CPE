@@ -370,3 +370,45 @@ test('a failed durable chat job unlocks the form and allows a new question', asy
   await expect(page.getByText('คำตอบจาก API', { exact: true })).toBeVisible();
   expect(submissions).toBe(2);
 });
+
+test('provider downtime explains the failure and allows an explicit new submission', async ({
+  page,
+}) => {
+  let submissions = 0;
+  await setup(page, (route) => {
+    submissions++;
+    return submissions === 1
+      ? fulfill(
+          route,
+          {
+            error: {
+              code: 'generation_provider_busy',
+              message: 'Provider unavailable',
+              retryable: true,
+              job_id: 'busy-chat',
+            },
+          },
+          503,
+        )
+      : fulfill(route, final);
+  });
+  await page.route('**/api/jobs/busy-chat', (route) =>
+    fulfill(route, {
+      job_id: 'busy-chat',
+      kind: 'chat',
+      state: 'failed',
+      stage: 'failed',
+      error_code: 'generation_provider_busy',
+      retryable: true,
+    }),
+  );
+  await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'ไม่พร้อมให้บริการชั่วคราว' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'ส่งคำถาม', exact: true })).toBeEnabled();
+  expect(submissions).toBe(1);
+  await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
+  await expect(page.getByText('คำตอบจาก API', { exact: true })).toBeVisible();
+  expect(submissions).toBe(2);
+});
