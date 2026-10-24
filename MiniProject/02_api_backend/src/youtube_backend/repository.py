@@ -1,5 +1,6 @@
 import hashlib
 import json
+import random
 import time
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -405,6 +406,10 @@ class Repository(Ownership):
             "result",
         )
         result = {k: job[k] for k in keys}
+        with self.db.read() as connection:
+            wait = row(connection, db.v2["pauses"], db.v2["pauses"].c.job_id == job["job_id"])
+        if wait:
+            result["wait"] = wait["data"]
         result.update({k: iso(job[k]) for k in ("created_at", "updated_at", "available_at")})
         result["mode"] = self.settings.adapter_mode
         if job["kind"] not in {"import", "delete"}:
@@ -557,6 +562,9 @@ class Repository(Ownership):
                         retryable=False,
                     )
                 )
+                connection.execute(
+                    db.v2["pauses"].delete().where(db.v2["pauses"].c.job_id == candidate["job_id"])
+                )
                 return row(connection, db.jobs, db.jobs.c.job_id == candidate["job_id"])
         return None
 
@@ -569,13 +577,24 @@ class Repository(Ownership):
         if job["cancel_requested"] and not allow_cancel:
             raise AppError("cancelled", "Task cancelled", 409)
         if not allow_cancel:
+            if job["deadline_at"] is not None and job["deadline_at"] <= time.time():
+                raise AppError("task_timeout", "Task exceeded its deadline", 504)
             self._check_job_authorization(connection, job)
+            if job["kind"] in {"import", "delete", "attach", "enrich"}:
+                video = row(connection, db.videos, db.videos.c.video_id == job["video_id"])
+                if (
+                    not video
+                    or video["generation"] != job["generation"]
+                    or (job["kind"] == "delete" and video["status"] != "deleting")
+                    or (job["kind"] != "delete" and video["status"] in {"deleting", "deleted"})
+                ):
+                    raise AppError("cancelled", "Source lifecycle changed", 409)
         return job
 
     def check_execution(self, job_id, token):
         with self.db.read() as connection:
             job = self._owned(connection, job_id, token)
-            if job["kind"] in {"import", "delete", "attach"}:
+            if job["kind"] in {"import", "delete", "attach", "enrich"}:
                 video = row(connection, db.videos, db.videos.c.video_id == job["video_id"])
                 expected = "deleting" if job["kind"] == "delete" else None
                 if (
@@ -682,9 +701,17 @@ class Repository(Ownership):
             provider_floor = {
                 "generation_provider_busy": 15,
                 "generation_rate_limited": 60,
+                "provider_unavailable": 15,
+                "provider_rate_limited": 60,
+                "provider_timeout": 5,
+                "quota_wait": 60,
             }.get(error.code, 0)
             base_delay = max(self.settings.job_retry_base_seconds, provider_floor)
             delay = min(300, base_delay * 2 ** (job["attempt_count"] - 1))
+            if error.code.startswith("provider_") or error.code == "quota_wait":
+                delay += random.uniform(0, min(10, delay * 0.2))
+            if error.retry_after_seconds is not None:
+                delay = max(delay, error.retry_after_seconds)
             retry = (
                 not cancelled
                 and not deadline_exhausted
@@ -693,16 +720,50 @@ class Repository(Ownership):
                 and time.time() + delay < job["deadline_at"]
             )
             missing = not cancelled and error.code == "no_transcript" and job["kind"] == "import"
+            paused = not cancelled and job["kind"] == "enrich" and error.pause
             state = (
                 "cancelled"
                 if cancelled
+                else "paused"
+                if paused
                 else "queued"
                 if retry
                 else "completed"
                 if missing
                 else "failed"
             )
-            stage = "no_transcript" if missing else state
+            visual_pending = False
+            if missing:
+                media = db.v2["media_states"]
+                visual_pending = bool(
+                    connection.scalar(
+                        sa.select(media.c.video_id).where(
+                            media.c.video_id == job["video_id"],
+                            media.c.generation == job["generation"],
+                            media.c.state.in_(["pending", "processing", "ready"]),
+                        )
+                    )
+                )
+            stage = "visual_pending" if visual_pending else "no_transcript" if missing else state
+            if error.retry_after_seconds is not None or paused:
+                from sqlalchemy.dialects.sqlite import insert
+
+                waits = db.v2["pauses"]
+                known = error.retry_time_source == "provider"
+                data = {
+                    "reason": error.code,
+                    "time_source": "provider" if known else "estimate",
+                    "retry_at" if known else "estimated_retry_at": iso(
+                        time.time() + (error.retry_after_seconds if known else delay)
+                    ),
+                }
+                if retry and not paused:
+                    data["scheduled_retry_at"] = iso(time.time() + delay)
+                connection.execute(
+                    insert(waits)
+                    .values(job_id=job_id, data=data)
+                    .on_conflict_do_update(index_elements=[waits.c.job_id], set_={"data": data})
+                )
             connection.execute(
                 db.jobs.update()
                 .where(db.jobs.c.job_id == job_id)
@@ -710,7 +771,7 @@ class Repository(Ownership):
                     state=state,
                     stage=stage,
                     error_code="cancelled" if cancelled else error.code,
-                    retryable=bool(error.retryable and not cancelled),
+                    retryable=bool((error.retryable or paused) and not cancelled),
                     lease_token=None,
                     lease_until=None,
                     available_at=time.time() + delay,
@@ -718,14 +779,35 @@ class Repository(Ownership):
                 )
             )
             self._video_failure(
-                connection, job, "no_transcript" if missing else "queued" if retry else "failed"
+                connection,
+                job,
+                "visual_pending"
+                if visual_pending
+                else "no_transcript"
+                if missing
+                else "queued"
+                if retry
+                else "failed",
             )
+            if job["kind"] == "enrich":
+                table = db.v2["media_states"]
+                connection.execute(
+                    table.update()
+                    .where(
+                        table.c.video_id == job["video_id"], table.c.generation == job["generation"]
+                    )
+                    .values(
+                        state="paused" if paused else "pending" if retry else "failed",
+                        error_code=error.code,
+                        updated_at=time.time(),
+                    )
+                )
 
     def finish(self, job_id, token, result=None, state="completed"):
         with self.db.write() as connection:
             job = self._owned(connection, job_id, token)
             kind = job["kind"]
-            if kind not in {"import", "delete", "attach"}:
+            if kind not in {"import", "delete", "attach", "enrich"}:
                 self._check_sources(connection, job["payload"]["sources"], owner=job["owner_id"])
             if kind == "attach":
                 video = row(connection, db.videos, db.videos.c.video_id == job["video_id"])
@@ -889,9 +971,9 @@ class Repository(Ownership):
                     )
             if job["kind"] == "delete":
                 raise AppError("deletion_committed", "Deletion cannot be cancelled", 409)
-            if job["state"] in ACTIVE:
+            if job["state"] in ACTIVE or job["state"] == "paused":
                 values = dict(cancel_requested=True, updated_at=time.time())
-                if job["state"] == "queued":
+                if job["state"] in {"queued", "paused"}:
                     values.update(state="cancelled", stage="cancelled", error_code="cancelled")
                     self._video_failure(connection, job, "failed")
                 connection.execute(
@@ -900,6 +982,11 @@ class Repository(Ownership):
         return self.get_job(job_id)
 
     def retry(self, job_id):
+        old = self.get_job(job_id)
+        if old["kind"] == "enrich":
+            from .media import MediaStore
+
+            return MediaStore(self).enqueue(old["video_id"], resume_job=job_id)
         if self.settings.auth_enabled:
             old = self.get_job(job_id)
             if old["kind"] == "attach" and old["state"] == "failed":

@@ -37,6 +37,12 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     auth_enabled: bool = True
+    gemini_free_policy_file: str | None = None
+    gemini_max_concurrent: int = Field(default=1, ge=1, le=20)
+    gemini_user_concurrent: int = Field(default=1, ge=1, le=10)
+    media_asset_dir: str = "./runtime/media-assets"
+    media_max_frames: int = Field(default=12, ge=1, le=100)
+    media_max_frame_bytes: int = Field(default=2_000_000, ge=1024, le=20_000_000)
     google_client_id: str = ""
     session_ttl_seconds: int = Field(default=86400, ge=300, le=2592000)
     session_cookie_secure: bool = True

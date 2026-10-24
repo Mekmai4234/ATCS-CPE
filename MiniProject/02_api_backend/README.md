@@ -1,5 +1,10 @@
 # Module 02: API / Backend
 
+Free-only outbound policy, shared quota broker and media evidence v2 are documented
+in [FREE_TIER_MEDIA.md](FREE_TIER_MEDIA.md). Schema head is 0003. The default denies
+unverified Gemini and undeclared legacy provider calls; consumer broker/enrich wiring
+is a release dependency. Local operations can be declared independently of Gemini.
+
 Authentication is now required by default. See [AUTH.md](AUTH.md) for Google login,
 CSRF, ownership/admin APIs, explicit legacy migration and frontend/deployment handoff.
 The historical single-user demo commands below require the explicit development/test

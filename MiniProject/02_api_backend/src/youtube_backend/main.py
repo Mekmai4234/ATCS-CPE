@@ -172,6 +172,13 @@ def create_app(settings=None, database=None, adapters=None):
     @app.get("/health")
     def health():
         database.check_schema()
+        from .quota import QuotaBroker
+
+        try:
+            QuotaBroker(repository).policy()
+            policy_state = "operator_attested"
+        except AppError:
+            policy_state = "unverified"
         return dict(
             status="ok",
             schema_revision=SCHEMA_REVISION,
@@ -181,6 +188,8 @@ def create_app(settings=None, database=None, adapters=None):
             full_pair_preflight=settings.backend_full_preflight,
             single_user=not settings.auth_enabled,
             authentication_required=settings.auth_enabled,
+            gemini_free_policy=policy_state,
+            media_contract_version=2,
             capabilities=runtime.capabilities,
             integration_profile=settings.backend_integration_profile
             if settings.adapter_mode == "custom"
@@ -252,7 +261,17 @@ def create_app(settings=None, database=None, adapters=None):
         code = job["error_code"] or "task_failed"
         status = (
             503
-            if code == "dependency_unavailable"
+            if code
+            in {
+                "dependency_unavailable",
+                "free_tier_unverified",
+                "free_model_unverified",
+                "gemini_broker_required",
+                "quota_policy_mismatch",
+                "provider_unavailable",
+            }
+            else 429
+            if code in {"quota_wait", "provider_rate_limited"}
             else 504
             if code == "task_timeout"
             else (409 if code in {"cancelled", "source_changed"} else 502)
@@ -315,6 +334,32 @@ def create_app(settings=None, database=None, adapters=None):
     @app.get("/api/auth/challenge")
     def login_challenge(request: Request, response: Response):
         return auth.challenge(request, response)
+
+    @app.get("/api/v2/videos/{video_id}/evidence")
+    def media_evidence(video_id: str):
+        from .media import MediaStore
+
+        return MediaStore(repository).evidence(video_id)
+
+    @app.get("/api/media/assets/{asset_id}")
+    def media_asset(asset_id: str):
+        from .media import MediaStore
+
+        content, mime = MediaStore(repository).asset(asset_id)
+        return Response(
+            content,
+            media_type=mime,
+            headers={"X-Content-Type-Options": "nosniff", "Content-Disposition": "inline"},
+        )
+
+    @app.post("/api/v2/videos/{video_id}/enrichment", status_code=202, response_model=Accepted)
+    async def enrich(video_id: str, idempotency_key: IdempotencyKey = None):
+        from .media import MediaStore
+
+        await runtime.start()
+        if not callable(getattr(runtime.adapter, "enrich", None)):
+            raise AppError("dependency_unavailable", "Local media adapter is not connected", 503)
+        return accepted(MediaStore(repository).enqueue(video_id, idempotency_key=idempotency_key))
 
     @app.post("/api/auth/google")
     def google_login(body: GoogleLogin, request: Request, response: Response):
