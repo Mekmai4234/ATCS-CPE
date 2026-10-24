@@ -1,6 +1,13 @@
 # Module 05 — AI Answers and Analysis
 
-Latest member authorization work: [MEMBER_AUTHORIZATION.md](MEMBER_AUTHORIZATION.md).
+Latest visual / Free Tier work: [VISUAL_HANDOFF.md](VISUAL_HANDOFF.md).
+Executed checks: [VISUAL_TEST_REPORT.md](VISUAL_TEST_REPORT.md).
+**Live compatibility change:** 05 Gemini count/generate/catalog calls now require a
+trusted shared broker with verified Free Tier/model grants. Without it they fail with
+`quota_pending` before network access. The current 02 backend has no such broker;
+the new multimodal consumer is not mounted on existing HTTP routes.
+
+Earlier member authorization work: [MEMBER_AUTHORIZATION.md](MEMBER_AUTHORIZATION.md).
 Member verification: [MEMBER_TEST_REPORT.md](MEMBER_TEST_REPORT.md).
 Earlier review fixes and combined verification: [REVIEW_FIX_REPORT.md](REVIEW_FIX_REPORT.md).
 Previous follow-up results: [FOLLOWUP_REPORT.md](FOLLOWUP_REPORT.md).
