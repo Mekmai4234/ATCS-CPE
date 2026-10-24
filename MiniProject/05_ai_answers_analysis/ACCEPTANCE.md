@@ -1,5 +1,10 @@
 # Module 05 follow-up acceptance — updated 2026-10-22
 
+2026-10-24 Free Tier update: follow [VISUAL_HANDOFF.md](VISUAL_HANDOFF.md) first.
+Earlier live commands below are historical prerequisites, not an authorization to use
+paid APIs. 05 now requires the trusted shared broker even for text/catalog calls.
+Without the upstream broker, live generation returns quota_pending before network.
+
 Member authentication prerequisites and current dependency versions are documented in
 [MEMBER_AUTHORIZATION.md](MEMBER_AUTHORIZATION.md). Earlier verification below remains
 historical; the current authenticated test results are in [MEMBER_TEST_REPORT.md](MEMBER_TEST_REPORT.md).

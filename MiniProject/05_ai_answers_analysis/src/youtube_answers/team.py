@@ -78,7 +78,7 @@ async def create_adapters(*, settings, repository):
             "integration_not_installed", "Install module 05 with --extra team", status=503
         ) from None
     config = load_team_configuration(settings)
-    gateway = GeminiModel(config.answers)
+    gateway = GeminiModel(config.answers, broker=getattr(repository, "quota_broker", None))
     try:
         answers = AnswerAdapters(
             settings=settings,

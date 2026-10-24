@@ -81,7 +81,7 @@ class AnswerAdapters(RagAdapters):
         embedder=None,
     ):
         config = answer_settings or AnswerSettings()
-        gateway = model or GeminiModel(config)
+        gateway = model or GeminiModel(config, broker=getattr(repository, "quota_broker", None))
         super().__init__(
             settings=settings, repository=repository, rag_settings=rag_settings, embedder=embedder
         )
@@ -108,7 +108,7 @@ async def create_adapters(*, settings, repository):
 
     config = resolved_service(settings, AnswerSettings)
     rag_config = resolved_service(settings, RagSettings)
-    gateway = GeminiModel(config)
+    gateway = GeminiModel(config, broker=getattr(repository, "quota_broker", None))
     try:
         return AnswerAdapters(
             settings=settings,
