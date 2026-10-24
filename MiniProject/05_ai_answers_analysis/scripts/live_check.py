@@ -1,4 +1,4 @@
-"""Opt-in paid Gemini smoke/evaluation on public synthetic fixtures, without DB writes."""
+"""Opt-in Free Tier Gemini evaluation; a trusted shared broker is still required."""
 
 import argparse
 import asyncio
@@ -12,9 +12,9 @@ from youtube_answers.gemini import GeminiModel
 from youtube_answers.prompts import payload
 
 
-async def evaluate(output, env_file=None):
+async def evaluate(output, env_file=None, *, broker=None):
     config = AnswerSettings(_env_file=env_file) if env_file else AnswerSettings(_env_file=None)
-    model = GeminiModel(config)
+    model = GeminiModel(config, broker=broker)
     dataset = json.loads(
         (Path(__file__).parents[1] / "fixtures/evaluation.json").read_text("utf-8")
     )
@@ -79,7 +79,9 @@ async def evaluate(output, env_file=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--live", action="store_true", help="Explicitly allow paid Gemini calls")
+    parser.add_argument(
+        "--live", action="store_true", help="Opt in; verified Free Tier broker required"
+    )
     parser.add_argument("--output", type=Path, default=Path("runtime/answers05/live-check.json"))
     parser.add_argument("--env-file", type=Path, help="Only this env file plus process variables")
     args = parser.parse_args()
