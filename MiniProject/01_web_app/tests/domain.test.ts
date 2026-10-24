@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildScope, citationUrl, terminal, videoIdFromUrl } from '../src/domain';
-import type { Citation, Video } from '../src/types';
+import { buildScope, citationUrl, jobWarning, terminal, videoIdFromUrl } from '../src/domain';
+import type { Citation, Job, Video } from '../src/types';
 
 const video = {
   video_id: 'dQw4w9WgXcQ',
@@ -81,5 +81,11 @@ describe('source scope', () => {
     expect(['completed', 'partial', 'failed', 'cancelled'].every(terminal)).toBe(true);
     expect(terminal('running')).toBe(false);
     expect(terminal('no_transcript')).toBe(false);
+  });
+  it('explains truncated answers without presenting them as completed', () => {
+    const job = { state: 'failed', error_code: 'generation_output_truncated' } as Job;
+    expect(jobWarning(job)).toContain('ถูกตัด');
+    expect(jobWarning({ ...job, state: 'completed' })).toBeNull();
+    expect(jobWarning({ ...job, error_code: 'invalid_citation' })).toContain('invalid_citation');
   });
 });

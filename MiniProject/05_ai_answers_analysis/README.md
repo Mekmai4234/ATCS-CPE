@@ -149,6 +149,12 @@ image does not package this integration; the commands above use the local 05 env
 - Local budgeting reserves serialized UTF-8 bytes for evidence, policy and schema. Live
   requests also use Gemini countTokens on content plus a serialized-config byte allowance.
   This deliberately conservative allowance is not exact full-request token accounting.
+- Gemini 3 Flash requests explicitly use LOW thinking so that default reasoning does not
+  consume the shared `ANSWER_MAX_OUTPUT_TOKENS` budget before answer JSON is complete.
+  Other model families retain their defaults. The token cap is unchanged. A MAX_TOKENS
+  finish becomes `generation_output_truncated`; incomplete output is never published or
+  automatically retried as a valid answer. Ask a narrower question or increase the configured
+  cap deliberately for longer responses.
 
 ## Evaluation and limits
 
