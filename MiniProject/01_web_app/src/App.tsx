@@ -179,8 +179,6 @@ export default function App({
   const [scopeNotice, setScopeNotice] = useState('');
   const [historyPending, setHistoryPending] = useState(false);
   const [buddyOpen, setBuddyOpen] = useState(false);
-  const [buddyHidden, setBuddyHidden] = useState(false);
-  const buddyRestore = useRef<HTMLButtonElement>(null);
   const followResults = useRef(true);
   const resultsViewport = useRef<HTMLDivElement>(null);
   const [newResults, setNewResults] = useState(false);
@@ -471,6 +469,28 @@ export default function App({
         setTaskError(
           `${errorText(error)}${error instanceof ApiError && error.requestId ? ` · Request ID: ${error.requestId}` : ''}`,
         );
+        if (currentOp.jobId) {
+          try {
+            const saved = await api.job(currentOp.jobId, controller.signal);
+            if (!alive.current) return;
+            setJobs((previous) => ({ ...previous, [saved.job_id]: saved }));
+            if (terminal(saved.state)) {
+              if ((saved.state === 'completed' || saved.state === 'partial') && saved.result) {
+                setTaskError('');
+                await completeTask(currentOp, saved.result, saved, controller.signal);
+              } else {
+                setTaskError(jobWarning(saved) || errorText(error));
+                setOperation(null);
+                operationRef.current = null;
+                setCanRetry(false);
+              }
+              return;
+            }
+          } catch {
+            // A failed status read leaves the durable job unresolved. Keep the
+            // explicit follow-up action; never resubmit an ambiguous POST.
+          }
+        }
         setCanRetry(!!currentOp.jobId || !(error instanceof ApiError) || error.retryable);
         if (!currentOp.jobId && error instanceof ApiError && !error.retryable) {
           setOperation(null);
@@ -774,18 +794,6 @@ export default function App({
             ))}
           </nav>
           <div className="profile-controls">
-            {member && (
-              <button
-                ref={buddyRestore}
-                className="secondary buddy-restore"
-                onClick={() => {
-                  setBuddyHidden(false);
-                  setBuddyOpen(true);
-                }}
-              >
-                เปิดแชต Buddy
-              </button>
-            )}
             {adminEnabled && (
               <button className="admin-link" onClick={() => onNavigate?.('/admin')}>
                 จัดการระบบ
@@ -1369,10 +1377,7 @@ export default function App({
       {member && (
         <FloatingBuddy
           open={buddyOpen}
-          hidden={buddyHidden}
           onOpen={setBuddyOpen}
-          onHide={setBuddyHidden}
-          restoreRef={buddyRestore}
           videos={filtered}
           selected={selected}
           select={(id) =>
