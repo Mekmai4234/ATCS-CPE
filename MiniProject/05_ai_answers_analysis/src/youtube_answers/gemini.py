@@ -1,6 +1,7 @@
 """One async, bounded count+generate attempt. Module 02 owns job retries."""
 
 import asyncio
+import re
 import time
 
 import httpx
@@ -54,6 +55,11 @@ class GeminiModel:
             response_json_schema=provider_response_schema(),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
+        # Gemini 3 Flash shares max_output_tokens between thinking and answer JSON.
+        # Its default thinking can consume this bounded answer budget before the
+        # first statement is complete. Other model families keep their own defaults.
+        if re.match(r"^(?:models/)?gemini-3(?:\.\d+)?-flash(?:-|$)", self.settings.llm_model):
+            config.thinking_config = types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW)
         contents = [types.Content(role="user", parts=[types.Part(text=json_text(payload))])]
         started = time.monotonic()
         try:
@@ -74,6 +80,11 @@ class GeminiModel:
             if len(response.candidates or []) != 1:
                 raise error("invalid_model_output", "Gemini returned no single usable candidate")
             candidate = response.candidates[0]
+            if str(candidate.finish_reason) in {"MAX_TOKENS", "FinishReason.MAX_TOKENS"}:
+                raise error(
+                    "generation_output_truncated",
+                    "Gemini exhausted the output token budget before completing the answer",
+                )
             if str(candidate.finish_reason) not in {"STOP", "FinishReason.STOP"}:
                 raise error("invalid_model_output", "Gemini output was blocked or truncated")
             if candidate.content is None or any(
