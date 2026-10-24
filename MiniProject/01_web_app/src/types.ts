@@ -70,6 +70,7 @@ export interface Answer {
   mode?: string;
 }
 export interface SourceSnapshot {
+  accessRevision?: number; // Client-only library membership epoch, never an authorization claim.
   video_id: string;
   generation?: number;
   indexed_version?: string | null;
@@ -119,5 +120,20 @@ export interface ProgressEvent {
   state: string;
   summary: string;
   timestamp: string;
+}
+export interface ConversationPage {
+  conversation_id: string;
+  total: number;
+  limit: number;
+  offset: number;
+  messages: {
+    message_id: string;
+    job_id: string;
+    role: string;
+    content: string;
+    citations: Citation[];
+    scope: { video_id: string; generation?: number; transcript_version?: string }[];
+    state: JobState;
+  }[];
 }
 export type TaskType = 'chat' | 'summary' | 'compare' | 'research' | Artifact['type'];
