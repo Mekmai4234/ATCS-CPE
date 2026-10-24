@@ -1,0 +1,17 @@
+# syntax=docker/dockerfile:1
+FROM node:24-bookworm-slim@sha256:8cabefbd444809cf0e319b5831c65da1ea202200ca552a5e75fd7938a6f86658 AS build
+WORKDIR /web
+RUN npm install --global pnpm@11.25.0
+COPY 01_web_app/package.json 01_web_app/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY 01_web_app/ ./
+# Same-origin API; this build never accepts provider keys or Google credentials.
+ARG PUBLIC_ORIGIN=https://localhost
+ARG GOOGLE_CLIENT_ID=""
+ENV VITE_DEMO_MODE=false NEXT_PUBLIC_API_BASE_URL=$PUBLIC_ORIGIN VITE_GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+RUN pnpm build
+
+FROM caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+COPY --from=build /web/dist /srv
+COPY 07_testing_deployment/Caddyfile /etc/caddy/Caddyfile
+EXPOSE 80 443
