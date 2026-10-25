@@ -5,6 +5,8 @@ import '@fontsource/ibm-plex-sans-thai/500.css';
 import '@fontsource/ibm-plex-sans-thai/600.css';
 import '@fontsource/ibm-plex-sans-thai/700.css';
 import '@fontsource-variable/manrope';
+import '@fontsource/kanit/thai-700.css';
+import '@fontsource/kanit/thai-800.css';
 import './styles.css';
 import './theme.css';
 import './mint.css';

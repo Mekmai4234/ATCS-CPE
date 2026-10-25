@@ -62,6 +62,7 @@ export default function FloatingBuddy(props: Props) {
   const [view, setView] = useState(viewport);
   const [point, setPoint] = useState(() => readPosition(storage(), viewport()));
   const current = useRef(point);
+  const preferred = useRef(point);
   const [menu, setMenu] = useState(false);
   const [dragging, setDragging] = useState(false);
   const launcher = useRef<HTMLButtonElement>(null);
@@ -88,6 +89,7 @@ export default function FloatingBuddy(props: Props) {
   const apply = (value: Point, save = false) => {
     const next = clampPoint(value, viewport());
     current.current = next;
+    preferred.current = next;
     setPoint(next);
     if (save) {
       try {
@@ -103,13 +105,29 @@ export default function FloatingBuddy(props: Props) {
     requestAnimationFrame(() => launcher.current?.focus());
   }
   useEffect(() => {
+    let resizeFrame = 0;
     const resize = () => {
-      const next = viewport();
-      setView(next);
-      apply(current.current);
+      // Coalesce transient visual-viewport changes before clamping the saved position.
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        const next = viewport();
+        if (next.width <= 0 || next.height <= 0) return;
+        setView(next);
+        // Temporary viewport sizes must not overwrite the user's chosen position.
+        const visible = clampPoint(preferred.current, next);
+        current.current = visible;
+        setPoint(visible);
+      });
     };
     const avoidFocus = (event: FocusEvent) => {
       if (!(event.target instanceof HTMLElement) || event.target.closest('.buddy-widget')) return;
+      // Focusing the document after a screenshot or navigation is not an obscured control.
+      if (
+        !event.target.matches(
+          'a[href],button,input,textarea,select,summary,[contenteditable="true"],[tabindex]:not([tabindex="-1"])',
+        )
+      )
+        return;
       const rect = event.target.getBoundingClientRect(),
         button = launcher.current?.getBoundingClientRect();
       if (
@@ -118,14 +136,35 @@ export default function FloatingBuddy(props: Props) {
         rect.left < button.right &&
         rect.bottom > button.top &&
         rect.top < button.bottom
-      )
-        apply(cornerPoint(rect.top > innerHeight / 2 ? 'top-right' : 'bottom-right', viewport()));
+      ) {
+        const view = viewport();
+        const headerBottom = document.querySelector('.topbar')?.getBoundingClientRect().bottom || 0;
+        for (const corner of ['bottom-right', 'bottom-left', 'top-left', 'top-right']) {
+          let candidate = cornerPoint(corner, view);
+          if (corner.startsWith('top'))
+            candidate = clampPoint(
+              { ...candidate, y: Math.max(candidate.y, headerBottom + 16) },
+              view,
+            );
+          // Include the position menu button so moving Buddy cannot cover a nearby control.
+          if (
+            rect.right <= candidate.x - 31 ||
+            rect.left >= candidate.x + 72 ||
+            rect.bottom <= candidate.y ||
+            rect.top >= candidate.y + 72
+          ) {
+            apply(candidate);
+            break;
+          }
+        }
+      }
     };
     window.addEventListener('resize', resize);
     window.visualViewport?.addEventListener('resize', resize);
     window.visualViewport?.addEventListener('scroll', resize);
     document.addEventListener('focusin', avoidFocus);
     return () => {
+      cancelAnimationFrame(resizeFrame);
       cancelAnimationFrame(frame.current);
       window.removeEventListener('resize', resize);
       window.visualViewport?.removeEventListener('resize', resize);
@@ -156,8 +195,8 @@ export default function FloatingBuddy(props: Props) {
       if (incoming) setNewMessage(true);
     }
   }, [props.turns.length, props.status, open]);
-  const width = Math.min(400, view.width - 24);
-  const height = Math.min(650, view.height - (mobile ? 24 : 112));
+  const width = Math.min(view.width >= 1200 ? 460 : 400, view.width - 24);
+  const height = Math.min(700, view.height - (mobile ? 24 : 112));
   const x = mobile
     ? view.left + 12
     : Math.max(
@@ -393,7 +432,7 @@ export default function FloatingBuddy(props: Props) {
             >
               {!props.turns.length && (
                 <div className="buddy-empty">
-                  <InteractiveBuddy state={state} />
+                  <InteractiveBuddy headOnly active={false} decorative state={state} />
                   <h3>เริ่มจากคลิปที่อยากเข้าใจ</h3>
                   <p>เลือกคลิป แล้วถาม Buddy พร้อมเปิดหลักฐานจากช่วงเวลาจริงในคลิป</p>
                 </div>
@@ -411,6 +450,10 @@ export default function FloatingBuddy(props: Props) {
                       )
                       .join(' · ')}
                   </small>
+                  <div className="buddy-reply-heading">
+                    <InteractiveBuddy headOnly active={false} decorative />
+                    <strong>Buddy AI</strong>
+                  </div>
                   <ResultView result={turn.result} partial={turn.partial} />
                 </article>
               ))}

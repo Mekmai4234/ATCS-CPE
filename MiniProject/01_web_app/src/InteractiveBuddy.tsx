@@ -28,7 +28,7 @@ export default function InteractiveBuddy({
       frame = 0;
       node.style.setProperty('--eye-x', `${pending.x * 6}px`);
       node.style.setProperty('--eye-y', `${pending.y * 5}px`);
-      node.style.setProperty('--head-tilt', `${pending.x * 5}deg`);
+      node.style.setProperty('--head-tilt', `${pending.x * 1.5}deg`);
     };
     const reset = () => {
       pending = { x: 0, y: 0 };
@@ -85,36 +85,33 @@ export default function InteractiveBuddy({
   return (
     <div
       ref={root}
-      className={`buddy-rig ${headOnly ? 'head-only' : ''} ${className} ${greeting ? 'is-waving' : ''}`}
+      className={`buddy-rig ${headOnly ? 'head-only' : 'buddy-scene'} ${className} ${greeting ? 'is-waving' : ''}`}
       data-state={state}
       aria-hidden={decorative || headOnly ? true : undefined}
     >
       {fallback ? (
         <img className="buddy-static" src="/assets/rag-buddy-640.webp" alt="" />
+      ) : headOnly ? (
+        <img
+          className="buddy-avatar-image"
+          src="/assets/buddy-reference/avatar-256.webp"
+          width="256"
+          height="256"
+          alt=""
+          onError={() => setFallback(true)}
+        />
       ) : (
-        <>
-          {!headOnly && (
-            <>
-              <img
-                className="buddy-body"
-                src="/assets/buddy-rig/body.webp"
-                alt=""
-                onError={() => setFallback(true)}
-              />
-              <img
-                className="buddy-hand"
-                src="/assets/buddy-rig/hand.webp"
-                alt=""
-                onError={() => setFallback(true)}
-              />
-            </>
-          )}
-          <div className="buddy-head">
-            <img src="/assets/buddy-rig/head.webp" alt="" onError={() => setFallback(true)} />
-            <span className="buddy-pupil pupil-left" />
-            <span className="buddy-pupil pupil-right" />
-          </div>
-        </>
+        <img
+          className="buddy-scene-image"
+          src="/assets/buddy-reference/scene-1536.webp"
+          srcSet="/assets/buddy-reference/scene-768.webp 768w, /assets/buddy-reference/scene-1536.webp 1536w"
+          sizes="(max-width: 600px) 100vw, 65vw"
+          width="1536"
+          height="1024"
+          fetchPriority="high"
+          alt=""
+          onError={() => setFallback(true)}
+        />
       )}
       {!headOnly && !decorative && (
         <span className="buddy-greeting" role="status">
