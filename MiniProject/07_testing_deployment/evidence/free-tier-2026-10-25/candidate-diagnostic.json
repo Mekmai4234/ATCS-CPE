@@ -1,0 +1,32 @@
+{
+  "base": "1814bf3622eb62f0963da4f682ea31661728907c",
+  "modules": {
+    "01_web_app": "fffbcec5afa574851a6d4992d8ca10c7ae47e294",
+    "02_api_backend": "b3bb18d960cc664653a8d3be4732112f1c1059b2",
+    "03_video_ingestion": "dfda16d3b1bd1d2aae7e9c84780095f5fd201916",
+    "04_rag_knowledge": "b3e983a30a4677b7f344bb09af013fd2cac4f9af",
+    "05_ai_answers_analysis": "387dfeddb7f5f7db91f455c12ec4b5db67ed855b",
+    "06_research_learning_agent": "e63bdb65021e7865b4ed5fc7905264367aeacef4"
+  },
+  "status": "candidate only; not merged develop",
+  "live_google_verified": false,
+  "tooling_commit": "1814bf3622eb62f0963da4f682ea31661728907c",
+  "tooling_dirty": true,
+  "lock_profile": "isolated-free-tier-diagnostic-refreshed-lock",
+  "lock_sha256": "fe361bd23c0fbf5711830b3d2259aa4e6dd5e0b048b4961fbbf7d15341d5f3c4",
+  "original_lock_sha256": "fbb1a1d0f71c0dee61d1b52fa74cfebf51aebc8d8b2e3509489de79ad25f1cc3",
+  "diagnostic_lock_refresh": true,
+  "results": {
+    "strict_schema_consumer": {
+      "passed": 5,
+      "failed": 1,
+      "blocker": "02 broker lacks 05 authorize interface"
+    },
+    "backend_media_quota": {
+      "passed": 24,
+      "failed": 0
+    }
+  },
+  "tooling_sha256_before_lock_refresh": "de286164bd929185df998e11571aa96a33296f19316481a9559bc3a889c0c842",
+  "strict_contract_test_sha256": "eb0c8a66cb0d1b9017697fd05c80ae1486d594e1694583526497b680323426fe"
+}
