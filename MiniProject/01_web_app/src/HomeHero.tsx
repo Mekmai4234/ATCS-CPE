@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react';
 import { Mascot } from './Forest';
-import { LearningScene, UiIcon } from './Visuals';
+import { UiIcon } from './Visuals';
 
 export default function HomeHero({
   name,
@@ -56,7 +56,9 @@ export default function HomeHero({
               {busy ? 'กำลังเพิ่ม…' : 'เพิ่มวิดีโอ'} <span aria-hidden="true">→</span>
             </button>
           </form>
-          <p className="hero-import-hint">นำเข้าแล้วถาม พร้อมอ้างอิงช่วงเวลาในคลิป</p>
+          <p className="hero-import-hint">
+            <UiIcon name="spark" size={18} /> นำเข้าแล้วถาม พร้อมอ้างอิงช่วงเวลาในคลิป
+          </p>
           <div className="hero-shortcuts">
             <button onClick={openLibrary}>
               <span aria-hidden="true">▣</span> เปิดคลังวิดีโอ
@@ -70,8 +72,6 @@ export default function HomeHero({
         <span className="home-small-note">ยินดีต้อนรับคุณ{name} · เรียนรู้จากคลิปในคลังของคุณ</span>
       </div>
       <div className="home-mascot">
-        <LearningScene />
-        <div className="mascot-halo" />
         <Mascot />
         <span className="buddy-speech">ไปเรียนรู้กัน!</span>
       </div>
