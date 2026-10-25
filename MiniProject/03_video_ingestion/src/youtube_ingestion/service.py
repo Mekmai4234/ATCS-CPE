@@ -17,11 +17,27 @@ logger = logging.getLogger(__name__)
 
 
 class IngestionService:
-    def __init__(self, settings=None, *, captions=None, metadata=None):
+    def __init__(self, settings=None, *, captions=None, metadata=None, media=None):
         self.settings = settings or IngestionSettings()
         self.captions = captions if captions is not None else SubprocessCaptions()
         self.metadata = metadata if metadata is not None else YouTubeMetadata(self.settings)
         self.closed = False
+        self.media = media
+
+    async def prepare_media(self, path, context):
+        """Internal server-staged upload path; distinct from TranscriptResult.
+
+        02 must authorize/stage the file and persist the new evidence contract before
+        wiring this operation into its worker. Caption errors never become fake text.
+        """
+        context.check()
+        if self.closed:
+            raise failure("media_closed", "Ingestion adapter is closed", 503)
+        if self.media is None:
+            from .media import MediaPreparation
+
+            self.media = MediaPreparation()
+        return await self.media.prepare(path, context)
 
     async def ingest(self, video_id: str, context: ExecutionContext) -> TranscriptResult:
         context.check()
@@ -73,4 +89,8 @@ class IngestionService:
         try:
             await self.captions.close()
         finally:
-            await self.metadata.close()
+            try:
+                await self.metadata.close()
+            finally:
+                if self.media is not None:
+                    await self.media.close()
