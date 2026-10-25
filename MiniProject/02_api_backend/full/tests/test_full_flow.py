@@ -140,6 +140,15 @@ def install_doubles(monkeypatch):
     from youtube_ingestion.metadata import YouTubeMetadata
     from youtube_rag import integration
 
+    # All external provider transports below are replaced by local test doubles.
+    # This declaration does not exist on the delivered live 05 factory.
+    monkeypatch.setattr(
+        team.TeamAdapters,
+        "provider_operations",
+        dict.fromkeys(("index", "answer", "analyze", "research", "artifact"), "local"),
+        raising=False,
+    )
+
     async def captions(self, video_id, languages, timeout):
         return CaptionTrack(
             video_id=video_id,
@@ -362,6 +371,65 @@ async def sign_in_member(full, client, subject):
     client.headers.update(
         {"Origin": "http://localhost:3000", "X-CSRF-Token": result.json()["csrf_token"]}
     )
+
+
+@pytest.mark.parametrize("full", [True], indirect=True)
+async def test_full_factory_cannot_bypass_free_attestation_or_request_broker(
+    full, monkeypatch, tmp_path
+):
+    import hashlib
+    import json
+    from datetime import UTC, datetime, timedelta
+
+    import sqlalchemy as sa
+
+    from youtube_backend import database as tables
+
+    await sign_in_member(full, full.client, "free-only-member")
+    await import_ready(full)  # Explicit local transport doubles create real RAG state.
+    monkeypatch.setattr(type(full.runtime.adapter), "provider_operations", {})
+    calls = []
+
+    async def forbidden(*args, **kwargs):
+        calls.append(True)
+        raise AssertionError("Provider callback must not be reached")
+
+    monkeypatch.setattr(ModelDouble, "generate", forbidden)
+    body = {"question": "RAG", "scope": {"video_ids": [VIDEO_A]}}
+    denied = await full.client.post("/api/chat", json=body)
+    assert denied.status_code == 503, denied.text
+    assert denied.json()["error"]["code"] == "free_tier_unverified"
+    now = datetime.now(UTC)
+    policy = dict(
+        tier="free",
+        project_ref="fixture-full-project",
+        verified_by="fixture-operator",
+        evidence_ref="synthetic-not-a-real-tier-check",
+        key_sha256=hashlib.sha256(
+            full.runtime_settings.gemini_api_key.get_secret_value().encode()
+        ).hexdigest(),
+        verified_at=(now - timedelta(seconds=1)).isoformat(),
+        expires_at=(now + timedelta(days=1)).isoformat(),
+        pools={"fixture": {"rpm": 1, "tpm": 1000, "rpd": 1}},
+        models=[
+            dict(
+                model=full.runtime_settings.llm_model,
+                bucket="fixture",
+                endpoints=["generateContent"],
+                returned_models=[full.runtime_settings.llm_model],
+                roles=["chat"],
+            )
+        ],
+    )
+    file = tmp_path / "fixture-policy.json"
+    file.write_text(json.dumps(policy), encoding="utf-8")
+    full.runtime_settings.gemini_free_policy_file = str(file)
+    denied = await full.client.post("/api/chat", json=body)
+    assert denied.status_code == 503 and denied.json()["error"]["code"] == "gemini_broker_required"
+    assert not calls
+    assert (await full.client.get(f"/api/videos/{VIDEO_A}/transcript")).status_code == 200
+    with full.db.read() as c:
+        assert c.scalar(sa.select(sa.func.count()).select_from(tables.v2["reservations"])) == 0
 
 
 @pytest.mark.parametrize("full", [True], indirect=True)

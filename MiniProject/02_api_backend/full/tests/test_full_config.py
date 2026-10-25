@@ -176,7 +176,17 @@ def test_cli_config_init_check_and_preflight_without_secret_leak(config, tmp_pat
 
 @pytest.mark.parametrize(
     "command",
-    ["api", "worker", "gc", "reindex", "rag-init", "migrate", "bootstrap-admin", "claim-legacy"],
+    [
+        "api",
+        "worker",
+        "gc",
+        "reindex",
+        "rag-init",
+        "quota-policy",
+        "migrate",
+        "bootstrap-admin",
+        "claim-legacy",
+    ],
 )
 def test_launcher_dispatches_identical_environment_without_keys_in_argv(
     config, monkeypatch, tmp_path, command
@@ -190,7 +200,7 @@ def test_launcher_dispatches_identical_environment_without_keys_in_argv(
     for key, value in config.child_environment({}).items():
         monkeypatch.setenv(key, value)
     args = ["yk-full", "--env-file", str(file), command]
-    if command in {"gc", "reindex", "rag-init"}:
+    if command in {"gc", "reindex", "rag-init", "quota-policy"}:
         args += ["--workers-stopped"]
     if command == "reindex":
         args += ["--video-id", "dQw4w9WgXcQ"]

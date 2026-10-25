@@ -36,6 +36,9 @@ async def test_missing_captions_unavailable_and_transient_retry(env):
     retry = queue_import(env, "RetryOnce01")
     await env.worker.run_once(retry)
     assert env.repo.get_job(retry)["state"] == "queued"
+    with env.db.write() as connection:
+        # Advance the durable retry schedule; a provider timeout now has a floor.
+        connection.execute(db.jobs.update().where(db.jobs.c.job_id == retry).values(available_at=0))
     await env.worker.run_once(retry)
     assert env.repo.get_job(retry)["stage"] == "ready"
     assert env.repo.get_job(retry)["attempt_count"] == 2

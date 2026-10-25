@@ -81,7 +81,7 @@ class Ownership:
                 .limit(1)
             ):
                 raise AppError("cancelled", "No library authorizes this import", 409)
-        elif job["kind"] == "attach":
+        elif job["kind"] in {"attach", "enrich"}:
             self._require_video(connection, job["video_id"], owner)
         else:
             self._check_sources(connection, job["payload"].get("sources", []), owner=owner)
