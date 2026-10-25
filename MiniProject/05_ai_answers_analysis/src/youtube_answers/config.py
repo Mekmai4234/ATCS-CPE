@@ -22,6 +22,10 @@ class AnswerSettings(BaseSettings):
     answer_max_model_calls: int = Field(default=64, ge=1, le=1000)
     answer_max_history_messages: int = Field(default=12, ge=0, le=40)
     answer_max_history_bytes: int = Field(default=4000, ge=0, le=20000)
+    vision_model: str = Field(default="", max_length=200)
+    vision_max_frames: int = Field(default=12, ge=1, le=12)
+    vision_frames_per_question: int = Field(default=3, ge=0, le=3)
+    vision_max_image_bytes: int = Field(default=4_000_000, ge=1024, le=4_000_000)
 
     def model_post_init(self, context):
         if self.enable_streaming:
