@@ -1,2 +1,2 @@
 # Preserve the bytes whose SHA-256 is retained in the diagnostic report.
-* -text
+* -text whitespace=cr-at-eol
