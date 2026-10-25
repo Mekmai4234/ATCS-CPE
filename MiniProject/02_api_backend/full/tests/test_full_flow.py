@@ -75,7 +75,7 @@ def metadata():
 
 
 class ModelDouble:
-    def __init__(self, settings):
+    def __init__(self, settings, *, broker=None):
         self.settings = settings
 
     async def generate(self, payload, timeout):
@@ -387,7 +387,7 @@ async def test_full_factory_cannot_bypass_free_attestation_or_request_broker(
 
     await sign_in_member(full, full.client, "free-only-member")
     await import_ready(full)  # Explicit local transport doubles create real RAG state.
-    monkeypatch.setattr(type(full.runtime.adapter), "provider_operations", {})
+    monkeypatch.setattr(full.runtime.adapter, "provider_operations", {})
     calls = []
 
     async def forbidden(*args, **kwargs):
