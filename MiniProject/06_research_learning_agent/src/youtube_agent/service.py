@@ -24,7 +24,7 @@ from youtube_backend.schemas import (
 from youtube_backend.urls import canonical_url
 
 from .authorization import member_service
-from .gemini import byte_size, json_text
+from .gemini import GeminiModel, byte_size, json_text
 from .models import TOOL_MODELS, Usage, error
 
 CONTENTS = {"study_plan": StudyPlanContent, "quiz": QuizContent, "flashcards": FlashcardsContent}
@@ -50,6 +50,9 @@ class Run:
     pending: set = field(default_factory=set)
     artifacts: list = field(default_factory=list)
     step: int = 0
+    model_calls: int = 0
+    tool_calls: int = 0
+    research: bool = False
 
     def remaining(self):
         self.context.check()
@@ -76,7 +79,18 @@ class AgentService:
             Usage(self.settings.llm_model, provider="none"),
         )
 
-    async def _bounded(self, run, function, *, reserve=True):
+    async def _bounded(self, run, function, *, reserve=True, model=False):
+        if model:
+            if run.model_calls >= self.settings.agent_max_model_calls:
+                raise error("agent_budget_exhausted", "Model call budget exhausted")
+            run.model_calls += 1
+        else:
+            limit = self.settings.agent_max_tool_calls - (2 if reserve else 0)
+            if run.tool_calls >= limit:
+                raise error(
+                    "agent_budget_exhausted", "Tool budget reached final validation reserve"
+                )
+            run.tool_calls += 1
         remaining = run.remaining() - (
             self.settings.agent_finalize_reserve_seconds if reserve else 0
         )
@@ -152,7 +166,8 @@ class AgentService:
             "run_controller",
             state,
             f"Validated output; processed_chunks={result.coverage.processed_chunks}; "
-            f"complete={result.coverage.complete}",
+            f"complete={result.coverage.complete}; model_calls={run.model_calls}; "
+            f"tool_calls={run.tool_calls}",
         )
         return result
 
@@ -262,9 +277,18 @@ class AgentService:
                 "insufficient_evidence", "No transcript evidence for learning output", status=409
             )
         schema = CONTENTS[request["type"]]
+        if run.research and run.model_calls >= self.settings.agent_max_model_calls - 1:
+            raise error("agent_budget_exhausted", "Preserving the final answer model allowance")
         generated = await self._bounded(
             run,
-            lambda timeout: self.model.generate(request, list(records.values()), schema, timeout),
+            lambda timeout: self.model.generate(
+                request,
+                list(records.values()),
+                schema,
+                timeout,
+                **({"context": run.context} if isinstance(self.model, GeminiModel) else {}),
+            ),
+            model=True,
         )
         run.usage.add(generated.metadata)
         try:
@@ -430,6 +454,7 @@ class AgentService:
         if member is not None:
             return await member.research(request, sources, context)
         run = self._run(sources, context)
+        run.research = True
         request = self._request(ResearchRequest, request, run)
         history = [
             {
@@ -455,12 +480,27 @@ class AgentService:
                             "remaining_steps": self.settings.agent_max_steps - step + 1,
                             "remaining_seconds": max(0, run.remaining()),
                             "coverage": self._coverage(run).model_dump(),
+                            "final_only": run.model_calls
+                            == self.settings.agent_max_model_calls - 1,
                         },
                     }
                 )
                 reply = await self._bounded(
-                    run, lambda timeout: self.model.decide(history, timeout)
+                    run,
+                    lambda timeout: self.model.decide(
+                        history,
+                        timeout,
+                        **({"context": run.context} if isinstance(self.model, GeminiModel) else {}),
+                    ),
+                    model=True,
                 )
+                if (
+                    run.model_calls == self.settings.agent_max_model_calls
+                    and reply.name != "finish_research"
+                ):
+                    return await self._deliver(
+                        run, self._partial(run, "Final model allowance reached.")
+                    )
                 run.usage.add(reply.metadata)
                 # Only credit observations after the subsequent decision successfully returned.
                 run.processed.update(run.pending)
@@ -537,6 +577,17 @@ class AgentService:
             )
         except AppError as exc:
             context.check()
+            if getattr(exc, "pause", False) or exc.code in {
+                "free_tier_unverified",
+                "free_model_unverified",
+                "quota_policy_mismatch",
+                "quota_wait",
+                "provider_rate_limited",
+                "provider_unavailable",
+            }:
+                if not run.evidence:
+                    raise
+                return await self._deliver(run, self._partial(run, f"Stopped: {exc.code}."))
             if exc.code in SOURCE_ERRORS:
                 raise
             if exc.code in {"agent_budget_exhausted", "context_budget_exceeded"} or run.evidence:

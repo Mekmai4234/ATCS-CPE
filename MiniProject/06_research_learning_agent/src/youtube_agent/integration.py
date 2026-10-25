@@ -60,6 +60,16 @@ class AgentAdapters(RagAdapters):
     async def artifact(self, request, sources, context):
         return await self.agent.artifact(request, sources, context)
 
+    async def research_media(self, request, snapshots, context, *, planner=None, vision=None):
+        """Internal v2 handoff only. 02 does not publish this through v1 research jobs."""
+        from .media import MediaAgentService
+
+        tools = RagMediaTools(self.rag)
+        agent = self.agent.agent if isinstance(self.agent, MemberAgentService) else self.agent
+        return await MediaAgentService(
+            agent.settings, tools, planner=planner, vision=vision
+        ).research(request, snapshots, context)
+
     async def close(self):
         try:
             agent = self.agent.agent if isinstance(self.agent, MemberAgentService) else self.agent
@@ -101,3 +111,42 @@ async def create_member_adapters(*, settings, repository):
     except BaseException:
         await gateway.close()
         raise
+
+
+class RagMediaTools:
+    """Reuse 04's native lexical/enrichment boundary without inventing a research scope."""
+
+    def __init__(self, rag):
+        self.media = rag.media
+
+    def authorize(self, sources, context):
+        import hashlib
+
+        from .gemini import json_text
+
+        scope = self.media.scope(sources, BackendExecution(context))
+        return hashlib.sha256(
+            json_text([scope, context.job_id, context.lease_token]).encode()
+        ).hexdigest()
+
+    async def inventory(self, sources, context):
+        return await self.media.inventory(sources, BackendExecution(context))
+
+    async def search(self, question, sources, context):
+        values = await self.media.search(
+            question, sources, BackendExecution(context), mode="lexical"
+        )
+        return [
+            {"evidence_id": v["evidence_id"], "citation": v["citation"]} for v in values["hits"]
+        ]
+
+    async def evidence(self, sources, ids, context):
+        return await self.media.evidence(sources, ids, BackendExecution(context))
+
+    async def frames(self, sources, context):
+        self.authorize(sources, context)
+        return [
+            r["citation"]["frame_id"]
+            for s in sources
+            for r in self.media.local(s, BackendExecution(context))[0]
+        ]

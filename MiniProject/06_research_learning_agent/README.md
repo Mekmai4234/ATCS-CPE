@@ -249,3 +249,15 @@ docker compose -p yk06-auth-review -f 06_research_learning_agent/compose.test.ya
 ```
 
 See the latest report for commands, dependency revisions and actual gate results.
+
+## Free Tier and media Agent (2026-10-25)
+
+Real Gemini planning/artifact requests now require 02's shared Free Tier admission,
+including countTokens. Defaults bound each run to four model operations and 32 tools,
+with protected finalization capacity. Stored OCR/visual evidence has an opt-in internal
+controller using native v2 frame/time citations and at most three extra frames.
+
+See [FREE_TIER_AGENT.md](FREE_TIER_AGENT.md) for contracts, policy, reservation limits
+and the remaining 02/04/05 public media wiring. The native media path currently permits
+enrichment leases; public multi-step media research is not enabled by this PR.
+See [FREE_TIER_REPORT.md](FREE_TIER_REPORT.md) for the tested common candidate and results.

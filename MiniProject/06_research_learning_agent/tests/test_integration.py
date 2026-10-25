@@ -278,9 +278,16 @@ async def test_step_exhaustion_persists_honest_partial(integrated):
     assert job["result"]["citations"]
 
 
-async def test_real_sdk_wire_through_backend_worker_and_chroma(integrated):
+async def test_real_sdk_wire_through_backend_worker_and_chroma(integrated, monkeypatch):
     """The complete 02 -> 06 -> SDK HTTP mock -> 04 loop, not a scripted model gateway."""
     calls = []
+
+    async def wire_broker(context, callback, **request):
+        context.check()
+        return await callback()
+
+    # SDK wire test only. Actual durable project admission has a separate contract suite.
+    monkeypatch.setattr(ExecutionContext, "gemini_call", wire_broker, raising=False)
 
     def handler(request):
         if request.url.path.endswith(":countTokens"):
