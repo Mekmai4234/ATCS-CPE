@@ -9,6 +9,14 @@ Installation, runnable commands and full integration are documented in README.md
 
 Architecture
 ------------
+- VisualAnswerService is an internal multimodal consumer behind an authorized 02/04 bridge.
+- 03-local-v1 prepared frames map to media snapshots without fake transcript versions.
+- OCR originals, AI observations, source/frame/time and sampling limitations remain distinct.
+- ObservationCache stores private SQLite entries keyed by scope/grants, content hash,
+  generation/evidence version, OCR, pinned returned model, prompt and schema.
+- Gemini count/generate/catalog requests require verified Free Tier broker leases.
+- No local broker, paid fallback, new billing action or full-video-per-question upload is added.
+- VISUAL_HANDOFF.md describes unimplemented upstream contracts and production blockers.
 - MemberContext verifies the durable job owner, frozen sources, active account, library
   grant identity and conversation ownership before and after retrieval/provider awaits.
 - Only the durable job's history is accepted. Admin roles do not bypass private ownership.

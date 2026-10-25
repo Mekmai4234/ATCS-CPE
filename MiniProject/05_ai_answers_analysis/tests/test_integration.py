@@ -10,6 +10,7 @@ from conftest import VIDEO_A, VIDEO_B, ScriptedModel, metadata
 from google import genai
 from google.genai import types
 from identity_helpers import OwnedTestRepository, login
+from quota_helpers import OfflineBroker
 from youtube_agent.config import AgentSettings
 from youtube_agent.models import ModelReply
 from youtube_agent.service import AgentService
@@ -406,7 +407,7 @@ async def test_real_sdk_wire_through_02_05_04(integrated):
             retry_options=types.HttpRetryOptions(attempts=1),
         ),
     )
-    model = GeminiModel(AnswerSettings(_env_file=None), client=client)
+    model = GeminiModel(AnswerSettings(_env_file=None), client=client, broker=OfflineBroker())
     env.answers.answers.model = model
     try:
         queued = env.repo.enqueue(

@@ -392,7 +392,7 @@ def main():
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument(
-        "--live", action="store_true", help="Allow imports and paid provider requests"
+        "--live", action="store_true", help="Allow imports and server-verified Free Tier requests"
     )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
@@ -418,7 +418,7 @@ def main():
     )
     args = parser.parse_args()
     if not args.live:
-        parser.error("Pass --live to allow importing videos and paid generation/embedding requests")
+        parser.error("Pass --live to allow imports and server-verified Free Tier requests")
     url = urlsplit(args.base_url)
     if (
         url.scheme not in {"http", "https"}

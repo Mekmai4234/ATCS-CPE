@@ -11,9 +11,10 @@ from youtube_backend.schemas import ProviderMetadata
 
 from .models import Generated, GeneratedAnswer, error
 from .prompts import POLICY, json_text
+from .quota import verified_grant
 
 
-def provider_response_schema():
+def provider_response_schema(schema=GeneratedAnswer):
     """Keep high-cardinality array bounds out of Gemini's constrained decoder.
 
     The nested 100 statements / 1000 citation IDs limits can make generateContent
@@ -28,12 +29,13 @@ def provider_response_schema():
             return [compact(item) for item in value]
         return value
 
-    return compact(GeneratedAnswer.model_json_schema())
+    return compact(schema.model_json_schema())
 
 
 class GeminiModel:
-    def __init__(self, settings, *, client=None):
+    def __init__(self, settings, *, client=None, broker=None):
         self.settings = settings
+        self.broker = broker
         if client is None and not settings.gemini_api_key.get_secret_value():
             raise error("generation_unavailable", "GEMINI_API_KEY is required", status=503)
         self._http = httpx.AsyncClient() if client is None else None
@@ -47,26 +49,76 @@ class GeminiModel:
             ),
         )
 
-    async def generate(self, payload, timeout):
+    def grant(self, model, purpose):
+        return verified_grant(self.broker, self.settings, model, purpose)
+
+    def _recheck(self, grant):
+        current = self.grant(grant.requested_model, grant.purpose)
+        if current.model_dump(exclude={"expires_at"}) != grant.model_dump(exclude={"expires_at"}):
+            raise error("quota_pending", "Verified model/project policy changed", status=503)
+
+    async def generate(
+        self,
+        payload,
+        timeout,
+        *,
+        schema=GeneratedAnswer,
+        policy=POLICY,
+        images=(),
+        purpose="chat",
+        model=None,
+    ):
+        model = model or self.settings.llm_model
+        grant = self.grant(model, purpose)
+        if images and purpose != "vision":
+            raise error("invalid_scope", "Images require an authorized vision grant")
+        if len(images) > 1 or any(
+            len(data) > self.settings.vision_max_image_bytes for data, _ in images
+        ):
+            raise error("context_budget_exceeded", "Inline image exceeds the bounded request")
         config = types.GenerateContentConfig(
-            system_instruction=POLICY,
-            max_output_tokens=self.settings.answer_max_output_tokens,
+            http_options=types.HttpOptions(retry_options=types.HttpRetryOptions(attempts=1)),
+            system_instruction=policy,
+            max_output_tokens=min(self.settings.answer_max_output_tokens, grant.max_output_tokens),
             response_mime_type="application/json",
-            response_json_schema=provider_response_schema(),
+            response_json_schema=provider_response_schema(schema),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
         # Gemini 3 Flash shares max_output_tokens between thinking and answer JSON.
         # Its default thinking can consume this bounded answer budget before the
         # first statement is complete. Other model families keep their own defaults.
-        if re.match(r"^(?:models/)?gemini-3(?:\.\d+)?-flash(?:-|$)", self.settings.llm_model):
-            config.thinking_config = types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW)
-        contents = [types.Content(role="user", parts=[types.Part(text=json_text(payload))])]
+        if grant.thinking_level and re.match(
+            r"^(?:models/)?gemini-3(?:\.\d+)?-flash(?:-|$)", model
+        ):
+            config.thinking_config = types.ThinkingConfig(thinking_level=grant.thinking_level)
+        contents = [
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part(text=json_text(payload)),
+                    *[types.Part.from_bytes(data=data, mime_type=mime) for data, mime in images],
+                ],
+            )
+        ]
         started = time.monotonic()
         try:
             async with asyncio.timeout(timeout):
-                count = await self.client.aio.models.count_tokens(
-                    model=self.settings.llm_model, contents=contents
-                )
+                async with self.broker.reserve(
+                    grant=grant,
+                    operation="count_tokens",
+                    input_tokens=self.settings.max_context_tokens,
+                    output_tokens=0,
+                ):
+                    self._recheck(grant)
+                    count = await self.client.aio.models.count_tokens(
+                        model=model,
+                        contents=contents,
+                        config=types.CountTokensConfig(
+                            http_options=types.HttpOptions(
+                                retry_options=types.HttpRetryOptions(attempts=1),
+                            )
+                        ),
+                    )
                 if type(count.total_tokens) is not int or count.total_tokens <= 0:
                     raise error("invalid_token_count", "Gemini returned an invalid token count")
                 # countTokens cannot count GenerateContentConfig on the Developer API.
@@ -74,9 +126,21 @@ class GeminiModel:
                 allowance = len(config.model_dump_json(exclude_none=True).encode("utf-8")) + 256
                 if count.total_tokens + allowance > self.settings.max_context_tokens:
                     raise error("context_budget_exceeded", "Model input exceeds context budget")
-                response = await self.client.aio.models.generate_content(
-                    model=self.settings.llm_model, contents=contents, config=config
-                )
+                async with self.broker.reserve(
+                    grant=grant,
+                    operation="generate_content",
+                    input_tokens=count.total_tokens + allowance,
+                    output_tokens=config.max_output_tokens,
+                ) as lease:
+                    self._recheck(grant)
+                    response = await self.client.aio.models.generate_content(
+                        model=model, contents=contents, config=config
+                    )
+                    lease.record(
+                        response.usage_metadata.model_dump() if response.usage_metadata else {},
+                        response.model_version,
+                    )
+            self._recheck(grant)
             if len(response.candidates or []) != 1:
                 raise error("invalid_model_output", "Gemini returned no single usable candidate")
             candidate = response.candidates[0]
@@ -92,15 +156,19 @@ class GeminiModel:
             ):
                 raise error("invalid_model_output", "Unexpected Gemini content")
             try:
-                content = GeneratedAnswer.model_validate_json(response.text)
+                content = schema.model_validate_json(response.text)
             except (ValueError, TypeError):
                 raise error("invalid_model_output", "Gemini returned invalid answer JSON") from None
+            if response.model_version not in grant.returned_models:
+                raise error(
+                    "quota_pending", "Returned model requires Free Tier re-verification", status=503
+                )
             usage = response.usage_metadata
             return Generated(
                 content,
                 ProviderMetadata(
                     provider="gemini",
-                    requested_model=self.settings.llm_model,
+                    requested_model=model,
                     returned_model=response.model_version,
                     usage={
                         k: v
@@ -159,7 +227,22 @@ class GeminiModel:
         """Read account-visible model metadata; this does not establish generation access."""
         try:
             async with asyncio.timeout(timeout):
-                model = await self.client.aio.models.get(model=self.settings.llm_model)
+                grant = self.grant(self.settings.llm_model, "chat")
+                async with self.broker.reserve(
+                    grant=grant,
+                    operation="get_model",
+                    input_tokens=0,
+                    output_tokens=0,
+                ):
+                    self._recheck(grant)
+                    model = await self.client.aio.models.get(
+                        model=self.settings.llm_model,
+                        config=types.GetModelConfig(
+                            http_options=types.HttpOptions(
+                                retry_options=types.HttpRetryOptions(attempts=1),
+                            )
+                        ),
+                    )
             return {
                 "requested_model": self.settings.llm_model,
                 "catalog_name": model.name,
