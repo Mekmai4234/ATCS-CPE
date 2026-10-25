@@ -53,3 +53,17 @@ E) Native member flow
     Google verification and semantic quality have not been evaluated.
 
 Durable member quotas/fair scheduling and production Docker acceptance remain open.
+
+F) Local frames/OCR preparation (internal API only)
+1. Agree the 02 evidence/upload/job contract before enabling any public media path.
+2. 02 authorizes and stages an immutable allowed local file; pass its owned context.
+3. Opt into MediaPreparation / IngestionService.prepare_media, never fake TranscriptResult.
+4. Snapshot/hash, ffprobe, sample capped frames and preserve decoded PTS plus seek targets.
+5. Keep original PNG/hash/occurrence times; reuse exact images/OCR and mark near duplicates.
+6. Run local tha+eng OCR; keep image and explicit status when text cannot be read.
+7. Commit checkpoints under an OS writer lock. Retry resumes completed frames; OCR model
+   changes or OCR retry do not force frame extraction or caption fetching again.
+8. Cancel/timeout kills process trees, cleans snapshots/partials and retains completed work.
+9. Return PreparedMedia to the future 02 contract; 05 vision must use 02's quota broker.
+10. Run unit/process tests and opt-in real engine tests on a self-created silent clip.
+11. 07 packages engines/models and validates downstream locks, Linux/Docker and storage GC.
