@@ -179,7 +179,13 @@ for (const code of [403, 404])
     await expect.poll(() => server.counts().assets).toBe(2);
     expect(server.counts().posts).toBe(1);
   });
-for (const provider of ['generation_rate_limited', 'generation_provider_busy'])
+for (const provider of [
+  'generation_rate_limited',
+  'generation_provider_busy',
+  'provider_rate_limited',
+  'provider_unavailable',
+  'quota_wait',
+])
   test(`${provider} releases UI and follows existing job without resubmitting`, async ({
     page,
   }) => {
@@ -187,7 +193,9 @@ for (const provider of ['generation_rate_limited', 'generation_provider_busy'])
     await send(page);
     const waiting = page.getByRole('region', { name: 'งานที่พักติดตาม' });
     await expect(waiting).toBeVisible();
-    await expect(waiting).toContainText(provider === 'generation_rate_limited' ? '429' : '503');
+    await expect(waiting).toContainText(
+      ['generation_provider_busy', 'provider_unavailable'].includes(provider) ? '503' : '429',
+    );
     await expect(page.getByLabel('คำถามของคุณ')).toBeEnabled();
     await page.waitForTimeout(1200);
     expect(server.counts()).toMatchObject({ posts: 1, reads: 1 });
