@@ -123,6 +123,10 @@ async def integrated(tmp_path):
         analyzer=answers.analyze,
     )
     adapters = TeamAdapters(answers, FixtureIngestion(), agent)
+    # All provider callbacks in this fixture are labelled local doubles.
+    adapters.provider_operations = dict.fromkeys(
+        ("index", "answer", "analyze", "research", "artifact"), "local"
+    )
     worker = Worker(repo, adapters, settings)
     app = create_app(settings, db, adapters)
     async with httpx.AsyncClient(

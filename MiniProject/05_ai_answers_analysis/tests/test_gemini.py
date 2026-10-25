@@ -319,8 +319,9 @@ async def test_broker_accounts_each_rpc_and_actual_usage_without_sdk_retry(make_
     assert [c["operation"] for c in model.broker.calls] == ["count_tokens", "generate_content"]
     assert model.broker.calls[1]["input_tokens"] > 5
     assert model.broker.calls[1]["output_tokens"] == 1200
-    assert model.broker.records[0][1] == "fixture-sdk-wire"
-    assert model.broker.records[0][0]["prompt_token_count"] == 15
+    assert model.broker.records[0] == ({"prompt_token_count": 5}, None)
+    assert model.broker.records[-1][1] == "fixture-sdk-wire"
+    assert model.broker.records[-1][0]["prompt_token_count"] == 15
 
 
 async def test_returned_alias_change_does_not_publish_and_still_records_usage(make_model):
@@ -334,7 +335,7 @@ async def test_returned_alias_change_does_not_publish_and_still_records_usage(ma
     model.broker.returned = ["previous-verified-version"]
     with pytest.raises(AppError) as caught:
         await model.generate({}, 5)
-    assert caught.value.code == "quota_pending" and len(model.broker.records) == 1
+    assert caught.value.code == "quota_pending" and len(model.broker.records) == 2
 
 
 async def test_vision_sdk_uses_inline_original_and_separates_ocr_from_policy(make_model):

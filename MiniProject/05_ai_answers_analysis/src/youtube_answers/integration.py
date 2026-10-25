@@ -10,6 +10,7 @@ from .config import AnswerSettings
 from .configuration import resolved_service
 from .gemini import GeminiModel
 from .models import error
+from .quota import ExecutionBroker
 from .service import AnswerService
 
 
@@ -81,16 +82,22 @@ class AnswerAdapters(RagAdapters):
         embedder=None,
     ):
         config = answer_settings or AnswerSettings()
-        gateway = model or GeminiModel(config, broker=getattr(repository, "quota_broker", None))
+        gateway = model or GeminiModel(config, broker=ExecutionBroker(repository, config))
         super().__init__(
             settings=settings, repository=repository, rag_settings=rag_settings, embedder=embedder
         )
         self.answers = AnswerService(config, gateway, RagKnowledge(self.rag))
 
     async def answer(self, request, sources, history, context):
+        if isinstance(getattr(self.answers.model, "broker", None), ExecutionBroker):
+            with self.answers.model.broker.bind(context):
+                return await self.answers.answer(request, sources, history, context)
         return await self.answers.answer(request, sources, history, context)
 
     async def analyze(self, request, sources, context):
+        if isinstance(getattr(self.answers.model, "broker", None), ExecutionBroker):
+            with self.answers.model.broker.bind(context):
+                return await self.answers.analyze(request, sources, context)
         return await self.answers.analyze(request, sources, context)
 
     async def evidence(self, sources, chunk_ids, context):
@@ -108,7 +115,7 @@ async def create_adapters(*, settings, repository):
 
     config = resolved_service(settings, AnswerSettings)
     rag_config = resolved_service(settings, RagSettings)
-    gateway = GeminiModel(config, broker=getattr(repository, "quota_broker", None))
+    gateway = GeminiModel(config, broker=ExecutionBroker(repository, config))
     try:
         return AnswerAdapters(
             settings=settings,
