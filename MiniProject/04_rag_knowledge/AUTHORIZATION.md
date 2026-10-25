@@ -1,5 +1,9 @@
 # Account-aware RAG contract (04)
 
+For the 2026-10-24 media/Free Tier extension and current backend dependency,
+see [FREE_TIER_MEDIA.md](FREE_TIER_MEDIA.md) and
+[FREE_TIER_TEST_REPORT.md](FREE_TIER_TEST_REPORT.md).
+
 Contract version: 1. This module consumes the account-aware backend contract in
 02 PR #18, with the locked integration target now
 `b047e809f983ffb2e4f3f9d3e3f074b8976cd6da` (2026-10-22). Merge/deploy the
