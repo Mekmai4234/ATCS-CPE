@@ -62,3 +62,15 @@ This visual update does not deploy, migrate the live database, verify a real Goo
 - Browser suite: **75 passed, 8 skipped** (the skipped cases require the optional real backend/identity harness).
 - The launcher-position regression was also exercised three consecutive times after fixing temporary viewport changes. Keyboard focus no longer relocates Buddy over the header/logout control.
 - Five final screenshots were captured from the actual React pages at 1586 × 992 using a test session and API fixtures. The login screenshot renders the official Google button; no real account login or AI request was performed.
+
+## Navigation regression follow-up — 2026-10-25
+
+The oversized home illustration could extend over the header at desktop widths and receive clicks meant for navigation. Earlier layout tests used a demo banner, which moved the illustration down and concealed the production-layout overlap. The new no-banner regression reproduced the failure at 1536, 1920 and 2560 pixels before the fix.
+
+The header now has an explicit stacking layer and an opaque surface. Decorative scene layers no longer receive pointer events; mascot greeting events are attached to the bounded scene container, retaining pointer-responsive movement. The demo banner also has its own layer so the artwork cannot wash out its text.
+
+New regression coverage checks real pointer hit targets, all four navigation destinations, the logout control and horizontal overflow at 375, 768, 1024, 1280, 1440, 1536, 1920 and 2560 pixels. A keyboard/history test checks that switching pages and using Back/Forward preserves the chat draft and learning task type. Responses are isolated fixtures shaped like the live backend with no demo banner; no model requests are made.
+
+The running authenticated localhost application was also checked by clicking Home, Library, Chat and Learning. All destinations rendered and the browser reported no console errors during those checks. API health reported schema 0003 and non-synthetic custom mode; this does not attest a live Gemini response.
+
+Final navigation verification (26 October 2026): **104 unit tests and 84 browser tests passed**; 8 optional backend/identity cases were skipped in the browser run. Formatting, TypeScript/production build and production login-gate smoke also passed. No outbound Gemini request was used for this fix.
