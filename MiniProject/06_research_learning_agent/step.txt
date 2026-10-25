@@ -52,3 +52,11 @@ Auth candidate verification (2026-10-22)
 - Run core, combined acceptance and optional backend_contract tests; Docker Compose now provides tests, acceptance and contracts services.
 - Run python -m youtube_agent.evaluation in a NEW state directory; its default report must label isolated-member-fixture and preserve durable owners.
 - Use --legacy-test only for explicitly isolated offline regression; never combine it with --live or change production auth to make a test pass.
+
+Free Tier candidate checks (2026-10-25)
+- Assemble the exact 02/04/05 heads in FREE_TIER_REPORT.md with this module; do not edit other module source to make a check pass.
+- Run locked core, acceptance and contracts environments and Docker targets on that same candidate.
+- SDK wire tests use explicit mocked admission; backend_contract/test_free_agent.py separately tests the real shared broker and project credential binding.
+- On Windows keep UV_PROJECT_ENVIRONMENT short (for example module 06/runtime/c and runtime/a); nested candidate environments can exceed dependency import path limits.
+- Enable internal research_media only with an authorized bridge; current 04 reads require enrichment scope and cannot silently grant the agent planning role.
+- Do not call a live model until the operator verifies its Free Tier policy; no live billing/quota check was performed here.

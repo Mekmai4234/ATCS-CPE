@@ -1,9 +1,10 @@
 import asyncio
 import json
+from functools import partial
 
 import httpx
 import pytest
-from conftest import evidence
+from conftest import Context, evidence
 from google import genai
 from google.genai import types
 from youtube_backend.errors import AppError
@@ -11,6 +12,14 @@ from youtube_backend.schemas import QuizContent
 
 from youtube_agent.config import AgentSettings
 from youtube_agent.gemini import GeminiModel
+
+
+class MockBrokerContext(Context):
+    """SDK wire fixture only; actual 02 admission is tested in backend_contract."""
+
+    async def gemini_call(self, callback, **request):
+        self.check()
+        return await callback()
 
 
 def response(parts=None, *, finish="STOP"):
@@ -53,6 +62,10 @@ async def make_model():
             ),
         )
         model = GeminiModel(AgentSettings(_env_file=None, **kwargs), client=client)
+        context = MockBrokerContext()
+        context.settings = model.settings
+        model.decide = partial(model.decide, context=context)
+        model.generate = partial(model.generate, context=context)
         opened.append((model, transport))
         return model
 
@@ -144,7 +157,7 @@ async def test_structured_artifact_uses_schema_and_known_chunk_ids(make_model):
         (401, False),
         (403, False),
         (429, True),
-        (500, True),
+        (500, False),
         (503, True),
     ],
 )
@@ -163,6 +176,23 @@ async def test_errors_redacted_and_sdk_does_not_retry(make_model, status, retrya
     assert caught.value.retryable is retryable
     assert "LEAK" not in str(caught.value) and "secret" not in str(caught.value)
     assert len(requests) == 1
+    if status in {429, 503}:
+        assert (
+            caught.value.code == {429: "provider_rate_limited", 503: "provider_unavailable"}[status]
+        )
+
+
+async def test_no_shared_context_refuses_even_token_count(make_model):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(200, json=response())
+
+    model = make_model(handler)
+    with pytest.raises(AppError) as exc:
+        await GeminiModel.decide(model, [{"role": "user", "data": {}}], 5)
+    assert exc.value.code == "free_tier_unverified" and not calls
 
 
 @pytest.mark.parametrize("count", [0, None, 24001])
@@ -222,7 +252,7 @@ async def test_transport_failure_is_safe(make_model):
     model = make_model(handler)
     with pytest.raises(AppError) as caught:
         await model.decide([{"role": "user", "data": {}}], 5)
-    assert caught.value.code == "generation_unavailable"
+    assert caught.value.code == "provider_unavailable"
     assert "secret" not in str(caught.value)
 
 
