@@ -14,6 +14,7 @@ MODULE = Path(__file__).resolve().parents[1]
 # Only this disposable local CA is unverified; public HTTPS acceptance stays false.
 PROBE = """
 import http.client, json, socket, ssl
+from youtube_backend.database import SCHEMA_REVISION
 def request(path):
     c = http.client.HTTPSConnection('localhost',
         context=ssl._create_unverified_context(), timeout=10)
@@ -26,7 +27,7 @@ def request(path):
 status, _, body = request('/health')
 h = json.loads(body)
 assert status == 200 and h['authentication_required'] and not h['single_user']
-assert h['schema_revision'] == '0002' and h['full_pair_preflight']
+assert h['schema_revision'] == SCHEMA_REVISION and h['full_pair_preflight']
 assert h['mode'] == 'custom' and h['integration_profile'] == 'live'
 assert not h['live_provider_verified']
 assert all(v == 'available' for v in h['capabilities'].values())
