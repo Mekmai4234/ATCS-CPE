@@ -56,9 +56,7 @@ test('drag is clamped, does not click, persists only coordinates and survives re
     })
     .toBe(true);
 });
-test('Buddy is always present and pointercancel, presets and reset work with keyboard', async ({
-  page,
-}) => {
+test('Buddy is the only launcher and pointercancel, arrow keys and Home work', async ({ page }) => {
   await login(page);
   await expect(page.getByRole('button', { name: 'เปิดแชต Buddy', exact: true })).toHaveCount(0);
   const origin = (await launcher(page).boundingBox())!;
@@ -68,12 +66,13 @@ test('Buddy is always present and pointercancel, presets and reset work with key
   await launcher(page).dispatchEvent('pointercancel', { pointerId: 1, clientX: 30, clientY: 30 });
   await page.mouse.up();
   expect((await launcher(page).boundingBox())!.x).toBeCloseTo(origin.x, 0);
-  await page.getByRole('button', { name: 'ตำแหน่งและการแสดงแชต' }).click();
-  await page.getByRole('button', { name: 'มุมบนซ้าย', exact: true }).focus();
-  await page.keyboard.press('Enter');
-  expect((await launcher(page).boundingBox())!.x).toBe(16);
-  await page.getByRole('button', { name: 'ตำแหน่งและการแสดงแชต' }).click();
-  await page.getByRole('button', { name: 'คืนตำแหน่ง', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'ตำแหน่งและการแสดงแชต' })).toHaveCount(0);
+  await expect(page.locator('.buddy-widget > button')).toHaveCount(1);
+  await launcher(page).focus();
+  await page.keyboard.press('ArrowLeft');
+  expect((await launcher(page).boundingBox())!.x).toBeCloseTo(origin.x - 10, 0);
+  await page.keyboard.press('Home');
+  expect((await launcher(page).boundingBox())!.x).toBeCloseTo(origin.x, 0);
   await launcher(page).focus();
   await page.keyboard.press('Enter');
   await expect(dialog(page)).toBeVisible();
@@ -203,8 +202,8 @@ test('blocked local storage does not prevent opening or repositioning Buddy', as
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await login(page);
-  await page.getByRole('button', { name: 'ตำแหน่งและการแสดงแชต' }).click();
-  await page.getByRole('button', { name: 'มุมบนซ้าย', exact: true }).click();
+  await launcher(page).focus();
+  await page.keyboard.press('ArrowLeft');
   await open(page);
   await expect(dialog(page)).toBeVisible();
   expect(errors).toEqual([]);

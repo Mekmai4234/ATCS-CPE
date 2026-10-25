@@ -702,16 +702,6 @@ body .buddy-launcher {
 body .buddy-launcher .buddy-avatar-image {
   transform: scale(1.08);
 }
-body .buddy-position-toggle {
-  width: 44px;
-  height: 44px;
-  min-height: 44px;
-  font-size: 25px;
-  background: #ffffffec;
-}
-body .buddy-position-menu button {
-  min-height: 44px;
-}
 body .buddy-panel {
   border: 3px solid #fff;
   border-radius: 29px;

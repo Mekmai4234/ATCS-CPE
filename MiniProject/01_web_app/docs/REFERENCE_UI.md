@@ -6,7 +6,7 @@ Module: **01_web_app**. The login, home, library, learning pages and Buddy chat 
 
 - Replaced the assembled body/head/hand mascot in hero areas with a cohesive 3D scene based on the three user-approved references.
 - Replaced the floating launcher, navigation logo, chat header and assistant avatar with the matching transparent Buddy head.
-- Kept bounded pointer-responsive parallax on the hero, tap greeting, reduced-motion support, image-failure fallback, draggable chat, keyboard corner controls and persistent launcher coordinates.
+- Kept bounded pointer-responsive parallax on the hero, tap greeting, reduced-motion support, image-failure fallback, draggable chat, keyboard movement with arrow keys/Home and persistent launcher coordinates.
 - Added locally bundled Kanit 700/800 Thai display typography; body text retains IBM Plex Sans Thai and Manrope.
 - Reworked mint surfaces, headline scale, import card, video cards, login benefits and chat proportions. Thumbnail images are no longer dimmed by the previous treatment.
 - Preserved the official Google Identity Services control. Its exact internal appearance belongs to Google; no imitation login button or credential flow was added.
@@ -74,3 +74,8 @@ New regression coverage checks real pointer hit targets, all four navigation des
 The running authenticated localhost application was also checked by clicking Home, Library, Chat and Learning. All destinations rendered and the browser reported no console errors during those checks. API health reported schema 0003 and non-synthetic custom mode; this does not attest a live Gemini response.
 
 Final navigation verification (26 October 2026): **104 unit tests and 84 browser tests passed**; 8 optional backend/identity cases were skipped in the browser run. Formatting, TypeScript/production build and production login-gate smoke also passed. No outbound Gemini request was used for this fix.
+
+
+## Launcher simplification — 26 October 2026
+
+Removed the separate three-dot position button and its menu at the user's request. Only the Buddy chat face remains. Pointer/touch dragging still works; keyboard users can move the focused launcher with arrow keys and reset it with Home. The Buddy browser suite passed all 17 cases; formatting and production build passed.
