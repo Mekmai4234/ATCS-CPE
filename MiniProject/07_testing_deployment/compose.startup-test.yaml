@@ -6,10 +6,12 @@ services:
       APP_ENV: test
       GEMINI_API_KEY: fixture07-no-provider-requests
   api:
+    command: ["python", "07_testing_deployment/scripts/offline_start.py", "api"]
     environment:
       APP_ENV: test
       GEMINI_API_KEY: fixture07-no-provider-requests
   worker:
+    command: ["python", "07_testing_deployment/scripts/offline_start.py", "worker"]
     environment:
       APP_ENV: test
       GEMINI_API_KEY: fixture07-no-provider-requests

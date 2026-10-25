@@ -26,6 +26,7 @@ asyncio_mode = "auto"
 markers = [
   "regression: release-blocking checks of existing module 03/04 defects",
   "auth: strict multi-account acceptance requiring the real backend auth contract",
+  "free_tier_contract: strict media/broker feature gate; run explicitly, absent features fail",
 ]
 
 [tool.ruff]

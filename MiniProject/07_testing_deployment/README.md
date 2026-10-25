@@ -1,5 +1,13 @@
 # 07 — System verification and deployment
 
+Free Tier / local visual-media work (25 October):
+[acceptance and release blockers](FREE_TIER_ACCEPTANCE.md),
+[local tool packaging](LOCAL_MEDIA_TOOLS.md), [current report](FREE_TIER_REPORT.md).
+`preflight.py --run` now rejects unreviewed Free Tier startup. The legacy live smoke
+is blocked until per-smoke request/token reservations are integrated. Offline
+maintenance and isolated synthetic-key/internal-network drills remain available.
+Baseline CI green does not certify the separately run strict Free Tier feature gate.
+
 Integrated develop work (24 October): [INTEGRATED_SYSTEM.md](INTEGRATED_SYSTEM.md).
 The earlier [UI_CHECKOUT_REPORT.md](UI_CHECKOUT_REPORT.md) and
 [FLOATING_UI_ACCEPTANCE.md](FLOATING_UI_ACCEPTANCE.md). Backend modules 02–06 are now

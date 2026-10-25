@@ -11,9 +11,11 @@ services:
   initialize:
     environment: *auth
   api:
+    command: ["python", "07_testing_deployment/scripts/offline_start.py", "api"]
     environment: *auth
     ports: !reset []
   worker:
+    command: ["python", "07_testing_deployment/scripts/offline_start.py", "worker"]
     environment: *auth
   web:
     image: youtube-knowledge-team07-web:auth-check

@@ -1,0 +1,30 @@
+{
+  "free_tier_release_ready": false,
+  "blockers": [
+    "operator_free_tier_attestation_required",
+    "ai_studio_checked_required",
+    "key_project_match_required",
+    "model_access_checked_required",
+    "fresh_dated_operator_review_required",
+    "reviewed_key_binding_required",
+    "chat_model_limits_required",
+    "vision_model_limits_required",
+    "embedding_model_limits_required",
+    "agent_model_limits_required",
+    "bounded_smoke_budget_required",
+    "clean_exact_checkout_evidence_required",
+    "contract_v2_v1_history_not_accepted",
+    "migration_paired_restore_not_accepted",
+    "privacy_revoke_finalize_not_accepted",
+    "shared_broker_all_requests_not_accepted",
+    "quota_races_retry_cache_not_accepted",
+    "browser_media_pause_accessibility_not_accepted",
+    "visual_only_no_fake_transcript_not_accepted",
+    "seven_clip_review_not_accepted",
+    "server_capacity_cleanup_not_accepted",
+    "matching_backend_broker_policy_required"
+  ],
+  "billing_verified_by_tool": false,
+  "provider_request_made": false,
+  "secret_values_printed": false
+}

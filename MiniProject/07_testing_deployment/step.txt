@@ -33,3 +33,12 @@ INTEGRATED DEVELOP
 Use INTEGRATED_SYSTEM.md for the current combined frontend/backend workflow.
 The strict floating config runs delivered module-01 controls on the session-test harness.
 ui_qa.mjs --require-floating checks surface readiness only; production acceptance remains separate.
+Free Tier extension (2026-10-25):
+1. Run actual checkout source record, locked baseline/auth checks and source verify.
+2. Run check.py --group free-tier explicitly; absent/incompatible features fail.
+3. Build/run Dockerfile.media with the offline limits in LOCAL_MEDIA_TOOLS.md.
+4. Retain original clips, PNGs, OCR output, versions, copyright and resource report.
+5. Run free_tier.py without evidence to confirm unknown tier blocks (exit 2).
+6. Keep live smoke disabled until actual broker budgets and integration are accepted.
+7. Stop writers, cold-backup SQLite/Chroma/media together, restore into a new tree.
+8. Require actual server, model/project review, browser and image attestation gates.
