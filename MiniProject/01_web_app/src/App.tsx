@@ -24,6 +24,7 @@ import FloatingBuddy from './FloatingBuddy';
 import InteractiveBuddy from './InteractiveBuddy';
 import { scopeFingerprint } from './buddyModel';
 import { UiIcon } from './Visuals';
+import { serviceMessage, userMessages } from './userMessages';
 
 type WorkspaceView = 'home' | 'library' | 'chat' | 'learn';
 interface WorkspaceProps {
@@ -65,21 +66,11 @@ interface Turn {
   sources: SourceSnapshot[];
 }
 const errorText = (error: unknown) => {
-  if (error instanceof ApiError && [429, 503].includes(error.status || 0)) {
-    const provider = error.code.startsWith('generation_') ? 'Gemini' : 'บริการ';
-    const detail =
-      error.status === 429
-        ? `${provider} จำกัดการใช้งาน (429) ยังไม่ทราบว่าเป็นโควตารายวันหรือข้อจำกัดชนิดอื่น`
-        : `${provider} ไม่พร้อมให้บริการชั่วคราว (503)`;
-    const retry =
-      error.retryAfter && /^\d+$/.test(error.retryAfter)
-        ? ` · Backend ขอให้รอ ${error.retryAfter} วินาที`
-        : error.retryAfter && Number.isFinite(Date.parse(error.retryAfter))
-          ? ` · เวลาลองใหม่จาก Backend: ${error.retryAfter}`
-          : '';
-    return `${detail}${retry}${!error.code.startsWith('generation_') && error.message ? ` · ${error.message}` : ''}`;
+  if (error instanceof ApiError) {
+    const message = serviceMessage(error.code, error.status);
+    if (message) return message;
   }
-  return error instanceof Error ? error.message : 'เกิดข้อผิดพลาด กรุณาลองอีกครั้ง';
+  return error instanceof Error ? error.message : userMessages.failed;
 };
 const aborted = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
 
@@ -482,12 +473,7 @@ export default function App({
         operationRef.current = null;
         return;
       }
-      if (!job.result)
-        throw new ApiError(
-          'งานสิ้นสุดแล้วแต่ไม่มีผลลัพธ์ กรุณาตรวจสอบกับ backend',
-          'missing_result',
-          false,
-        );
+      if (!job.result) throw new ApiError(userMessages.failed, 'missing_result', false);
       await completeTask(currentOp, job.result, job, controller.signal);
     } catch (error) {
       if (!aborted(error) && alive.current) {
@@ -499,9 +485,7 @@ export default function App({
           setOperation(null);
           operationRef.current = null;
           setCanRetry(false);
-          setTaskError(
-            'Backend กำลังจัดการงานเดิม ดูสถานะในงานที่พักติดตามได้ เว็บจะไม่ส่งคำถามซ้ำเอง',
-          );
+          setTaskError('คำขอนี้ยังไม่เสร็จ คุณสามารถติดตามสถานะจากรายการงานที่พักไว้');
           return;
         }
         if (error instanceof ApiError && error.jobId) {
@@ -509,9 +493,7 @@ export default function App({
           setOperation(currentOp);
           operationRef.current = currentOp;
         }
-        setTaskError(
-          `${errorText(error)}${error instanceof ApiError && error.requestId ? ` · Request ID: ${error.requestId}` : ''}`,
-        );
+        setTaskError(errorText(error));
         if (currentOp.jobId) {
           try {
             const saved = await api.job(currentOp.jobId, controller.signal);
@@ -1369,9 +1351,7 @@ export default function App({
                   <article key={item.jobId}>
                     <strong>{item.label}</strong>
                     <p role="status">
-                      {jobs[item.jobId!]
-                        ? jobStatus(jobs[item.jobId!])
-                        : 'รอตรวจสอบสถานะจาก Backend'}
+                      {jobs[item.jobId!] ? jobStatus(jobs[item.jobId!]) : 'กำลังตรวจสอบสถานะคำขอ'}
                     </p>
                     <button
                       disabled={taskLocked}
@@ -1484,9 +1464,7 @@ export default function App({
             waiting={deferred.map((item) => ({
               id: item.jobId!,
               label: item.label,
-              status: jobs[item.jobId!]
-                ? jobStatus(jobs[item.jobId!])
-                : 'รอตรวจสอบสถานะจาก Backend',
+              status: jobs[item.jobId!] ? jobStatus(jobs[item.jobId!]) : 'กำลังตรวจสอบสถานะคำขอ',
               follow: () => {
                 setDeferred((previous) => previous.filter((value) => value.jobId !== item.jobId));
                 void execute(item, true);

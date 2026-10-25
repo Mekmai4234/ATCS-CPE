@@ -157,16 +157,18 @@ describe('visual integration boundary', () => {
       stage: 'queued',
       error_code: 'generation_rate_limited',
     } as Job;
-    expect(jobStatus(quota)).toContain('429');
-    expect(jobStatus(quota)).toContain('ยังไม่ทราบ');
-    expect(jobStatus(quota)).not.toContain('ลองอีกครั้ง');
-    expect(jobStatus({ ...quota, error_code: 'generation_provider_busy' })).toContain('503');
+    expect(jobStatus(quota)).toContain('มีคำขอจำนวนมาก');
+    expect(jobStatus(quota)).not.toMatch(/Gemini|429|โควตา/);
+    expect(jobStatus(quota)).not.toContain('ลองอีกครั้งได้หลัง');
+    expect(jobStatus({ ...quota, error_code: 'generation_provider_busy' })).toContain(
+      'ไม่พร้อมให้บริการชั่วคราว',
+    );
     expect(
       jobStatus({
         ...quota,
         presentation: { stage: 'quota_paused', retryAt: '2026-10-25T06:00:00Z' },
       }),
-    ).toContain('Backend ระบุ');
+    ).toContain('ลองอีกครั้งได้หลัง');
   });
   it('rejects invalid frame identity, times and generations', () => {
     expect(validFrame(frame)).toBe(true);
@@ -183,12 +185,12 @@ describe('visual integration boundary', () => {
     } as Job;
     expect(jobShouldPark(native)).toBe(true);
     expect(jobStatus(native)).toContain('เวลาประมาณการของระบบ');
-    expect(jobStatus(native)).not.toContain('Backend ระบุให้ลองอีกครั้ง');
+    expect(jobStatus(native)).not.toContain('ลองอีกครั้งได้หลัง');
     const known = {
       ...native,
       wait: { time_source: 'provider' as const, retry_at: '2026-10-25T06:00:00Z' },
     };
-    expect(jobStatus(known)).toContain('Backend ระบุให้ลองอีกครั้ง');
+    expect(jobStatus(known)).toContain('ลองอีกครั้งได้หลัง');
   });
   it('accepts a native paused job and parks it without treating it as a completed answer', async () => {
     const api = new Api('', async () =>
@@ -203,7 +205,7 @@ describe('visual integration boundary', () => {
     const paused = await api.job('paused');
     expect(jobShouldPark(paused)).toBe(true);
     expect(paused.result).toBeNull();
-    expect(jobStatus(paused)).toContain('รอผู้ดูแลยืนยัน');
+    expect(jobStatus(paused)).toContain('ผู้ช่วย AI ยังไม่พร้อมให้บริการ');
   });
   it('never enables deleted sources even with stale visual readiness', () => {
     expect(
