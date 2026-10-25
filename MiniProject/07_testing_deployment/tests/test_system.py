@@ -174,6 +174,10 @@ async def system(state, *, auth=False, configure_app=None):
         analyzer=answers.analyze,
     )
     adapters = TeamAdapters(answers, ingestion, agent)
+    # This acceptance harness injects only local caption/model/embedding doubles.
+    adapters.provider_operations = dict.fromkeys(
+        ("index", "answer", "analyze", "research", "artifact"), "local"
+    )
     app = create_app(settings, database, adapters)
     if configure_app:
         configure_app(app)
