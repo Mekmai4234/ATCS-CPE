@@ -15,6 +15,7 @@ class IngestionAdapters(UnavailableAdapters):
 
     def __init__(self, ingestion, knowledge):
         self.ingestion, self.knowledge = ingestion, knowledge
+        self.provider_operations = dict(getattr(knowledge, "provider_operations", {}))
         self.closed = False
 
     async def ingest(self, video_id, context):
