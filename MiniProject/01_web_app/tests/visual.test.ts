@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Api } from '../src/api';
-import { buildScope, jobStatus, videoQueryable } from '../src/domain';
+import { buildScope, jobShouldPark, jobStatus, videoQueryable } from '../src/domain';
 import { reconcileSources, snapshotSources } from '../src/sources';
 import { validFrame } from '../src/Evidence';
 import { visualFixture } from './visual-fixture';
@@ -173,6 +173,37 @@ describe('visual integration boundary', () => {
     expect(validFrame({ ...frame, timeSeconds: NaN })).toBe(false);
     expect(validFrame({ ...frame, generation: 0 })).toBe(false);
     expect(validFrame({ ...frame, videoId: 'https://evil.test' })).toBe(false);
+  });
+  it('understands native backend waiting metadata without calling estimates provider reset times', () => {
+    const native = {
+      state: 'queued',
+      stage: 'queued',
+      error_code: 'quota_wait',
+      wait: { time_source: 'estimate', estimated_retry_at: '2026-10-25T06:00:00Z' },
+    } as Job;
+    expect(jobShouldPark(native)).toBe(true);
+    expect(jobStatus(native)).toContain('เวลาประมาณการของระบบ');
+    expect(jobStatus(native)).not.toContain('Backend ระบุให้ลองอีกครั้ง');
+    const known = {
+      ...native,
+      wait: { time_source: 'provider' as const, retry_at: '2026-10-25T06:00:00Z' },
+    };
+    expect(jobStatus(known)).toContain('Backend ระบุให้ลองอีกครั้ง');
+  });
+  it('accepts a native paused job and parks it without treating it as a completed answer', async () => {
+    const api = new Api('', async () =>
+      json({
+        job_id: 'paused',
+        state: 'paused',
+        stage: 'paused',
+        error_code: 'free_tier_unverified',
+        result: null,
+      }),
+    );
+    const paused = await api.job('paused');
+    expect(jobShouldPark(paused)).toBe(true);
+    expect(paused.result).toBeNull();
+    expect(jobStatus(paused)).toContain('รอผู้ดูแลยืนยัน');
   });
   it('never enables deleted sources even with stale visual readiness', () => {
     expect(
