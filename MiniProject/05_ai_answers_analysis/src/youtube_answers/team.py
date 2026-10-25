@@ -6,6 +6,7 @@ from .configuration import load_team_configuration
 from .gemini import GeminiModel
 from .integration import AnswerAdapters, RagKnowledge
 from .models import error
+from .quota import ExecutionBroker
 
 
 class TeamAdapters(UnavailableAdapters):
@@ -26,6 +27,23 @@ class TeamAdapters(UnavailableAdapters):
 
     def __init__(self, answers, ingestion, agent):
         self.answers, self.ingestion, self.agent = answers, ingestion, agent
+        self.provider_operations = dict(answers.provider_operations)
+        answer_mode = (
+            "gemini-broker-v1"
+            if isinstance(getattr(answers.answers.model, "broker", None), ExecutionBroker)
+            else "unverified"
+        )
+        agent_mode = (
+            "gemini-broker-v1"
+            if type(agent.model).__module__ == "youtube_agent.gemini"
+            else "unverified"
+        )
+        self.provider_operations.update(
+            answer=answer_mode, analyze=answer_mode, research=agent_mode, artifact=agent_mode
+        )
+        declared = getattr(type(self), "provider_operations", None)
+        if isinstance(declared, dict):
+            self.provider_operations = dict(declared)
         self.closed = False
 
     async def ingest(self, video_id, context):
@@ -78,7 +96,7 @@ async def create_adapters(*, settings, repository):
             "integration_not_installed", "Install module 05 with --extra team", status=503
         ) from None
     config = load_team_configuration(settings)
-    gateway = GeminiModel(config.answers, broker=getattr(repository, "quota_broker", None))
+    gateway = GeminiModel(config.answers, broker=ExecutionBroker(repository, config.answers))
     try:
         answers = AnswerAdapters(
             settings=settings,
