@@ -194,7 +194,9 @@ for (const provider of [
     const waiting = page.getByRole('region', { name: 'งานที่พักติดตาม' });
     await expect(waiting).toBeVisible();
     await expect(waiting).toContainText(
-      ['generation_provider_busy', 'provider_unavailable'].includes(provider) ? '503' : '429',
+      ['generation_provider_busy', 'provider_unavailable'].includes(provider)
+        ? 'ไม่พร้อมให้บริการชั่วคราว'
+        : 'มีคำขอจำนวนมาก',
     );
     await expect(page.getByLabel('คำถามของคุณ')).toBeEnabled();
     await page.waitForTimeout(1200);
@@ -205,3 +207,59 @@ for (const provider of [
     expect(server.counts().posts).toBe(1);
     expect(server.methods.some((value) => value.endsWith('/retry'))).toBe(false);
   });
+
+for (const delivery of ['http', 'failed_job', 'paused_job'] as const) {
+  test(`service configuration details stay private in ${delivery} and both chat views`, async ({
+    page,
+  }) => {
+    await fixture(page);
+    let posts = 0;
+    const code =
+      delivery === 'http'
+        ? 'free_tier_unverified'
+        : delivery === 'failed_job'
+          ? 'free_model_unverified'
+          : 'quota_pending';
+    await page.route('**/api/chat', (route) => {
+      posts++;
+      return delivery === 'http'
+        ? route.fulfill({
+            status: 503,
+            json: {
+              error: {
+                code,
+                message: 'Gemini Free Tier: internal project/model verification details',
+                request_id: 'private-request-id',
+                retryable: false,
+              },
+            },
+          })
+        : route.fulfill({ status: 202, json: { job_id: 'private-config-job', state: 'queued' } });
+    });
+    await page.route('**/api/jobs/private-config-job', (route) =>
+      route.fulfill({
+        json: {
+          job_id: 'private-config-job',
+          kind: 'chat',
+          state: delivery === 'paused_job' ? 'paused' : 'failed',
+          stage: delivery === 'paused_job' ? 'paused' : 'failed',
+          error_code: code,
+          retryable: false,
+          result: null,
+        },
+      }),
+    );
+    await send(page);
+    await expect(page.getByText(/ขณะนี้ผู้ช่วย AI ยังไม่พร้อมให้บริการ/).first()).toBeVisible();
+    const forbidden =
+      /Gemini|Free Tier|free_tier_unverified|free_model_unverified|quota_pending|private-request-id|internal project/;
+    expect(await page.locator('body').innerText()).not.toMatch(forbidden);
+    await expect(page.getByRole('button', { name: 'ส่งคำถาม', exact: true })).toBeEnabled();
+    await expect(page.locator('.turn')).toHaveCount(0);
+    await page.locator('.buddy-launcher').click();
+    const buddy = page.getByRole('dialog', { name: 'Buddy AI แชตจากคลิป' });
+    await expect(buddy).toContainText('ขณะนี้ผู้ช่วย AI ยังไม่พร้อมให้บริการ');
+    expect(await buddy.innerText()).not.toMatch(forbidden);
+    expect(posts).toBe(1);
+  });
+}

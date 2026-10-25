@@ -137,7 +137,7 @@ for (const state of ['completed', 'partial', 'failed', 'cancelled']) {
         page.getByText('ได้ผลบางส่วน — งานนี้ยังไม่สำเร็จครบถ้วน', { exact: true }),
       ).toBeVisible();
     if (state === 'failed')
-      await expect(page.getByRole('alert').filter({ hasText: 'งานไม่สำเร็จ' })).toBeVisible();
+      await expect(page.getByRole('alert').filter({ hasText: 'ทำรายการไม่สำเร็จ' })).toBeVisible();
     if (state === 'cancelled')
       await expect(page.getByRole('alert').filter({ hasText: 'งานถูกยกเลิกแล้ว' })).toBeVisible();
     await page.waitForTimeout(1700);
@@ -149,7 +149,7 @@ for (const state of ['completed', 'partial', 'failed', 'cancelled']) {
 test('library connection failure stays an error without synthetic data', async ({ page }) => {
   await page.route('**/api/videos?*', (route) => route.abort('failed'));
   await page.goto(liveWeb);
-  await expect(page.getByRole('alert').filter({ hasText: 'เชื่อมต่อ API ไม่ได้' })).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'เชื่อมต่อระบบไม่ได้' })).toBeVisible();
   await expect(page.getByRole('checkbox')).toHaveCount(0);
   await expect(page.getByText('DEMO · ข้อมูลจำลอง', { exact: true })).toHaveCount(0);
 });
@@ -362,7 +362,7 @@ test('a failed durable chat job unlocks the form and allows a new question', asy
     }),
   );
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
-  await expect(page.getByRole('alert').filter({ hasText: 'incomplete_index' })).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'ข้อมูลคลิปยังไม่พร้อม' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'ส่งคำถาม', exact: true })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'เริ่มบทสนทนาใหม่', exact: true })).toBeEnabled();
   await page.getByLabel('คำถามของคุณ').fill('คำถามใหม่');
