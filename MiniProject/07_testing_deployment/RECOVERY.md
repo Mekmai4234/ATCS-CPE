@@ -34,3 +34,12 @@ uv run --project 07_testing_deployment --locked python 07_testing_deployment/scr
 
 Production-volume restore and image rollback remain operational acceptance work. The
 offline drill is not evidence that a production deployment has been recovered.
+# Media/Free Tier extension (25 October 2026)
+
+Cold backup format 2 now includes `state/media/` with SQLite/Chroma and checksums.
+Restore still accepts format 1. Keep referenced media under this same state tree;
+an external media/upload/cache directory is not automatically included. Copy and
+validate any external referenced assets as a separate reviewed migration step before
+release. Do not run a v2 migration against real data for a test fixture. Quota usage
+and policy state must remain in the shared SQLite backup; never reset usage to obtain
+more requests. See FREE_TIER_ACCEPTANCE.md for the incomplete integration gates.

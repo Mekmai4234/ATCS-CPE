@@ -86,6 +86,12 @@ def main():
     parser.add_argument("--env-file", type=Path)
     parser.add_argument("--require-key", action="store_true")
     parser.add_argument(
+        "--free-tier-evidence",
+        type=Path,
+        default=os.environ.get("FREE_TIER_EVIDENCE_FILE"),
+        help="Reviewed exact-checkout Free Tier evidence; required before live API/worker startup",
+    )
+    parser.add_argument(
         "--auth-evidence",
         type=Path,
         help="Require auth release settings and reviewed integration evidence",
@@ -97,6 +103,10 @@ def main():
     try:
         settings = resolve(args.env_file)
         result = inspect_settings(settings, args.require_key or bool(args.run))
+        if args.run or args.free_tier_evidence:
+            from free_tier import require
+
+            result.update(require(settings, args.free_tier_evidence))
         if args.auth_evidence:
             from auth_readiness import check
 

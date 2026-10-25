@@ -13,6 +13,32 @@ concurrency:
   group: miniproject-checkout-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  local-media-tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: MiniProject
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python 07_testing_deployment/scripts/source.py record --record 07_testing_deployment/runtime/checkout-source.json
+      - run: docker build -f 07_testing_deployment/Dockerfile.media -t ragbuddy-07-media:qa .
+      - name: Seven original clips with real local OCR, no network
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" --network none --cpus 1 --memory 512m --memory-swap 512m --pids-limit 128 --read-only --tmpfs /tmp:rw,noexec,nosuid,size=128m --mount "type=bind,source=$PWD/07_testing_deployment/runtime,target=/evidence" ragbuddy-07-media:qa
+          echo 'Local tool QA only. Gemini/model semantics, integrated visual-only flow and server capacity remain separate release gates.' >> "$GITHUB_STEP_SUMMARY"
+      - run: python 07_testing_deployment/scripts/source.py verify --record 07_testing_deployment/runtime/checkout-source.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checkout-local-media
+          path: |
+            MiniProject/07_testing_deployment/runtime/checkout-source.json
+            MiniProject/07_testing_deployment/runtime/local-media/
+          retention-days: 7
   python:
     strategy:
       fail-fast: false
@@ -62,7 +88,7 @@ jobs:
           node-version: '24'
       - run: npm install --global pnpm@11.25.0
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck && pnpm format:check && pnpm test && pnpm build
+      - run: pnpm typecheck && pnpm test && pnpm build
       - run: pnpm run --if-present test:production
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm exec playwright test --config ../07_testing_deployment/playwright.config.ts
@@ -79,6 +105,9 @@ jobs:
         if: hashFiles('MiniProject/01_web_app/tests/identity_server.py') == ''
         run: echo 'BLOCKED - actual checkout has no real identity browser harness. No pinned fallback.' >> "$GITHUB_STEP_SUMMARY"
       - run: uv run --no-project python ../07_testing_deployment/scripts/source.py verify --record ../07_testing_deployment/runtime/checkout-source.json
+      # Keep the format gate strict, after runtime checks so an upstream formatting
+      # failure does not discard all browser/integration evidence.
+      - run: pnpm format:check
       - uses: actions/upload-artifact@v4
         if: always()
         with:
