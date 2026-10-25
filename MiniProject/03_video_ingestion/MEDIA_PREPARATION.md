@@ -135,3 +135,7 @@ no API key and makes no claim to have verified a project's billing tier.
 Primary command references: [ffprobe](https://ffmpeg.org/ffprobe.html),
 [Tesseract CLI](https://tesseract-ocr.github.io/tessdoc/Command-Line-Usage.html),
 [Tesseract installation](https://tesseract-ocr.github.io/tessdoc/Installation.html).
+
+## Integrated Linux engine acceptance (2026-10-25)
+
+The real-engine fixture accepts MEDIA_TEST_FONT for Thai and MEDIA_TEST_LATIN_FONT for Latin glyphs; on Windows both may use Tahoma. On Linux, use installed Noto Thai and Latin fonts separately. Fixture-only FFV1 encoding uses a separate bounded 2GB virtual-address budget; the actual decoding/OCR under test retains the configured product memory limit. This is not an increase to the production default or a general server capacity claim.
