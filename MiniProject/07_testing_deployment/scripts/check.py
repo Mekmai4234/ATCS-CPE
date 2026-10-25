@@ -46,6 +46,9 @@ def clean_environment():
                 "GOOGLE_",
                 "SESSION_",
                 "AUTH_",
+                "FREE_",
+                "QUOTA_",
+                "MEDIA_",
             )
         ) or key.upper() in {
             "DATABASE_URL",
@@ -93,7 +96,11 @@ def commands(group, output):
                 ],
             )
     if group in {"all", "acceptance", "regressions"}:
-        expression = "regression" if group == "regressions" else "not regression and not auth"
+        expression = (
+            "regression"
+            if group == "regressions"
+            else "not regression and not auth and not free_tier_contract"
+        )
         yield (
             "07-acceptance" if group != "regressions" else "07-regressions",
             [
@@ -148,6 +155,23 @@ def commands(group, output):
                 f"cache_dir={output / 'cache-auth'}",
             ],
         )
+    if group == "free-tier":
+        yield (
+            "07-free-tier-contract",
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "07_testing_deployment/tests/free_tier",
+                "-q",
+                "-W",
+                "error",
+                "--junitxml",
+                str(output / "07-free-tier.xml"),
+                "-o",
+                f"cache_dir={output / 'cache-free-tier'}",
+            ],
+        )
     if group in {"all", "lint"}:
         paths = [*MODULES, "07_testing_deployment"]
         yield "lint", [sys.executable, "-m", "ruff", "check", *paths]
@@ -158,7 +182,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--group",
-        choices=["all", "baseline", "acceptance", "regressions", "auth", "lint"],
+        choices=["all", "baseline", "acceptance", "regressions", "auth", "lint", "free-tier"],
         default="all",
     )
     parser.add_argument("--timeout", type=int, default=900)
