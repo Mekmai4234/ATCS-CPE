@@ -5,6 +5,7 @@
 !02_api_backend/src/**
 !02_api_backend/tests/
 !02_api_backend/tests/test_identity.py
+!02_api_backend/tests/test_free_tier.py
 !04_rag_knowledge/
 !04_rag_knowledge/pyproject.toml
 !04_rag_knowledge/src/

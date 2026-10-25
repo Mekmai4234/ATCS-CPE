@@ -19,6 +19,9 @@ class AgentSettings(BaseSettings):
     agent_max_output_tokens: int = Field(default=2400, ge=128, le=32000)
     llm_timeout_seconds: float = Field(default=60, gt=0, le=600)
     agent_read_page_size: int = Field(default=30, ge=1, le=200)
+    agent_max_model_calls: int = Field(default=4, ge=1, le=100)
+    agent_max_tool_calls: int = Field(default=32, ge=3, le=256)
+    agent_max_extra_frames: int = Field(default=3, ge=0, le=3)
 
     @model_validator(mode="after")
     def budgets(self):
@@ -29,4 +32,10 @@ class AgentSettings(BaseSettings):
     @classmethod
     def from_backend(cls, settings):
         """Consume already-resolved runtime settings instead of reloading module env files."""
-        return cls(_env_file=None, **{name: getattr(settings, name) for name in cls.model_fields})
+        return cls(
+            _env_file=None,
+            **{
+                name: getattr(settings, name, field.default)
+                for name, field in cls.model_fields.items()
+            },
+        )
