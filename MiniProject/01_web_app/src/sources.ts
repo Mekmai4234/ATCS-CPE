@@ -1,4 +1,5 @@
 import type { Citation, Scope, SourceSnapshot, TaskResult, Video } from './types';
+import { videoQueryable } from './domain';
 
 export const sourceKey = (source: SourceSnapshot) =>
   JSON.stringify([
@@ -6,6 +7,7 @@ export const sourceKey = (source: SourceSnapshot) =>
     source.generation ?? null,
     source.indexed_version ?? null,
     source.accessRevision ?? null,
+    source.evidenceVersion ?? null,
   ]);
 
 export function snapshotSources(
@@ -24,10 +26,11 @@ export function snapshotSources(
         (!scope.date_to ||
           (!!video.published_at && video.published_at.slice(0, 10) <= scope.date_to)),
     )
-    .map(({ video_id, generation, indexed_version }) => ({
+    .map(({ video_id, generation, indexed_version, presentation }) => ({
       video_id,
       generation,
       indexed_version,
+      ...(presentation ? { evidenceVersion: presentation.version } : {}),
       ...(revisions ? { accessRevision: revisions.get(video_id) || 0 } : {}),
     }));
 }
@@ -51,6 +54,16 @@ export function reconcileSources(
     let available = citation.source_available ?? fallback;
     const source = sources.find((s) => s.video_id === citation.video_id);
     const current = check.videos?.find((video) => video.video_id === citation.video_id);
+    const frame = citation.presentation?.frame;
+    if (
+      frame &&
+      (!source ||
+        frame.videoId !== citation.video_id ||
+        frame.generation !== source.generation ||
+        frame.evidenceVersion !== source.evidenceVersion ||
+        citation.presentation?.version !== frame.evidenceVersion)
+    )
+      available = false;
     const versionKnown =
       source?.generation !== undefined &&
       !!source.indexed_version &&
@@ -60,7 +73,7 @@ export function reconcileSources(
       versionKnown &&
       source.generation === current.generation &&
       source.indexed_version === current.indexed_version &&
-      current.status === 'ready';
+      videoQueryable(current);
     if (
       check.unavailableVideoIds?.has(citation.video_id) ||
       (source && check.retired?.has(sourceKey(source)))
@@ -68,7 +81,8 @@ export function reconcileSources(
       available = false;
     if (
       current &&
-      (current.status !== 'ready' ||
+      (!videoQueryable(current) ||
+        (source?.evidenceVersion && source.evidenceVersion !== current.presentation?.version) ||
         (source?.generation !== undefined &&
           current.generation !== undefined &&
           source.generation !== current.generation) ||

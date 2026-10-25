@@ -1,5 +1,7 @@
 import { citationUrl, timestamp } from './domain';
 import type { Artifact, Citation, Coverage, TaskResult } from './types';
+import { evidenceLabels } from './domain';
+import { FrameEvidence, validFrame, VisualCoverageNotice } from './Evidence';
 
 export function Citations({
   citations,
@@ -11,14 +13,28 @@ export function Citations({
   return (
     <div className="citations">
       {citations.map((citation, i) => {
-        const url = (citation.source_available ?? available) ? citationUrl(citation) : null;
+        const visual = citation.presentation && citation.presentation.kind !== 'transcript';
+        const frame = citation.presentation?.frame;
+        const active =
+          (citation.source_available ?? available) &&
+          (!visual || (validFrame(frame) && frame.videoId === citation.video_id));
+        const url = active
+          ? visual && validFrame(frame)
+            ? `https://www.youtube.com/watch?v=${frame.videoId}&t=${Math.floor(frame.timeSeconds)}s`
+            : visual
+              ? null
+              : citationUrl(citation)
+          : null;
         return (
           <div className="citation" key={`${citation.citation_id}-${i}`}>
             <span className="source-number">{i + 1}</span>
             <div>
               <strong>{citation.title}</strong>
+              <small>{evidenceLabels[citation.presentation?.kind || 'transcript']}</small>
               <span>
-                {timestamp(citation.start_seconds)}–{timestamp(citation.end_seconds)}
+                {visual && validFrame(frame)
+                  ? timestamp(frame.timeSeconds)
+                  : `${timestamp(citation.start_seconds)}–${timestamp(citation.end_seconds)}`}
               </span>
             </div>
             {url ? (
@@ -26,12 +42,19 @@ export function Citations({
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={`เปิดหลักฐาน ${citation.title} ที่ ${timestamp(citation.start_seconds)}`}
+                aria-label={`เปิดหลักฐาน ${citation.title} ที่ ${timestamp(visual && validFrame(frame) ? frame.timeSeconds : citation.start_seconds)}`}
               >
                 เปิดคลิป ↗
               </a>
             ) : (
               <small>แหล่งข้อมูลใช้ไม่ได้</small>
+            )}
+            {visual && citation.presentation && (
+              <FrameEvidence
+                key={`${frame?.generation}:${frame?.evidenceVersion}:${frame?.frameId}`}
+                evidence={citation.presentation}
+                available={active}
+              />
             )}
           </div>
         );
@@ -150,6 +173,7 @@ export function ResultView({ result, partial = false }: { result: TaskResult; pa
         coverage={result.coverage}
         insufficient={result.status === 'insufficient_evidence'}
       />
+      <VisualCoverageNotice value={result.visualCoverage} />
       {result.artifacts?.map((artifact, i) => (
         <ArtifactView artifact={artifact} key={artifact.artifact_id || i} />
       ))}

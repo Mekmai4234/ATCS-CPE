@@ -30,6 +30,7 @@ export interface AdminSnapshot {
 // This is a frontend port, not an assumed module-02 HTTP contract. A real adapter
 // must map the team's verified contract here before production login is enabled.
 export interface SessionPort {
+  readonly evidence?: import('./types').EvidenceBridge;
   readonly ready: boolean;
   readonly demo: boolean;
   challenge?(signal?: AbortSignal): Promise<LoginChallenge>;
