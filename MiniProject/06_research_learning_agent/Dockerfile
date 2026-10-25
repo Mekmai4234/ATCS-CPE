@@ -37,6 +37,7 @@ CMD ["pytest", "-c", "pyproject.toml", "../tests", "tests", "-q", "-W", "error",
 FROM acceptance AS contracts
 USER 0:0
 COPY 02_api_backend/tests/test_identity.py /app/02_api_backend/tests/test_identity.py
+COPY 02_api_backend/tests/test_free_tier.py /app/02_api_backend/tests/test_free_tier.py
 COPY 06_research_learning_agent/acceptance/backend_contract ./backend_contract
 ENV PYTHONPATH="/app/06_research_learning_agent/tests:/app/02_api_backend/tests"
 USER 10001:10001
