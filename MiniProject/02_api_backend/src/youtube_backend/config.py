@@ -64,6 +64,13 @@ class Settings(BaseSettings):
     worker_poll_seconds: float = Field(default=1, gt=0, le=60)
     import_max_urls: int = Field(default=50, ge=1, le=500)
     llm_model: str = "gemini-3.5-flash"
+    vision_model: str = ""
+    vision_max_frames: int = Field(default=12, ge=1, le=12)
+    vision_frames_per_question: int = Field(default=3, ge=0, le=3)
+    vision_max_image_bytes: int = Field(default=4_000_000, ge=1024, le=4_000_000)
+    agent_max_model_calls: int = Field(default=4, ge=1, le=100)
+    agent_max_tool_calls: int = Field(default=32, ge=3, le=256)
+    agent_max_extra_frames: int = Field(default=3, ge=0, le=3)
     gemini_api_key: SecretStr = SecretStr("")
     openai_api_key: SecretStr = SecretStr("")
     llm_timeout_seconds: float = Field(default=60, gt=0)
