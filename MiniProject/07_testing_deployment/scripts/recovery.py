@@ -52,19 +52,20 @@ def backup(source, target, *, stopped=False):
         for p in source.rglob("*")
         if p.is_file()
         and (
-            p.relative_to(source).parts[0] == "chroma"
+            p.relative_to(source).parts[0] in {"chroma", "media"}
             or p.name in {"app.db", "app.db-wal", "app.db-shm", "seed-result.json"}
             and p.parent == source
         )
     ]
     target.mkdir(parents=True)
+    (target / "chroma").mkdir()
     for path in files:
         dest = target / path.relative_to(source)
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(path, dest)
     validate_state(target)
     manifest = dict(
-        version=1,
+        version=2,
         method="cold-copy",
         files={
             p.relative_to(target).as_posix(): digest(p) for p in target.rglob("*") if p.is_file()
@@ -80,7 +81,7 @@ def restore(source, target):
     if source.is_symlink() or any(p.is_symlink() for p in source.rglob("*")):
         raise ValueError("Symlinks are not allowed in a backup")
     manifest = json.loads((source / "backup.json").read_text(encoding="utf-8"))
-    if manifest.get("version") != 1:
+    if manifest.get("version") not in {1, 2}:
         raise ValueError("Unsupported backup version")
     if not isinstance(manifest.get("files"), dict) or "app.db" not in manifest["files"]:
         raise ValueError("Backup must list its SQLite database")
@@ -105,6 +106,7 @@ def restore(source, target):
         raise ValueError("Backup manifest does not cover all files")
     validate_state(source)
     target.mkdir(parents=True)
+    (target / "chroma").mkdir()
     for name in manifest["files"]:
         dest = target / name
         dest.parent.mkdir(parents=True, exist_ok=True)

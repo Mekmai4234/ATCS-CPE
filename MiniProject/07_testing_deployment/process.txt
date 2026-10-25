@@ -27,3 +27,13 @@ to their owners. Auth release stays blocked until real integration and Google sm
 Browser identity acceptance uses the real HTTP adapter/API/worker with external GIS
 fixtures. Production-container acceptance verifies local HTTPS, secure cookies and
 unauthenticated API denial on an internal network, without release attestation or paid calls.
+Free Tier process (2026-10-25):
+Default CI uses the actual checkout and retains provenance before/after checks.
+Offline tool QA and synthetic fixtures do not establish real model quality or billing.
+Manual strict feature checks never replace current-source baseline regression.
+Align module 02/05 broker interfaces before enabling any combined provider path.
+Unknown billing, unreviewed alias/model, missing limits or missing acceptance block live.
+The old unbounded live smoke is intentionally disabled even after a review artifact.
+Use existing server resources; measure capacity and retention before accepting uploads.
+Keep source snapshots, privacy fences and v1 readers in the actual combined tests.
+Never fabricate transcript_version or rotate keys to bypass a project quota.
