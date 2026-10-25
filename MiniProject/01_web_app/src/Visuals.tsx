@@ -30,38 +30,6 @@ export function UiIcon({ name, size = 22 }: { name: IconName; size?: number }) {
   );
 }
 
-export function LearningScene() {
-  return (
-    <div className="learning-scene" aria-hidden="true">
-      <span className="scene-orb" />
-      <span className="scene-tile scene-play">
-        <svg viewBox="0 0 40 40">
-          <path d="M13 8 Q10 6 10 11v20q0 5 4 2l19-11q4-2 0-5Z" fill="currentColor" />
-        </svg>
-      </span>
-      <span className="scene-tile scene-chart">
-        <i />
-        <i />
-        <i />
-      </span>
-      <span className="scene-tile scene-note">
-        <i />
-        <i />
-        <i />
-      </span>
-      <span className="scene-books">
-        <i />
-        <i />
-        <i />
-      </span>
-      <span className="scene-leaf leaf-one" />
-      <span className="scene-leaf leaf-two" />
-      <span className="scene-star star-one">✦</span>
-      <span className="scene-star star-two">✦</span>
-    </div>
-  );
-}
-
 export function LoginBenefits() {
   return (
     <ul className="login-benefits">

@@ -21,6 +21,7 @@ import type { Member } from './session';
 import { BuddyLogo, ForestBackdrop } from './Forest';
 import HomeHero from './HomeHero';
 import FloatingBuddy from './FloatingBuddy';
+import InteractiveBuddy from './InteractiveBuddy';
 import { scopeFingerprint } from './buddyModel';
 import { UiIcon } from './Visuals';
 
@@ -1342,7 +1343,7 @@ export default function App({
                     <article className="turn" key={turn.id}>
                       <div className="user-question">{turn.label}</div>
                       <div className="assistant-label">
-                        <span className="assistant-mark">✦</span> Knowledge Assistant
+                        <InteractiveBuddy headOnly active={false} decorative /> Buddy AI
                       </div>
                       <ResultView result={turn.result} partial={turn.partial} />
                     </article>

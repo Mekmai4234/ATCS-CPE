@@ -157,7 +157,9 @@ test('IME and Shift+Enter do not submit; cancellation is available for a pending
   await expect(dialog(page).getByRole('button', { name: 'ส่งข้อความถึง Buddy' })).toBeEnabled();
   await page.screenshot({ path: 'runtime/screenshots/mint-chat-cancelled.png', fullPage: true });
 });
-test('mascot head/pupils are bounded and reduced motion remains static', async ({ page }) => {
+test('reference mascot follows the pointer within bounds and reduced motion stays static', async ({
+  page,
+}) => {
   await login(page);
   const rig = page.locator('.home-mascot .buddy-rig');
   const box = (await rig.boundingBox())!;
@@ -174,18 +176,18 @@ test('mascot head/pupils are bounded and reduced motion remains static', async (
       ),
     ),
   ).toBeLessThanOrEqual(6);
-  await page.mouse.move(2, 2);
+  await page.locator('html').dispatchEvent('pointerleave');
   await expect
     .poll(() => rig.evaluate((node) => (node as HTMLElement).style.getPropertyValue('--eye-x')))
     .toBe('0px');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.mouse.move(box.x + box.width * 0.9, box.y + box.height * 0.4);
   expect(
-    await rig.locator('.buddy-head').evaluate((node) => getComputedStyle(node).transform),
+    await rig.locator('.buddy-scene-image').evaluate((node) => getComputedStyle(node).transform),
   ).toBe('none');
 });
-test('missing rig layer falls back to the existing still image', async ({ page }) => {
-  await page.route('**/buddy-rig/body.webp', (route) => route.abort());
+test('missing reference artwork falls back to the existing still image', async ({ page }) => {
+  await page.route('**/buddy-reference/scene-*.webp', (route) => route.abort());
   await login(page);
   await expect(page.locator('.home-mascot .buddy-static')).toBeVisible();
 });

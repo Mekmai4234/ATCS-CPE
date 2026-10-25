@@ -8,7 +8,7 @@ import { HttpSessionPort } from './httpSession';
 import { DemoSessionPort, safeMemberSession, safeWorkspacePath } from './session';
 import type { MemberSession, SessionPort } from './session';
 import PublicInfo, { InfoLinks, isInfoPath } from './PublicInfo';
-import { LearningScene, LoginBenefits, UiIcon } from './Visuals';
+import { LoginBenefits, UiIcon } from './Visuals';
 
 const defaultPort: SessionPort =
   import.meta.env.VITE_DEMO_MODE === 'true'
@@ -234,14 +234,12 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
       </header>
       <main className="login-layout">
         <section className="login-story" aria-labelledby="login-intro">
-          <span className="forest-eyebrow">YOUR PERSONAL LEARNING BUDDY</span>
           <h1 id="login-intro">
             เพื่อนคู่คิดจากคลิปโปรด
             <span className="coral-stroke" />
           </h1>
           <p>ถาม สรุป และเรียนรู้ไปกับ Buddy</p>
           <div className="login-mascot-stage">
-            <LearningScene />
             <Mascot />
           </div>
           <span className="story-caption">พบกับ RAG Buddy · เพื่อนร่วมทางการเรียนรู้</span>
@@ -321,6 +319,7 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
             <span aria-hidden="true">⌁</span> คลังคลิปและผลการเรียนรู้เป็นของบัญชีคุณ
           </div>
           <InfoLinks />
+          <small className="login-signature">RAG Buddy · Your learning companion</small>
         </section>
       </main>
       <footer className="login-footer">RAG Buddy · เรียนรู้ในจังหวะของคุณ</footer>
