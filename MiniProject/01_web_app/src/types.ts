@@ -1,4 +1,5 @@
-export type JobState = 'queued' | 'running' | 'completed' | 'partial' | 'failed' | 'cancelled';
+export type JobState =
+  'queued' | 'running' | 'paused' | 'completed' | 'partial' | 'failed' | 'cancelled';
 export type VideoStatus =
   | 'queued'
   | 'fetching_transcript'
@@ -97,6 +98,13 @@ export interface TaskResult extends Partial<Answer> {
   artifact_ids?: string[];
 }
 export interface Job {
+  wait?: {
+    reason?: string;
+    time_source?: 'provider' | 'estimate';
+    retry_at?: string;
+    estimated_retry_at?: string;
+    scheduled_retry_at?: string;
+  };
   presentation?: JobPresentation;
   job_id: string;
   kind: string;

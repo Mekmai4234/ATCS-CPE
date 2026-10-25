@@ -4,6 +4,7 @@ import { Api, ApiError, pollJob } from './api';
 import {
   buildScope,
   jobWarning,
+  jobShouldPark,
   statusLabels,
   terminal,
   videoIdFromUrl,
@@ -457,13 +458,7 @@ export default function App({
         currentOp.jobId,
         async (update) => {
           setJobs((previous) => ({ ...previous, [update.job_id]: update }));
-          if (
-            update.presentation?.stage === 'quota_paused' ||
-            (update.state === 'queued' &&
-              ['generation_rate_limited', 'generation_provider_busy'].includes(
-                update.error_code || '',
-              ))
-          )
+          if (jobShouldPark(update))
             throw new ApiError(jobStatus(update), 'provider_wait', false, undefined, update.job_id);
           if (currentOp.type === 'research') {
             const progress = await api.research(update.job_id, lastEvent, controller.signal);
