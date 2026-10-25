@@ -111,3 +111,10 @@ commands before execution; develop without PR 18 does not provide them. The 07 s
 suite now rehearses migration/bootstrap/claim and pre/post-migration paired restore on
 a disposable copy of real fixture SQLite/Chroma. No user data migration, live Google
 sign-in or public deployment was performed.
+# Free Tier startup requirement — 25 October 2026
+
+The production `preflight.py --run` commands below additionally require a reviewed
+Free Tier evidence file. No outbound startup is accepted from an unknown/Paid project.
+Current visual/broker integration and image attestation are incomplete, so these
+release commands remain blocked. Use FREE_TIER_ACCEPTANCE.md for the new gates;
+the internal-network, synthetic-key auth drill is separate and certifies no provider.
