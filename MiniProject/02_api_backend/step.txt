@@ -78,6 +78,22 @@ Full-system startup workflow (implemented in 02)
 6. Stop API/workers before explicit guarded maintenance; never adopt old demo data.
 See full/README.md for exact commands, limitations and module-07 handoff.
 
+Free-only Gemini and media v2 workflow
+--------------------------------------
+1. Read FREE_TIER_MEDIA.md. Existing 0001/0002 stores need a stopped, backed-up
+   yk-full migrate; fresh stores initialize at 0003. Preserve SQLite/Chroma/media together.
+2. Configure one policy path and concurrency limits for all API/worker processes.
+   Inspect the real project's tier/model quotas in AI Studio; do not infer them from a flag.
+3. Install the operator policy with yk-full quota-policy --workers-stopped. Do not
+   clear usage accounting. Outbound methods require per-request broker integration.
+4. Connect 03's enrich adapter using MediaEnrichment bytes/provenance; keep local
+   OCR independent of vision. Queue via the authenticated v2 enrichment route.
+5. Poll private jobs, distinguish paused/provider/local-estimate waits, and serve
+   frames only through the authorized asset API. Explicit retry creates a new bounded
+   enrichment job and honors known provider Retry-After without extending the old deadline.
+6. Run tests/test_free_tier.py, tests/test_media_v2.py, the full locked suites and
+   scripts/docker_full_smoke.py. Real Google/media/billing acceptance remains separate.
+
 Floating and Full-page Chat Integration
 --------------------------------------
 1. Follow FLOATING_CHAT_CONTRACT.md and its schema-checked JSON examples. Both UI

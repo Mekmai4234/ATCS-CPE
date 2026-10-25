@@ -1,5 +1,10 @@
 # Full-system backend launcher (owned by 02)
 
+Read [FREE_TIER_MEDIA.md](../FREE_TIER_MEDIA.md) before this release: schema 0003,
+operator Free Tier attestation and per-request consumer broker integration are
+required for outbound Gemini. Old full-factory methods fail closed until adapted;
+local-only enrichment uses the separate v2 adapter contract. No model fallback is added.
+
 The default API now requires Google login. Read [AUTH.md](../AUTH.md) before starting,
 including migration from 0001, GOOGLE_CLIENT_ID, cookie/origin settings and CSRF.
 Operator commands `migrate`, `bootstrap-admin`, and `claim-legacy` use this launcher's
