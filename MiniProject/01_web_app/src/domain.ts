@@ -1,4 +1,5 @@
 import type { Citation, Job, Scope, Video } from './types';
+import { serviceMessage, userMessages } from './userMessages';
 export const evidenceLabels = {
   transcript: 'บทถอดเสียง',
   ocr: 'ข้อความบนภาพ',
@@ -18,24 +19,16 @@ export const videoQueryable = (video: Video) =>
     !!(video.presentation?.queryable && video.presentation.kinds.length));
 export function jobStatus(job: Job) {
   const extra = job.presentation;
-  const provider = ['generation_rate_limited', 'provider_rate_limited', 'quota_wait'].includes(
-    job.error_code || '',
-  )
-    ? 'Gemini จำกัดการใช้งาน (429); ยังไม่ทราบว่าโควตารายวันหมดหรือไม่'
-    : ['generation_provider_busy', 'provider_unavailable'].includes(job.error_code || '')
-      ? 'Gemini ไม่พร้อมให้บริการชั่วคราว (503)'
-      : job.error_code === 'free_tier_unverified'
-        ? 'รอผู้ดูแลยืนยัน Gemini Free Tier ก่อนเรียก API'
-        : '';
+  const provider = serviceMessage(job.error_code);
   const stage = extra
     ? enrichmentLabels[extra.stage]
-    : statusLabels[job.stage] || statusLabels[job.state] || job.state;
+    : statusLabels[job.stage] || statusLabels[job.state] || 'กำลังตรวจสอบสถานะ';
   const providerTime =
     extra?.retryAt || (job.wait?.time_source === 'provider' ? job.wait.retry_at : undefined);
   const estimate = job.wait?.time_source === 'estimate' ? job.wait.estimated_retry_at : undefined;
   const when =
     providerTime && Number.isFinite(Date.parse(providerTime))
-      ? ` · Backend ระบุให้ลองอีกครั้ง ${new Date(providerTime).toLocaleString('th-TH')}`
+      ? ` · ลองอีกครั้งได้หลัง ${new Date(providerTime).toLocaleString('th-TH')}`
       : estimate && Number.isFinite(Date.parse(estimate))
         ? ` · เวลาประมาณการของระบบ ${new Date(estimate).toLocaleString('th-TH')}`
         : '';
@@ -136,30 +129,17 @@ export function buildScope(
   };
 }
 export function jobWarning(job: Job): string | null {
-  if (
-    job.state === 'failed' &&
-    ['generation_provider_busy', 'provider_unavailable'].includes(job.error_code || '')
-  )
-    return 'Gemini ไม่พร้อมให้บริการชั่วคราว จึงยังสร้างคำตอบไม่ได้ กรุณารอสักครู่แล้วส่งคำถามอีกครั้ง';
-  if (
-    job.state === 'failed' &&
-    ['generation_rate_limited', 'provider_rate_limited', 'quota_wait'].includes(
-      job.error_code || '',
-    )
-  )
-    return 'Gemini จำกัดจำนวนคำขอหรือโทเคน กรุณาตรวจสอบโควตาและส่งคำถามอีกครั้งเมื่อใช้งานได้';
-  if (
-    job.state === 'failed' &&
-    ['free_tier_unverified', 'free_model_unverified'].includes(job.error_code || '')
-  )
-    return 'ยังไม่ได้ยืนยันสิทธิ์ Gemini Free Tier ของโปรเจกต์หรือโมเดลนี้ กรุณาให้ผู้ดูแลตรวจสอบก่อนใช้งาน';
+  if (job.state === 'failed') {
+    const message = serviceMessage(job.error_code);
+    if (message) return message;
+  }
   if (job.state === 'failed' && job.error_code === 'transcript_too_large')
     return 'บทถอดเสียงยาวเกินขีดจำกัดการแสดงผล กรุณาเลือกคลิปเดียวหรือถามเฉพาะช่วงที่ต้องการ';
   if (job.state === 'failed' && job.error_code === 'transcript_unavailable')
     return 'ไม่พบบทถอดเสียงต้นฉบับของคลิป กรุณาตรวจสอบการนำเข้าวิดีโอ';
   if (job.state === 'failed' && job.error_code === 'generation_output_truncated')
     return 'คำตอบยาวเกินขีดจำกัดและถูกตัด กรุณาถามให้เจาะจงขึ้นหรือขอสรุปสั้น ๆ';
-  if (job.state === 'failed') return `งานไม่สำเร็จ (${job.error_code || 'task_failed'})`;
+  if (job.state === 'failed') return userMessages.failed;
   if (job.state === 'cancelled') return 'งานถูกยกเลิกแล้ว';
   if (job.stage === 'no_transcript') return 'ไม่พบบทถอดเสียงที่ใช้งานได้';
   return null;

@@ -86,7 +86,9 @@ describe('source scope', () => {
     const job = { state: 'failed', error_code: 'generation_output_truncated' } as Job;
     expect(jobWarning(job)).toContain('ถูกตัด');
     expect(jobWarning({ ...job, state: 'completed' })).toBeNull();
-    expect(jobWarning({ ...job, error_code: 'invalid_citation' })).toContain('invalid_citation');
+    expect(jobWarning({ ...job, error_code: 'invalid_citation' })).toBe(
+      'ทำรายการไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+    );
   });
   it('explains transcript size and availability failures', () => {
     expect(jobWarning({ state: 'failed', error_code: 'transcript_too_large' } as Job)).toContain(
@@ -101,7 +103,7 @@ describe('source scope', () => {
       jobWarning({ state: 'failed', error_code: 'generation_provider_busy' } as Job),
     ).toContain('ไม่พร้อมให้บริการชั่วคราว');
     expect(jobWarning({ state: 'failed', error_code: 'generation_rate_limited' } as Job)).toContain(
-      'จำกัดจำนวนคำขอหรือโทเคน',
+      'มีคำขอจำนวนมาก',
     );
     expect(
       jobWarning({ state: 'queued', error_code: 'generation_provider_busy' } as Job),
