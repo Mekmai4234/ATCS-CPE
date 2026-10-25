@@ -215,7 +215,9 @@ export class Api {
     const { data } = await this.request<Job>(`/api/jobs/${encodeURIComponent(id)}`, { signal });
     if (
       !data.job_id ||
-      !['queued', 'running', 'completed', 'partial', 'failed', 'cancelled'].includes(data.state)
+      !['queued', 'running', 'paused', 'completed', 'partial', 'failed', 'cancelled'].includes(
+        data.state,
+      )
     ) {
       throw new ApiError('สถานะงานไม่ตรง API', 'invalid_response', false);
     }

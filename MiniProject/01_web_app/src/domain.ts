@@ -18,20 +18,43 @@ export const videoQueryable = (video: Video) =>
     !!(video.presentation?.queryable && video.presentation.kinds.length));
 export function jobStatus(job: Job) {
   const extra = job.presentation;
-  const provider =
-    job.error_code === 'generation_rate_limited'
-      ? 'Gemini จำกัดการใช้งาน (429); ยังไม่ทราบว่าโควตารายวันหมดหรือไม่'
-      : job.error_code === 'generation_provider_busy'
-        ? 'Gemini ไม่พร้อมให้บริการชั่วคราว (503)'
+  const provider = ['generation_rate_limited', 'provider_rate_limited', 'quota_wait'].includes(
+    job.error_code || '',
+  )
+    ? 'Gemini จำกัดการใช้งาน (429); ยังไม่ทราบว่าโควตารายวันหมดหรือไม่'
+    : ['generation_provider_busy', 'provider_unavailable'].includes(job.error_code || '')
+      ? 'Gemini ไม่พร้อมให้บริการชั่วคราว (503)'
+      : job.error_code === 'free_tier_unverified'
+        ? 'รอผู้ดูแลยืนยัน Gemini Free Tier ก่อนเรียก API'
         : '';
   const stage = extra
     ? enrichmentLabels[extra.stage]
     : statusLabels[job.stage] || statusLabels[job.state] || job.state;
+  const providerTime =
+    extra?.retryAt || (job.wait?.time_source === 'provider' ? job.wait.retry_at : undefined);
+  const estimate = job.wait?.time_source === 'estimate' ? job.wait.estimated_retry_at : undefined;
   const when =
-    extra?.retryAt && Number.isFinite(Date.parse(extra.retryAt))
-      ? ` · Backend ระบุให้ลองอีกครั้ง ${new Date(extra.retryAt).toLocaleString('th-TH')}`
-      : '';
+    providerTime && Number.isFinite(Date.parse(providerTime))
+      ? ` · Backend ระบุให้ลองอีกครั้ง ${new Date(providerTime).toLocaleString('th-TH')}`
+      : estimate && Number.isFinite(Date.parse(estimate))
+        ? ` · เวลาประมาณการของระบบ ${new Date(estimate).toLocaleString('th-TH')}`
+        : '';
   return `${stage}${provider ? ` · ${provider}` : ''}${when}`;
+}
+
+export function jobShouldPark(job: Job): boolean {
+  return (
+    job.state === 'paused' ||
+    job.presentation?.stage === 'quota_paused' ||
+    (job.state === 'queued' &&
+      [
+        'generation_rate_limited',
+        'generation_provider_busy',
+        'provider_rate_limited',
+        'provider_unavailable',
+        'quota_wait',
+      ].includes(job.error_code || ''))
+  );
 }
 
 export const terminal = (state: string) =>
@@ -39,6 +62,7 @@ export const terminal = (state: string) =>
 export const statusLabels: Record<string, string> = {
   queued: 'รอคิว',
   running: 'กำลังทำงาน',
+  paused: 'พักงานไว้',
   fetching_transcript: 'กำลังดึงบทถอดเสียง',
   indexing: 'กำลังสร้างฐานความรู้',
   ready: 'พร้อมใช้งาน',
@@ -112,10 +136,23 @@ export function buildScope(
   };
 }
 export function jobWarning(job: Job): string | null {
-  if (job.state === 'failed' && job.error_code === 'generation_provider_busy')
+  if (
+    job.state === 'failed' &&
+    ['generation_provider_busy', 'provider_unavailable'].includes(job.error_code || '')
+  )
     return 'Gemini ไม่พร้อมให้บริการชั่วคราว จึงยังสร้างคำตอบไม่ได้ กรุณารอสักครู่แล้วส่งคำถามอีกครั้ง';
-  if (job.state === 'failed' && job.error_code === 'generation_rate_limited')
+  if (
+    job.state === 'failed' &&
+    ['generation_rate_limited', 'provider_rate_limited', 'quota_wait'].includes(
+      job.error_code || '',
+    )
+  )
     return 'Gemini จำกัดจำนวนคำขอหรือโทเคน กรุณาตรวจสอบโควตาและส่งคำถามอีกครั้งเมื่อใช้งานได้';
+  if (
+    job.state === 'failed' &&
+    ['free_tier_unverified', 'free_model_unverified'].includes(job.error_code || '')
+  )
+    return 'ยังไม่ได้ยืนยันสิทธิ์ Gemini Free Tier ของโปรเจกต์หรือโมเดลนี้ กรุณาให้ผู้ดูแลตรวจสอบก่อนใช้งาน';
   if (job.state === 'failed' && job.error_code === 'transcript_too_large')
     return 'บทถอดเสียงยาวเกินขีดจำกัดการแสดงผล กรุณาเลือกคลิปเดียวหรือถามเฉพาะช่วงที่ต้องการ';
   if (job.state === 'failed' && job.error_code === 'transcript_unavailable')

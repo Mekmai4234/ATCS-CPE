@@ -56,3 +56,7 @@ are never re-enabled by a reimport of the same video ID.
 Server progress and final outputs are authoritative. Client polling has bounded
 transient retries and can pause observation without relabelling the server job.
 Streaming and session restoration are not implemented.
+
+## Integrated provider waiting states (2026-10-25)
+
+The real 02 broker emits provider_rate_limited, provider_unavailable and quota_wait as well as the older generation-prefixed codes. Queued jobs with these codes are parked for explicit GET follow-up, without repeating POST or using the import/delete retry route. Native paused jobs are accepted and do not become completed answers. The wait object distinguishes provider retry_at from local estimated_retry_at; the UI labels estimates as estimates, never as a known daily reset. Missing Free Tier/model verification is an operator configuration issue, not a provider outage.
