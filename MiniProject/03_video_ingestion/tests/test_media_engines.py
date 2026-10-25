@@ -13,6 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 from youtube_backend.errors import AppError
 
 from youtube_ingestion.config import MediaSettings
+from youtube_ingestion.local_tools import LocalTools
 from youtube_ingestion.media import MediaPreparation
 
 
@@ -53,35 +54,42 @@ async def test_real_silent_clip_thai_english_ocr_and_resume(engine_media, tmp_pa
     image = Image.new("RGB", (1280, 720), "white")
     draw = ImageDraw.Draw(image)
     font = ImageFont.truetype(font_path, 72)
-    draw.text((80, 150), "RAG BUDDY", font=font, fill="black")
+    latin_font = ImageFont.truetype(os.environ.get("MEDIA_TEST_LATIN_FONT", font_path), 72)
+    draw.text((80, 150), "RAG BUDDY", font=latin_font, fill="black")
     draw.text((80, 300), "ทดสอบภาษาไทย", font=font, fill="black")
     title = tmp_path / "title.png"
     image.save(title)
     clip = settings.upload_root / "silent.mkv"
     # FFV1 is lossless: identical recurring frames can safely reuse OCR by exact hash.
-    await service.tools.run(
-        [
-            settings.ffmpeg,
-            "-nostdin",
-            "-v",
-            "error",
-            "-loop",
-            "1",
-            "-i",
-            title,
-            "-t",
-            "3",
-            "-r",
-            "4",
-            "-an",
-            "-c:v",
-            "ffv1",
-            "-threads",
-            "1",
-            clip,
-        ],
-        Context(),
-    )
+    # Fixture encoding needs a larger virtual-address budget on Linux FFV1.
+    # The actual product's decoding/OCR below retains its original memory cap.
+    encoder = LocalTools(settings.model_copy(update={"memory_mb": max(2048, settings.memory_mb)}))
+    try:
+        await encoder.run(
+            [
+                settings.ffmpeg,
+                "-nostdin",
+                "-v",
+                "error",
+                "-loop",
+                "1",
+                "-i",
+                title,
+                "-t",
+                "3",
+                "-r",
+                "4",
+                "-an",
+                "-c:v",
+                "ffv1",
+                "-threads",
+                "1",
+                clip,
+            ],
+            Context(),
+        )
+    finally:
+        await encoder.close()
     result = await service.prepare(clip, Context())
     assert not result.info.has_audio and not result.info.has_subtitle_stream
     assert [f.timestamp_seconds for f in result.frames] == [0.5, 1.25, 2.0, 2.75]
