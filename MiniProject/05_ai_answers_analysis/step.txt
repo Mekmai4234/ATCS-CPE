@@ -2,6 +2,18 @@
 
 Installation and runnable commands: README.md
 Executed checks and limits: TEST_REPORT.md
+Visual handoff and new executed checks: VISUAL_HANDOFF.md, VISUAL_TEST_REPORT.md
+
+E) Opt-in Internal Visual Consumer (not mounted on HTTP)
+------------------------------------------------------
+1. Require 02 authorization for frozen media snapshots and map prepared 03 frame metadata.
+2. Search authorized transcript/OCR/stored observations before inspecting new frames.
+3. Require externally verified Free Tier/model capability and shared broker leases.
+4. Reuse an authorized/versioned observation cache entry or load original bytes and check hash.
+5. Analyze at most three additional prepared frames per question, never a full video upload.
+6. Validate structured observations, separate original OCR and recheck permissions before caching.
+7. Validate cited mixed evidence and return kind/frame/time/API locators with sampled coverage.
+8. 02 must revalidate and publish atomically; no new public route/schema is owned by 05.
 
 A) Grounded Question Answering
 ------------------------------
