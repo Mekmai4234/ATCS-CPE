@@ -94,6 +94,37 @@ class ManagedAdapters:
             raise AppError(
                 "dependency_unavailable", "This operation's adapters are not connected", 503
             )
+        # Admission checks only adapter availability. Gate the actual outbound
+        # operation in invoke(), so local ingestion/OCR can run before indexing.
+
+    def gemini_gate(self, name):
+        """Legacy provider adapters cannot silently bypass the project broker.
+
+        Local operations are explicitly declared by trusted composition, never by
+        request JSON. Production consumers must declare gemini-broker-v1 and wrap
+        every provider HTTP call via ExecutionContext.gemini_call.
+        """
+        if (
+            self.settings.adapter_mode == "fixture"
+            or self.settings.backend_integration_profile == "offline"
+        ):
+            return
+        if name not in {"index", "answer", "analyze", "research", "artifact", "enrich"}:
+            return
+        declared = getattr(self.adapter, "provider_operations", {})
+        if isinstance(declared, dict) and declared.get(name) in {"local", "gemini-broker-v1"}:
+            return
+        from .quota import QuotaBroker
+
+        model = self.settings.embedding_model if name == "index" else self.settings.llm_model
+        endpoint = "embedContent" if name == "index" else "generateContent"
+        QuotaBroker(self.repository).access(model, endpoint)
+        raise AppError(
+            "gemini_broker_required",
+            "Adapter must route every Gemini call through the broker",
+            503,
+            pause=True,
+        )
 
     async def close(self):
         if self._lock is None:
@@ -106,11 +137,12 @@ class ManagedAdapters:
                 await close_adapter(self.adapter)
 
     def __getattr__(self, name):
-        if name not in METHODS:
+        if name not in METHODS and name != "enrich":
             raise AttributeError(name)
 
         async def invoke(*args, **kwargs):
             await self.start()
+            self.gemini_gate(name)
             return await getattr(self.adapter, name)(*args, **kwargs)
 
         return invoke

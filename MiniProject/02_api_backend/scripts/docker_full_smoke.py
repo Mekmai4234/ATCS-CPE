@@ -85,6 +85,7 @@ class FullCheck(DockerCheck):
             self.check("Network-disabled Linux suite: " + result.group(0))
             self.dc("up", "-d", "--wait", "--wait-timeout", "90", "api", "worker", timeout=150)
             health, _ = self.request("GET", "/health")
+            assert health["gemini_free_policy"] == "unverified"
             assert set(health["capabilities"].values()) == {"available"}
             assert health["full_pair_preflight"] and not health["live_provider_verified"]
             identity = self.dc(
@@ -119,7 +120,7 @@ class FullCheck(DockerCheck):
                 timeout=150,
             )
             health, _ = self.request("GET", "/health")
-            assert health["authentication_required"] and health["schema_revision"] == "0002"
+            assert health["authentication_required"] and health["schema_revision"] == "0003"
             self.request("GET", "/api/videos", expected=401)
             self.check("Authentication enforced before and after container recreation")
             self.results["passed"] = True
