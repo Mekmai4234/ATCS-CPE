@@ -40,10 +40,16 @@ function MemberArea({
 }) {
   const api = useMemo(
     () =>
-      new Api(import.meta.env.NEXT_PUBLIC_API_BASE_URL, port.transport(session), 75000, {
-        csrf: () => ({ token: session.csrfToken, header: session.csrfHeader }),
-        onSessionExpired: expired,
-      }),
+      new Api(
+        import.meta.env.NEXT_PUBLIC_API_BASE_URL,
+        port.transport(session),
+        75000,
+        {
+          csrf: () => ({ token: session.csrfToken, header: session.csrfHeader }),
+          onSessionExpired: expired,
+        },
+        port.evidence,
+      ),
     [session, port, expired],
   );
   useEffect(() => () => api.dispose(), [api]);

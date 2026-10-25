@@ -101,9 +101,14 @@ python tests/identity_smoke.py --checkout
 - ยังไม่ได้ตรวจ YouTube/embeddings/Gemini จริง การทดสอบกับ module 02 ใช้ fixture adapters จึงยืนยัน flow และ contract ไม่ยืนยันคุณภาพ AI
 - ประวัติผลและงานที่กำลังติดตามอยู่ในหน่วยความจำของแท็บ รีโหลดแล้วไม่กู้ UI อัตโนมัติ งานที่ server รับไปแล้วอาจยังทำต่อ
 - หยุดติดตามชั่วคราวเมื่อ GET ล้มเหลวต่อเนื่อง 3 ครั้ง หรือครบ 10 นาที พร้อมปุ่มติดตามอีกครั้ง; ไม่อ้างว่า server ล้มเหลวเพราะ browser timeout
-- ไม่มีระบบสมาชิกหรือการแยกผู้ใช้ สอดคล้องกับ backend ต้นแบบผู้ใช้เดียว
-- ใช้ external YouTube link สำหรับเล่นคลิปและ citation; มาสคอตเป็น PNG อ้างอิง ยังไม่มี animation
+- ระบบสมาชิกใช้ HttpSessionPort และ API auth/session ของ 02; ยังต้องตรวจ Google จริงตาม [AUTH_INTEGRATION.md](AUTH_INTEGRATION.md)
+- ใช้ external YouTube link สำหรับเล่นคลิปและ citation; Buddy เคลื่อนไหวจากภาพหลายเลเยอร์และรองรับ reduced motion
 - ยังไม่ได้ deploy ขึ้นระบบใช้งานจริง
+
+งานภาพรอบ 24 ตุลาคม 2026 เพิ่มส่วนแสดงหลักฐานที่ใช้ร่วมกันและการพักติดตามงาน
+429/503 โดยไม่ส่งคำถามซ้ำเอง ส่วน visual-only chat ยังไม่เปิดใน production:
+develop ยังไม่มี API ภาพ และ branch สัญญา v2 ของ 02 ยังระบุว่า chat ใช้ transcript-v1
+ดู [EVIDENCE_HANDOFF.md](EVIDENCE_HANDOFF.md) สำหรับข้อต่อที่ต้องตกลงและเกณฑ์ทดสอบร่วมกับ 07
 
 Build ที่ `dist/` ใช้กับ static hosting ได้ ค่าตั้งค่าฝั่ง browser ถูกฝังตอน build เก็บ API/model keys ไว้ที่ backend เท่านั้น
 
