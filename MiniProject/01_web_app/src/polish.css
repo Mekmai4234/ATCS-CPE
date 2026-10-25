@@ -59,12 +59,15 @@ body .head-only {
   overflow: visible;
 }
 body .forest-workspace .topbar {
+  position: relative;
+  z-index: 10;
+  isolation: isolate;
   min-height: 84px;
   max-width: none;
   margin: 0;
   padding: 10px var(--ui-space);
   border: 0;
-  background: #ffffffc4;
+  background: #f8fffd;
   gap: 20px;
 }
 body .forest-workspace .forest-nav {
@@ -114,6 +117,8 @@ body .forest-workspace .page-body {
   padding: 0 var(--ui-space) 16px;
 }
 body .demo-banner {
+  position: relative;
+  z-index: 1;
   margin: 4px var(--ui-space) 0;
   padding: 7px 12px;
   font-size: 11px;
@@ -264,6 +269,7 @@ body .home-mascot .mascot-3d {
 }
 body .buddy-scene {
   aspect-ratio: 3 / 2;
+  pointer-events: none;
 }
 body .buddy-scene-image {
   display: block;
@@ -303,6 +309,7 @@ body .buddy-rig[data-state='error'] .buddy-greeting {
   opacity: 1;
 }
 body .home-mascot .buddy-speech {
+  pointer-events: none;
   position: absolute;
   top: 10px;
   right: 24%;

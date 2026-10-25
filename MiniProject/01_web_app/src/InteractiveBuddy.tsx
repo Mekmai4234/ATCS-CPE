@@ -21,6 +21,9 @@ export default function InteractiveBuddy({
   useEffect(() => {
     const node = root.current;
     if (!node || !active || fallback || headOnly) return;
+    // The oversized artwork is decorative. Listen on its bounded scene container
+    // so it can react to the pointer without covering navigation or form controls.
+    const interactionSurface = node.parentElement || node;
     const motion = matchMedia('(prefers-reduced-motion: reduce)');
     let frame = 0,
       pending = { x: 0, y: 0 };
@@ -69,16 +72,16 @@ export default function InteractiveBuddy({
     motion.addEventListener('change', connect);
     document.addEventListener('visibilitychange', visibility);
     document.documentElement.addEventListener('pointerleave', reset);
-    node.addEventListener('pointerenter', enter);
-    node.addEventListener('pointerdown', enter);
+    interactionSurface.addEventListener('pointerenter', enter);
+    interactionSurface.addEventListener('pointerdown', enter);
     return () => {
       reset();
       window.removeEventListener('pointermove', move);
       motion.removeEventListener('change', connect);
       document.removeEventListener('visibilitychange', visibility);
       document.documentElement.removeEventListener('pointerleave', reset);
-      node.removeEventListener('pointerenter', enter);
-      node.removeEventListener('pointerdown', enter);
+      interactionSurface.removeEventListener('pointerenter', enter);
+      interactionSurface.removeEventListener('pointerdown', enter);
       clearTimeout(wave.current);
     };
   }, [active, fallback, headOnly]);
