@@ -97,12 +97,14 @@ describe('source scope', () => {
     );
   });
   it('distinguishes provider downtime from quota limits', () => {
-    expect(jobWarning({ state: 'failed', error_code: 'generation_provider_busy' } as Job)).toContain(
-      'ไม่พร้อมให้บริการชั่วคราว',
-    );
+    expect(
+      jobWarning({ state: 'failed', error_code: 'generation_provider_busy' } as Job),
+    ).toContain('ไม่พร้อมให้บริการชั่วคราว');
     expect(jobWarning({ state: 'failed', error_code: 'generation_rate_limited' } as Job)).toContain(
       'จำกัดจำนวนคำขอหรือโทเคน',
     );
-    expect(jobWarning({ state: 'queued', error_code: 'generation_provider_busy' } as Job)).toBeNull();
+    expect(
+      jobWarning({ state: 'queued', error_code: 'generation_provider_busy' } as Job),
+    ).toBeNull();
   });
 });

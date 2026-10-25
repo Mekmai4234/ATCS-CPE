@@ -7,6 +7,9 @@ import type {
   Page,
   ProgressEvent,
   Video,
+  EvidenceBridge,
+  FrameReference,
+  TaskResult,
 } from './types';
 import { terminal } from './domain';
 
@@ -18,6 +21,7 @@ export class ApiError extends Error {
     public requestId?: string,
     public jobId?: string,
     public status?: number,
+    public retryAfter?: string,
   ) {
     super(message);
   }
@@ -37,7 +41,81 @@ export class Api {
     private transport: Transport = (input, init) => fetch(input, init),
     private timeoutMs = 75000,
     private security?: ApiSecurity,
+    private evidence?: EvidenceBridge,
   ) {}
+  private mapCitation = (value: import('./types').Citation) => ({
+    ...value,
+    presentation: this.evidence?.citation(value),
+  });
+  private mapArtifact = (value: Artifact): Artifact => ({
+    ...value,
+    citations: value.citations.map(this.mapCitation),
+  });
+  private mapResult = (value: TaskResult): TaskResult => ({
+    ...value,
+    visualCoverage: this.evidence?.coverage(value),
+    citations: value.citations?.map(this.mapCitation),
+    artifacts: value.artifacts?.map(this.mapArtifact),
+  });
+  loadFrame = async (frame: FrameReference, signal: AbortSignal): Promise<Blob> => {
+    if (this.disposed) throw new DOMException('Session ended', 'AbortError');
+    if (!this.evidence)
+      throw new ApiError(
+        'ยังรอ API หลักฐานภาพที่ตรวจสิทธิ์',
+        'evidence_contract_unavailable',
+        false,
+      );
+    return this.evidence.asset(frame, signal, this.readEvidenceAsset);
+  };
+  private readEvidenceAsset = async (path: string, signal: AbortSignal): Promise<Blob> => {
+    if (this.disposed) throw new DOMException('Session ended', 'AbortError');
+    const base = new URL(this.base || '/', 'http://local.invalid');
+    const target = new URL(path, base);
+    if (
+      !path.startsWith('/api/') ||
+      /[\\\r\n#]/.test(path) ||
+      target.origin !== base.origin ||
+      !target.pathname.startsWith('/api/')
+    )
+      throw new ApiError('เส้นทางภาพไม่ถูกต้อง', 'invalid_asset', false);
+    signal.throwIfAborted();
+    const controller = new AbortController();
+    this.controllers.add(controller);
+    const abort = () => controller.abort();
+    signal.addEventListener('abort', abort, { once: true });
+    const timer = setTimeout(abort, this.timeoutMs);
+    try {
+      const response = await this.transport(`${this.base}${path}`, {
+        credentials: this.security ? 'include' : 'same-origin',
+        cache: 'no-store',
+        redirect: 'error',
+        signal: controller.signal,
+        headers: { Accept: 'image/png,image/jpeg,image/webp,image/avif' },
+      });
+      if (response.status === 401) this.security?.onSessionExpired();
+      if (!response.ok)
+        throw new ApiError(
+          response.status === 403 || response.status === 404
+            ? 'ไม่มีสิทธิ์ดูภาพ หรือภาพใช้ไม่ได้แล้ว'
+            : 'โหลดภาพไม่สำเร็จ',
+          'asset_unavailable',
+          false,
+          undefined,
+          undefined,
+          response.status,
+        );
+      if (!/^image\/(png|jpeg|webp|avif)(;|$)/i.test(response.headers.get('Content-Type') || ''))
+        throw new ApiError('ข้อมูลภาพไม่ถูกต้อง', 'invalid_asset', false);
+      const blob = await response.blob();
+      if (blob.size > 10 * 1024 * 1024)
+        throw new ApiError('ภาพมีขนาดใหญ่เกินไป', 'invalid_asset', false);
+      return blob;
+    } finally {
+      clearTimeout(timer);
+      this.controllers.delete(controller);
+      signal.removeEventListener('abort', abort);
+    }
+  };
   dispose() {
     this.disposed = true;
     this.controllers.forEach((controller) => controller.abort());
@@ -80,6 +158,7 @@ export class Api {
           undefined,
           undefined,
           response.status,
+          response.headers.get('Retry-After') || undefined,
         );
       });
       if (!response.ok) {
@@ -91,6 +170,7 @@ export class Api {
           e?.request_id || response.headers.get('X-Request-ID') || undefined,
           e?.job_id,
           response.status,
+          response.headers.get('Retry-After') || undefined,
         );
       }
       if (!data || typeof data !== 'object')
@@ -117,7 +197,10 @@ export class Api {
     });
     if (!Array.isArray(data.items) || !Number.isInteger(data.total))
       throw new ApiError('รายการคลิปไม่ตรง API', 'invalid_response', false);
-    return data;
+    return {
+      ...data,
+      items: data.items.map((video) => ({ ...video, presentation: this.evidence?.source(video) })),
+    };
   }
   async importVideos(urls: string[], signal?: AbortSignal) {
     const { data } = await this.request<{ jobs: ImportItem[]; mode: string }>(
@@ -136,7 +219,11 @@ export class Api {
     ) {
       throw new ApiError('สถานะงานไม่ตรง API', 'invalid_response', false);
     }
-    return data;
+    return {
+      ...data,
+      presentation: this.evidence?.job(data),
+      result: data.result ? this.mapResult(data.result) : null,
+    };
   }
   async submit(
     path: string,
@@ -157,7 +244,7 @@ export class Api {
       'answer' in response.data &&
       typeof response.data.answer === 'string'
     )
-      return { status: 200, data: response.data as Answer };
+      return { status: 200, data: this.mapResult(response.data as Answer) as Answer };
     throw new ApiError('ผลคำขอไม่ตรง API', 'invalid_response', false);
   }
   async cancel(id: string) {
@@ -186,7 +273,13 @@ export class Api {
       data.conversation_id !== id
     )
       throw new ApiError('ประวัติสนทนาไม่ตรง API', 'invalid_response', false);
-    return data;
+    return {
+      ...data,
+      messages: data.messages.map((message) => ({
+        ...message,
+        citations: message.citations.map(this.mapCitation),
+      })),
+    };
   }
   async research(id: string, after = 0, signal?: AbortSignal) {
     return (
@@ -197,9 +290,13 @@ export class Api {
     ).data;
   }
   async artifact(id: string, signal?: AbortSignal) {
-    return (
-      await this.request<Artifact>(`/api/learning-artifacts/${encodeURIComponent(id)}`, { signal })
-    ).data;
+    return this.mapArtifact(
+      (
+        await this.request<Artifact>(`/api/learning-artifacts/${encodeURIComponent(id)}`, {
+          signal,
+        })
+      ).data,
+    );
   }
 }
 

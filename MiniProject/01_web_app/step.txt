@@ -79,3 +79,6 @@ INTEGRATED CHECKOUT
 3. Run pnpm exec playwright test and the module-07 floating config.
 4. Run module-07 browser_identity.py --checkout for the real HTTP/API/worker flow.
 5. Register the actual Google origin and verify real login separately; demo screenshots do not prove it.
+
+VISUAL EVIDENCE ACCEPTANCE
+Run unit/browser/build/production checks and identity_smoke.py --checkout sequentially (Playwright runners share ports/output directories). Agree the module-02 contract and run joint module-07 visual integration before production release. Fixture visual tests alone are insufficient.
