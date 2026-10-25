@@ -1,5 +1,7 @@
 # 05 visual evidence and Free Tier handoff — 2026-10-24
 
+> Integration update — 2026-10-25: text/analysis factories now use the 05 ExecutionBroker adapter bound to the real 02 SQL quota broker and durable execution lease. Every count/generate RPC is reserved and reconciled, including calls made by research tools under their actual agent role. 02 exports the shared vision/agent settings. The sections below record the original PR proposal; the proposed VisualBridge is still an internal interface, not a mounted public media-chat route. Native OCR/visual v2 storage and retrieval are in 02/04, while the public end-to-end media producer/answer route remains pending. Operator Free Tier verification is still mandatory; no billing status is fabricated.
+
 This implements the module 05 consumer work from `00_OVERVIEW (1).md` and
 `05_AI_ANSWERS_ANALYSIS.md`, against `develop@1814bf3`. Only module 05 is changed.
 

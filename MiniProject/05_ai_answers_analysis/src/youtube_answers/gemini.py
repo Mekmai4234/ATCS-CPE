@@ -108,7 +108,7 @@ class GeminiModel:
                     operation="count_tokens",
                     input_tokens=self.settings.max_context_tokens,
                     output_tokens=0,
-                ):
+                ) as count_lease:
                     self._recheck(grant)
                     count = await self.client.aio.models.count_tokens(
                         model=model,
@@ -119,6 +119,7 @@ class GeminiModel:
                             )
                         ),
                     )
+                    count_lease.record({"prompt_token_count": count.total_tokens}, None)
                 if type(count.total_tokens) is not int or count.total_tokens <= 0:
                     raise error("invalid_token_count", "Gemini returned an invalid token count")
                 # countTokens cannot count GenerateContentConfig on the Developer API.
