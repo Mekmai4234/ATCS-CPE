@@ -63,7 +63,6 @@ export default function FloatingBuddy(props: Props) {
   const [point, setPoint] = useState(() => readPosition(storage(), viewport()));
   const current = useRef(point);
   const preferred = useRef(point);
-  const [menu, setMenu] = useState(false);
   const [dragging, setDragging] = useState(false);
   const launcher = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
@@ -101,7 +100,6 @@ export default function FloatingBuddy(props: Props) {
   };
   function close() {
     onOpen(false);
-    setMenu(false);
     requestAnimationFrame(() => launcher.current?.focus());
   }
   useEffect(() => {
@@ -146,9 +144,8 @@ export default function FloatingBuddy(props: Props) {
               { ...candidate, y: Math.max(candidate.y, headerBottom + 16) },
               view,
             );
-          // Include the position menu button so moving Buddy cannot cover a nearby control.
           if (
-            rect.right <= candidate.x - 31 ||
+            rect.right <= candidate.x ||
             rect.left >= candidate.x + 72 ||
             rect.bottom <= candidate.y ||
             rect.top >= candidate.y + 72
@@ -235,6 +232,32 @@ export default function FloatingBuddy(props: Props) {
         aria-label={open ? 'ย่อแชต Buddy' : 'เปิดแชต Buddy แบบลอย'}
         aria-expanded={open}
         aria-controls="floating-buddy-chat"
+        aria-describedby="buddy-position-help"
+        aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home"
+        title="แชตกับ Buddy · ลากเพื่อย้ายตำแหน่ง"
+        onKeyDown={(event) => {
+          const steps: Record<string, Point> = {
+            ArrowUp: { x: 0, y: -1 },
+            ArrowDown: { x: 0, y: 1 },
+            ArrowLeft: { x: -1, y: 0 },
+            ArrowRight: { x: 1, y: 0 },
+          };
+          if (event.key === 'Home') {
+            event.preventDefault();
+            apply(cornerPoint('bottom-right', viewport()), true);
+          } else if (steps[event.key]) {
+            event.preventDefault();
+            const delta = steps[event.key],
+              distance = event.shiftKey ? 40 : 10;
+            apply(
+              {
+                x: current.current.x + delta.x * distance,
+                y: current.current.y + delta.y * distance,
+              },
+              true,
+            );
+          }
+        }}
         style={{ left: point.x, top: point.y }}
         onPointerDown={(event) => {
           if (event.button !== 0) return;
@@ -278,60 +301,13 @@ export default function FloatingBuddy(props: Props) {
             return;
           }
           onOpen(!open);
-          setMenu(false);
         }}
       >
         <InteractiveBuddy headOnly active={false} decorative state={state} />
       </button>
-      <button
-        className="buddy-position-toggle"
-        aria-label="ตำแหน่งและการแสดงแชต"
-        aria-expanded={menu}
-        style={{ left: Math.max(view.left + 4, point.x - 31), top: point.y + 20 }}
-        onClick={() => setMenu(!menu)}
-      >
-        ⋮
-      </button>
-      {menu && (
-        <div
-          className="buddy-position-menu"
-          role="group"
-          aria-label="จัดตำแหน่ง Buddy"
-          style={{
-            right: Math.max(12, view.left + view.width - point.x - 72),
-            top: Math.min(Math.max(view.top + 12, point.y - 230), view.top + view.height - 250),
-          }}
-        >
-          <strong>ย้ายโดยไม่ต้องลาก</strong>
-          {(
-            [
-              ['top-left', 'มุมบนซ้าย'],
-              ['top-right', 'มุมบนขวา'],
-              ['bottom-left', 'มุมล่างซ้าย'],
-              ['bottom-right', 'มุมล่างขวา'],
-            ] as const
-          ).map(([corner, label]) => (
-            <button
-              key={corner}
-              onClick={() => {
-                apply(cornerPoint(corner, viewport()), true);
-                setMenu(false);
-                launcher.current?.focus();
-              }}
-            >
-              {label}
-            </button>
-          ))}
-          <button
-            onClick={() => {
-              apply(cornerPoint('bottom-right', viewport()), true);
-              setMenu(false);
-            }}
-          >
-            คืนตำแหน่ง
-          </button>
-        </div>
-      )}
+      <span id="buddy-position-help" className="visually-hidden">
+        กด Enter เพื่อเปิดหรือย่อแชต ใช้ปุ่มลูกศรเพื่อย้ายตำแหน่ง และ Home เพื่อกลับมุมขวาล่าง
+      </span>
       {open && (
         <>
           {mobile && <div className="buddy-modal-scrim" onClick={close} />}

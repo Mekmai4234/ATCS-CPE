@@ -438,44 +438,6 @@ body .admin-card {
     0 0 0 3px #00a88340,
     0 12px 30px #08745740;
 }
-.buddy-position-toggle {
-  position: fixed;
-  width: 28px;
-  height: 34px;
-  min-height: 34px;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: white;
-  color: var(--ink);
-  z-index: 102;
-  font-size: 22px;
-}
-.buddy-position-menu {
-  position: fixed;
-  width: 205px;
-  padding: 12px;
-  background: white;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  box-shadow: 0 12px 45px #043f4520;
-  z-index: 104;
-  display: grid;
-  gap: 4px;
-}
-.buddy-position-menu button {
-  background: #f4fcf8;
-  color: #165c49;
-  border: 0;
-  border-radius: 8px;
-  text-align: left;
-  padding: 6px 10px;
-  min-height: 31px;
-}
-.buddy-position-menu strong {
-  font-size: 12px;
-  margin-bottom: 4px;
-}
 .buddy-panel {
   position: fixed;
   z-index: 103;
