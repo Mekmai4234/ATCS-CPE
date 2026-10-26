@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+import traceback
 from contextlib import suppress
 
 from pydantic import ValidationError
@@ -160,8 +161,15 @@ class Worker:
             )
         except AppError as error:
             self._fail_if_owned(job, error)
-        except Exception:
+        except Exception as error:
             # Deliberately omit exception strings; adapters may embed credentials in them.
+            frames = traceback.extract_tb(error.__traceback__)
+            logger.error(
+                "dependency_failed job_id=%s error_type=%s frames=%s",
+                job["job_id"],
+                type(error).__name__,
+                " > ".join(f"{frame.name}:{frame.lineno}" for frame in frames),
+            )
             self._fail_if_owned(
                 job, AppError("dependency_error", "Dependency failed unexpectedly", 502)
             )
