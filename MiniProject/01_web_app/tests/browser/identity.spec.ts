@@ -386,6 +386,7 @@ test('removing a shared source preserves the other member and never revives old 
     await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
     await expect(page.locator('.turn')).toHaveCount(1);
     await expect(page.getByRole('link', { name: /^เปิดหลักฐาน/ }).first()).toBeVisible();
+    await page.getByRole('button', { name: 'เลือกหรือเปลี่ยนวิดีโอ', exact: true }).click();
     await page.locator('.video-card').getByRole('button', { name: /^ลบ / }).click();
     await page.getByRole('button', { name: 'ยืนยันลบคลิป', exact: true }).click();
     await expect(page.locator('.turn').locator('a[href*="v=dQw4w9WgXcQ&"]')).toHaveCount(0);
