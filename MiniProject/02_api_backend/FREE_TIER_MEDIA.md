@@ -5,6 +5,30 @@ contract, persistence and scheduler. It does not deliver 03's extraction engine,
 04/05 visual retrieval/answers or 01's new visual UI. See FREE_TIER_TEST_REPORT.md
 for observed tests and release dependencies.
 
+## Token-counting accounting correction (26 October 2026)
+
+`countTokens` calls stay in the durable reservation ledger and still require the
+verified credential, model/endpoint/role grant, owner, lease and policy pin.
+They use a separate project-wide local cap of 60 requests/minute and the smaller
+of the member cap and 60. Global concurrency, FIFO and provider circuits remain
+in force. They do not consume the model inference RPM, TPM or rolling 24-hour
+RPD budget. Generation and embedding calls continue to consume their configured
+inference pool; sent/uncertain inference calls are never refunded.
+
+Earlier code pooled token-counting calls with inference. A 20-RPD pool could
+therefore reject generation after 12 token-counting calls and only 8 inference
+calls. Existing rows are now classified by endpoint at admission; no usage data
+is deleted, reset or rewritten. No database migration or policy-limit increase
+is required. Restart both API and workers so all processes use the same code.
+
+Google's [billing FAQ](https://ai.google.dev/gemini-api/docs/billing) excludes
+token-counting from inference quota, and the Google developer support
+[countTokens clarification](https://discuss.ai.google.dev/t/gemini-api-counttokens/188451)
+explicitly confirms this behavior for `models.countTokens`.
+
+Provider 429/503/504 responses remain real failures even with correct local
+accounting; this correction does not guarantee external service availability.
+
 ## Compatibility and stopped upgrade
 
 Schema **0003** adds media assets/frames/evidence revisions, private analysis cache,
