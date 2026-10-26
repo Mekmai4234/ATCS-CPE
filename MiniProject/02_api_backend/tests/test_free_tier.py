@@ -191,7 +191,7 @@ def test_dispatch_once_reconcile_input_usage_and_conservative_uncertain_accounti
 
 
 @pytest.mark.parametrize("dimension", ["rpm", "tpm", "rpd", "user_rpm"])
-def test_configured_project_and_member_limits_are_shared_by_endpoints(budget, dimension):
+def test_configured_inference_limits_are_shared_by_generation_and_embedding(budget, dimension):
     env = budget
     env.policy["pools"]["shared"][dimension] = 100 if dimension == "tpm" else 1
     env.policy_file.write_text(json.dumps(env.policy), encoding="utf-8")
@@ -202,12 +202,58 @@ def test_configured_project_and_member_limits_are_shared_by_endpoints(budget, di
         env.broker.reserve(
             env.context,
             model=env.settings.llm_model,
-            endpoint="countTokens",
+            endpoint="embedContent",
             input_tokens=1,
-            call_key="count-also-consumes-budget",
+            call_key="embedding-also-consumes-inference-budget",
         )
     assert wait.value.code == "quota_wait"
     assert wait.value.retry_time_source == "estimate"
+
+
+def count_request(env, key):
+    permit = env.broker.reserve(
+        env.context,
+        model=env.settings.llm_model,
+        endpoint="countTokens",
+        input_tokens=24000,
+        call_key=key,
+    )
+    env.broker.dispatch(env.context, permit)
+    env.broker.settle(permit, reply=ProviderReply(25, 25, None))
+
+
+def test_token_counting_does_not_spend_inference_rpm_tpm_or_daily_budget(budget):
+    env = budget
+    env.policy["pools"]["shared"].update(rpm=1, tpm=100, rpd=1)
+    env.policy_file.write_text(json.dumps(env.policy), encoding="utf-8")
+    count_request(env, "count-before-1")
+    count_request(env, "count-before-2")
+    permit = reserve(env)
+    env.broker.dispatch(env.context, permit)
+    env.broker.settle(permit)  # Uncertain inference still consumes its slot.
+    count_request(env, "count-after")
+    with pytest.raises(AppError) as denied:
+        reserve(env, "inference-is-still-limited")
+    assert denied.value.code == "quota_wait"
+    with env.db.read() as c:
+        rows = c.execute(sa.select(db.v2["reservations"])).mappings().all()
+    assert len(rows) == 4  # No deletion/refund of prior usage to recover capacity.
+
+
+def test_token_counting_retains_its_own_project_rate_limit(budget, monkeypatch):
+    monkeypatch.setattr("youtube_backend.quota.COUNT_TOKENS_RPM", 2)
+    count_request(budget, "count-1")
+    count_request(budget, "count-2")
+    with pytest.raises(AppError) as denied:
+        count_request(budget, "count-3")
+    assert denied.value.code == "quota_wait"
+
+
+def test_token_counting_cannot_bypass_global_concurrency(budget):
+    reserve(budget, "active-inference")
+    with pytest.raises(AppError) as denied:
+        count_request(budget, "concurrent-count")
+    assert denied.value.code == "quota_wait"
 
 
 def test_held_cancellation_refunds_but_inconsistent_workers_fail_closed(budget):
