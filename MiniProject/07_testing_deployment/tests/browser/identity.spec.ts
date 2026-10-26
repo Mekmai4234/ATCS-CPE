@@ -29,7 +29,7 @@ test("real HTTP research job produces events/citations and logout clears the wor
     .toBe(1);
   await page.getByRole("checkbox").check();
   await page
-    .getByRole("button", { name: "วิเคราะห์และเรียนรู้", exact: true })
+    .getByRole("button", { name: "สรุปและแบบฝึกหัด", exact: true })
     .click();
   await page.getByLabel("ประเภทงาน").selectOption("research");
   await page.getByLabel("เป้าหมายค้นคว้า").fill("Explain evidence for RAG");
