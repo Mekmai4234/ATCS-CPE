@@ -352,6 +352,10 @@ body .view-home .section-heading .secondary {
 body .view-home .filters {
   display: none;
 }
+body .view-home .filters.has-active-filters {
+  display: flex;
+  flex-wrap: wrap;
+}
 body .view-home .video-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
