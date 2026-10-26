@@ -3,6 +3,7 @@
 Local rolling 60s/24h accounting is conservative admission control, NOT Google's
 remaining balance or reset clock. Consumers must wrap EVERY outbound request,
 including countTokens and embedding, through call(). No key rotation/fallback.
+Token counting has its own project-wide request budget, not inference RPM/TPM/RPD.
 """
 
 import argparse
@@ -24,6 +25,10 @@ from . import database as db
 from .config import PROJECT_ROOT, Settings
 from .errors import AppError
 from .schemas import Schema
+
+# Deliberately below the separate token-counting endpoint limit. Authentication,
+# policy grants, durable leases, FIFO, concurrency and provider circuits still apply.
+COUNT_TOKENS_RPM = 60
 
 
 class Limits(Schema):
@@ -208,7 +213,8 @@ class QuotaBroker:
             raise AppError("budget_role_denied", "Operation role exceeds this job's authority", 403)
         policy, grant = self.access(model, endpoint, role)
         limits, now = policy.pools[grant.bucket], self.clock()
-        if input_tokens > limits.tpm:
+        counting = endpoint == "countTokens"
+        if not counting and input_tokens > limits.tpm:
             raise AppError(
                 "budget_input_too_large", "Request exceeds the verified token budget", 422
             )
@@ -293,8 +299,20 @@ class QuotaBroker:
                 if r["state"] != "held" or r["expires_at"] > now
             ]
             active = [r for r in live if r["state"] in {"held", "sent"} and r["expires_at"] > now]
-            pool = [r for r in live if r["bucket"] == grant.bucket]
+            # Preserve every ledger row. Classify historical calls by endpoint:
+            # countTokens must not exhaust the model's inference daily budget.
+            pool = (
+                [r for r in live if r["endpoint"] == "countTokens"]
+                if counting
+                else [
+                    r
+                    for r in live
+                    if r["bucket"] == grant.bucket and r["endpoint"] != "countTokens"
+                ]
+            )
             minute = [r for r in pool if r["created_at"] > now - 60]
+            rpm = COUNT_TOKENS_RPM if counting else limits.rpm
+            user_rpm = min(limits.user_rpm, COUNT_TOKENS_RPM) if counting else limits.user_rpm
             circuit = db.v2["circuits"]
             circuit_row = (
                 c.execute(
@@ -323,10 +341,10 @@ class QuotaBroker:
                 or len(active) >= self.settings.gemini_max_concurrent
                 or sum(r["owner_id"] == job["owner_id"] for r in active)
                 >= self.settings.gemini_user_concurrent
-                or len(minute) >= limits.rpm
-                or len(pool) >= limits.rpd
-                or sum(r["tokens"] for r in minute) + input_tokens > limits.tpm
-                or sum(r["owner_id"] == job["owner_id"] for r in minute) >= limits.user_rpm
+                or len(minute) >= rpm
+                or (not counting and len(pool) >= limits.rpd)
+                or (not counting and sum(r["tokens"] for r in minute) + input_tokens > limits.tpm)
+                or sum(r["owner_id"] == job["owner_id"] for r in minute) >= user_rpm
                 or (first and first["wait_id"] != wait_id)
             ):
                 denied = AppError(
