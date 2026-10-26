@@ -1203,3 +1203,140 @@ body .buddy-panel .citation strong {
 body .buddy-panel .citation a {
   font-size: 12px;
 }
+
+/* Video Buddy: visible answers, private conversation archive and distinct tools. */
+.chat-source-bar,
+.history-resume {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 1px solid #c9e8de;
+  background: #f2fcf8;
+  border-radius: 20px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.answer-zone,
+.turn {
+  scroll-margin-top: 24px;
+}
+.answer-zone .pending-panel {
+  min-height: 100px;
+}
+.answer-zone > .jump-latest {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 35;
+  background: #063d36;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 24px;
+  box-shadow: 0 4px 20px #063d3630;
+}
+.history-panel {
+  background: white;
+  border: 1px solid #d7ece5;
+  border-radius: 28px;
+  padding: clamp(20px, 3vw, 36px);
+}
+.history-search {
+  max-width: 760px;
+  margin: 20px 0;
+}
+.history-search label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.history-search > div {
+  display: flex;
+  gap: 10px;
+}
+.history-search input {
+  flex: 1;
+  min-width: 0;
+}
+.history-list {
+  display: grid;
+  gap: 12px;
+}
+.history-list article {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  border: 1px solid #d7ece5;
+  border-radius: 18px;
+  padding: 20px;
+}
+.history-list article > div {
+  min-width: 0;
+}
+.history-list h3 {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.history-list h3 button {
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #063d36;
+  font-size: 19px;
+  font-weight: 700;
+}
+.history-list p {
+  overflow-wrap: anywhere;
+  color: #49695f;
+  font-size: 14px;
+}
+.history-list time,
+.history-total {
+  color: #49695f;
+  font-size: 13px;
+}
+.history-pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+.history-panel button {
+  min-height: 44px;
+}
+body .chat-panel form[hidden] {
+  display: none;
+}
+@media (min-width: 1200px) and (max-width: 1500px) {
+  body .forest-workspace .topbar {
+    flex-wrap: wrap;
+  }
+  body .forest-workspace .forest-nav {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+  body .profile-controls {
+    margin-left: auto;
+  }
+}
+@media (max-width: 600px) {
+  body .forest-workspace .forest-nav {
+    flex-wrap: wrap;
+  }
+  .history-list article {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .history-search > div {
+    flex-wrap: wrap;
+  }
+  .history-search input {
+    flex-basis: 100%;
+  }
+}

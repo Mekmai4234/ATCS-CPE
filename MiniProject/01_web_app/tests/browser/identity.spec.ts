@@ -33,6 +33,42 @@ async function importOne(page: Page) {
   await expect.poll(async () => page.locator('input[type="checkbox"]:enabled').count()).toBe(1);
 }
 
+test('private history survives reload and continues through real HTTP without resubmitting on open', async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  await signIn(page, 'fixture-history-member');
+  await importOne(page);
+  const sent: { conversation_id: string | null }[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/chat')
+      sent.push(request.postDataJSON());
+  });
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก', exact: true }).click();
+  await page.getByLabel('คำถามของคุณ', { exact: true }).fill('Explain RAG history');
+  await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
+  await expect(page.locator('.turn')).toHaveCount(1);
+  await page.getByRole('button', { name: 'ประวัติแชต', exact: true }).click();
+  await page.getByRole('button', { name: 'เปิดบทสนทนา Explain RAG history', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'ถามต่อในบทสนทนานี้', exact: true })).toBeVisible();
+  const id = new URL(page.url()).pathname.split('/').at(-1);
+  await page.reload();
+  await expect(page.locator('.turn')).toHaveCount(1);
+  expect(sent).toHaveLength(1);
+  await page.getByRole('button', { name: 'ถามต่อในบทสนทนานี้', exact: true }).click();
+  await page.getByLabel('คำถามของคุณ', { exact: true }).fill('More detail from the same clip');
+  await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
+  await expect(page.locator('.turn')).toHaveCount(2);
+  expect(sent).toHaveLength(2);
+  expect(sent[1].conversation_id).toBe(id);
+  await page.getByRole('button', { name: 'ออกจากระบบ', exact: true }).click();
+  await signIn(page, 'fixture-history-other');
+  await page.getByRole('button', { name: 'ประวัติแชต', exact: true }).click();
+  await expect(page.locator('.history-list article')).toHaveCount(0);
+  await expect(page.getByText('เริ่มบทสนทนาแรกกับ Video Buddy', { exact: true })).toBeVisible();
+});
+
 test('real session cookie, nullable profile, challenge nonce and returning identity', async ({
   page,
 }) => {
@@ -47,7 +83,7 @@ test('real session cookie, nullable profile, challenge nonce and returning ident
       void response.json().then((value) => challenges.push(value.nonce));
   });
   await signIn(page, 'fixture-null');
-  await expect(page.getByText('สมาชิก RAG Buddy', { exact: true })).toBeVisible();
+  await expect(page.getByText('สมาชิก Video Buddy', { exact: true })).toBeVisible();
   const me = await (await page.request.get(`${api}/api/auth/me`)).json();
   expect(me.user.role).toBe('user');
   expect(me.user.name).toBeNull();
@@ -180,7 +216,7 @@ test('HTTP source lifecycle, artifacts and account switching preserve privacy', 
   const libraryA = await (await page.request.get(`${api}/api/videos`)).json();
   const importData = await (await imported).json();
   await page.getByRole('checkbox').check();
-  await page.getByRole('button', { name: 'ถามจากคลิปที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
   await page.getByLabel('คำถามของคุณ').fill('Explain RAG');
   const chatted = page.waitForResponse((response) => response.url().endsWith('/api/chat'));
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
@@ -193,7 +229,7 @@ test('HTTP source lifecycle, artifacts and account switching preserve privacy', 
   const chatResult = chatData.job_id
     ? (await (await page.request.get(`${api}/api/jobs/${chatData.job_id}`)).json()).result
     : chatData;
-  await page.getByRole('button', { name: 'วิเคราะห์และเรียนรู้', exact: true }).click();
+  await page.getByRole('button', { name: 'สรุปและแบบฝึกหัด', exact: true }).click();
   await page.getByLabel('ประเภทงาน').selectOption('quiz');
   const saved = page.waitForResponse(
     (response) =>
@@ -207,7 +243,7 @@ test('HTTP source lifecycle, artifacts and account switching preserve privacy', 
   await page.getByRole('button', { name: 'ยืนยันลบคลิป', exact: true }).click();
   await expect(page.locator('.turn').locator('a[href*="v=dQw4w9WgXcQ&"]')).toHaveCount(0);
   await expect(page.getByText(/^(การลบคลิป|นำออกจากคลัง): เสร็จแล้ว$/)).toBeVisible();
-  await page.getByRole('button', { name: 'คลังวิดีโอ', exact: true }).click();
+  await page.getByRole('button', { name: 'วิดีโอของฉัน', exact: true }).click();
   await page.getByLabel('ลิงก์วิดีโอ YouTube').fill('https://youtu.be/dQw4w9WgXcQ');
   await page.getByRole('button', { name: 'เพิ่มวิดีโอ', exact: true }).click();
   await expect.poll(async () => page.locator('input[type="checkbox"]:enabled').count()).toBe(1);
@@ -345,7 +381,7 @@ test('removing a shared source preserves the other member and never revives old 
     await importOne(other);
     const before = (await (await page.request.get(`${api}/api/videos`)).json()).items[0];
     await page.getByRole('checkbox').check();
-    await page.getByRole('button', { name: 'ถามจากคลิปที่เลือก' }).click();
+    await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
     await page.getByLabel('คำถามของคุณ').fill('Explain shared RAG');
     await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
     await expect(page.locator('.turn')).toHaveCount(1);
@@ -357,13 +393,13 @@ test('removing a shared source preserves the other member and never revives old 
     expect((await other.request.get(`${api}/api/videos/dQw4w9WgXcQ/transcript`)).status()).toBe(
       200,
     );
-    await page.getByRole('button', { name: 'คลังวิดีโอ', exact: true }).click();
+    await page.getByRole('button', { name: 'วิดีโอของฉัน', exact: true }).click();
     await page.getByLabel('ลิงก์วิดีโอ YouTube').fill('https://youtu.be/dQw4w9WgXcQ');
     await page.getByRole('button', { name: 'เพิ่มวิดีโอ', exact: true }).click();
     await expect.poll(async () => page.locator('input[type="checkbox"]:enabled').count()).toBe(1);
     const after = (await (await page.request.get(`${api}/api/videos`)).json()).items[0];
     expect(after.generation).toBe(before.generation); // Shared physical source was not deleted.
-    await page.getByRole('button', { name: 'ถามจากคลิป', exact: true }).click();
+    await page.getByRole('button', { name: 'แชตกับ Buddy', exact: true }).click();
     await expect(page.locator('.turn')).toHaveCount(1);
     await expect(page.locator('.turn').locator('a[href*="v=dQw4w9WgXcQ&"]')).toHaveCount(0);
     await page.getByRole('checkbox').check();

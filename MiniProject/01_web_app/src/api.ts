@@ -283,6 +283,16 @@ export class Api {
       })),
     };
   }
+  async conversations(query = '', offset = 0, signal?: AbortSignal) {
+    const params = new URLSearchParams({ q: query, limit: '20', offset: String(offset) });
+    const { data } = await this.request<Page<import('./types').ConversationSummary>>(
+      `/api/conversations?${params}`,
+      { signal, cache: 'no-store' },
+    );
+    if (!Array.isArray(data.items) || !Number.isInteger(data.total))
+      throw new ApiError('โหลดประวัติแชตไม่ได้ กรุณาลองใหม่', 'invalid_response', false);
+    return data;
+  }
   async research(id: string, after = 0, signal?: AbortSignal) {
     return (
       await this.request<Job & { events: ProgressEvent[] }>(

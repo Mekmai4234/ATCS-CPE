@@ -132,11 +132,11 @@ async function fixture(page: Page, assetStatus = 200, provider = '') {
 }
 async function send(page: Page) {
   await page.goto(`${base}/?visual=1`);
-  await page.getByRole('button', { name: 'คลังวิดีโอ', exact: true }).click();
+  await page.getByRole('button', { name: 'วิดีโอของฉัน', exact: true }).click();
   await expect(page.getByRole('checkbox').nth(2)).toBeDisabled();
   await page.getByRole('checkbox').first().check();
   await expect(page.getByText('ถามจากบทถอดเสียงได้แล้ว ส่วนข้อมูลภาพยังไม่ครบ')).toBeVisible();
-  await page.getByRole('button', { name: 'ถามจากคลิปที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
   await page.getByLabel('คำถามของคุณ').fill('ในภาพมีอะไร');
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
 }

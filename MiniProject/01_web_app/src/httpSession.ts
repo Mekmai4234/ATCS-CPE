@@ -14,7 +14,7 @@ type ServerUser = {
 type ServerSession = { user: ServerUser; csrf_token: string };
 const member = (user: ServerUser): Member => ({
   id: user.user_id,
-  name: user.name?.trim() || user.email?.trim() || 'สมาชิก RAG Buddy',
+  name: user.name?.trim() || user.email?.trim() || 'สมาชิก Video Buddy',
   email: user.email?.trim() || 'ไม่ได้ระบุอีเมล',
   picture: user.picture,
   role: user.role,

@@ -154,9 +154,9 @@ async function fixture(page: Page, initial: Account | null = null) {
   };
 }
 async function openChat(page: Page) {
-  await page.getByRole('button', { name: 'คลังวิดีโอ', exact: true }).click();
+  await page.getByRole('button', { name: 'วิดีโอของฉัน', exact: true }).click();
   await page.getByRole('checkbox').first().check();
-  await page.getByRole('button', { name: 'ถามจากคลิปที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
   await page.getByLabel('คำถามของคุณ').fill('ถามจากแหล่งข้อมูลของฉัน');
 }
 
@@ -224,7 +224,7 @@ test('logout clears old answers and history cannot reveal A after B signs in', a
   await page.goBack();
   await expect(page.getByText('คำตอบส่วนตัว A', { exact: true })).toHaveCount(0);
   await expect(page.locator('.video-card').filter({ hasText: 'คลังส่วนตัว A' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'คลังวิดีโอ', exact: true }).click();
+  await page.getByRole('button', { name: 'วิดีโอของฉัน', exact: true }).click();
   await expect(page.getByText('คลังส่วนตัว B', { exact: true }).last()).toBeVisible();
 });
 test('logout aborts old polling and does not resume it on the login screen', async ({ page }) => {

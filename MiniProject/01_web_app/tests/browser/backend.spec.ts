@@ -28,7 +28,7 @@ test('real module 02 HTTP + worker: import, chat, compare, research and saved ar
     .toBe(2);
   await page.locator('input[type="checkbox"]:enabled').nth(0).check();
   await page.locator('input[type="checkbox"]:enabled').nth(1).check();
-  await page.getByRole('button', { name: 'ถามจากคลิปที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
   await page.getByLabel('คำถามของคุณ').fill('Explain RAG');
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
   await expect(page.locator('.turn')).toHaveCount(1);
@@ -36,7 +36,7 @@ test('real module 02 HTTP + worker: import, chat, compare, research and saved ar
     'href',
     /youtube\.com\/watch\?v=.+&t=\d+s/,
   );
-  await page.getByRole('button', { name: 'วิเคราะห์และเรียนรู้', exact: true }).click();
+  await page.getByRole('button', { name: 'สรุปและแบบฝึกหัด', exact: true }).click();
   await page.getByLabel('ประเภทงาน').selectOption('compare');
   await page.getByRole('button', { name: 'เริ่มงาน', exact: true }).click();
   await expect(page.locator('.turn')).toHaveCount(2);
@@ -72,7 +72,7 @@ test('real module 02 HTTP + worker: import, chat, compare, research and saved ar
   await page.getByRole('button', { name: 'ยืนยันลบคลิป', exact: true }).click();
   await expect(page.locator('.turn').locator(`a[href*="v=${deletedId}&"]`)).toHaveCount(0);
   await expect(original.locator(`a[href*="v=${remainingId}&"]`).first()).toBeVisible();
-  await page.getByRole('button', { name: /คลังวิดีโอ/ }).click();
+  await page.getByRole('button', { name: /วิดีโอของฉัน/ }).click();
   await page.getByLabel('ลิงก์วิดีโอ YouTube').fill(`https://youtu.be/${deletedId}`);
   // Cleanup is durable; wait until the deletion job has actually completed.
   await expect(page.getByText('การลบคลิป: เสร็จแล้ว', { exact: true })).toBeVisible();
@@ -82,7 +82,7 @@ test('real module 02 HTTP + worker: import, chat, compare, research and saved ar
     .locator('.video-card')
     .filter({ has: page.locator(`a[href*="v=${deletedId}"]`) });
   await newSource.getByRole('checkbox').check();
-  await page.getByRole('button', { name: 'ถามจากคลิปที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
   await page.getByLabel('คำถามของคุณ').fill('Explain RAG again');
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
   await expect(page.locator('.turn')).toHaveCount(7);
