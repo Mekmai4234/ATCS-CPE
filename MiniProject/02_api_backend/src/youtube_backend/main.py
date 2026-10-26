@@ -24,6 +24,7 @@ from .schemas import (
     ArtifactRequest,
     ChatRequest,
     ChatResponse,
+    ConversationList,
     ConversationResponse,
     ErrorResponse,
     ImportRequest,
@@ -326,6 +327,12 @@ def create_app(settings=None, database=None, adapters=None):
     @app.get("/api/learning-artifacts/{artifact_id}")
     def get_artifact(artifact_id: str):
         return repository.artifact(artifact_id)
+
+    @app.get("/api/conversations", response_model=ConversationList)
+    def conversations(
+        limit: Limit = 20, offset: Offset = 0, q: Annotated[str, Query(max_length=200)] = ""
+    ):
+        return repository.conversations(limit, offset, q)
 
     @app.get("/api/conversations/{conversation_id}", response_model=ConversationResponse)
     def history(conversation_id: str, limit: Limit = 50, offset: Offset = 0):

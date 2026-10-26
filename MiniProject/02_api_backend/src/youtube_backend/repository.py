@@ -1156,6 +1156,70 @@ class Repository(Ownership):
             offset=offset,
         )
 
+    def conversations(self, limit, offset, query=""):
+        with self.db.read() as connection:
+            owner = self._actor(connection)
+            # The first question supplies a deterministic title without a provider call.
+            first_question = (
+                sa.select(db.messages.c.content)
+                .where(
+                    db.messages.c.conversation_id == db.conversations.c.conversation_id,
+                    db.messages.c.role == "user",
+                )
+                .order_by(db.messages.c.created_at, db.messages.c.message_id)
+                .limit(1)
+                .scalar_subquery()
+            )
+            updated = (
+                sa.select(sa.func.max(db.messages.c.created_at))
+                .where(db.messages.c.conversation_id == db.conversations.c.conversation_id)
+                .scalar_subquery()
+            )
+            condition = db.conversations.c.owner_id == owner
+            title = sa.func.substr(first_question, 1, 160)
+            if query.strip():
+                condition = sa.and_(condition, title.contains(query.strip(), autoescape=True))
+            total = connection.scalar(
+                sa.select(sa.func.count()).select_from(db.conversations).where(condition)
+            )
+            records = connection.execute(
+                sa.select(
+                    db.conversations,
+                    title.label("title"),
+                    sa.func.coalesce(updated, db.conversations.c.created_at).label("updated"),
+                )
+                .where(condition)
+                .order_by(sa.desc("updated"), db.conversations.c.conversation_id)
+                .limit(limit)
+                .offset(offset)
+            ).mappings()
+            items = []
+            for record in records:
+                message_filter = db.messages.c.conversation_id == record["conversation_id"]
+                message_count = connection.scalar(
+                    sa.select(sa.func.count()).select_from(db.messages).where(message_filter)
+                )
+                last_scope = (
+                    connection.scalar(
+                        sa.select(db.messages.c.scope)
+                        .where(message_filter)
+                        .order_by(db.messages.c.created_at.desc(), db.messages.c.message_id.desc())
+                        .limit(1)
+                    )
+                    or []
+                )
+                items.append(
+                    dict(
+                        conversation_id=record["conversation_id"],
+                        title=record["title"] or "บทสนทนาใหม่",
+                        created_at=iso(record["created_at"]),
+                        updated_at=iso(record["updated"]),
+                        message_count=message_count,
+                        video_ids=list(dict.fromkeys(s["video_id"] for s in last_scope)),
+                    )
+                )
+        return dict(items=items, total=total, limit=limit, offset=offset)
+
     def conversation(self, conversation_id, limit, offset):
         with self.db.read() as connection:
             self._private(
@@ -1178,7 +1242,7 @@ class Repository(Ownership):
             for message in connection.execute(
                 sa.select(db.messages)
                 .where(condition)
-                .order_by(db.messages.c.created_at)
+                .order_by(db.messages.c.created_at, db.messages.c.message_id)
                 .limit(limit)
                 .offset(offset)
             ).mappings():
@@ -1210,8 +1274,20 @@ class Repository(Ownership):
                     "state"
                 ]
                 items.append(item)
+            latest_job = connection.execute(
+                sa.select(db.jobs.c.payload)
+                .where(db.jobs.c.conversation_id == conversation_id)
+                .order_by(db.jobs.c.created_at.desc(), db.jobs.c.job_id.desc())
+                .limit(1)
+            ).scalar()
+            scope = latest_job.get("request", {}).get("scope") if latest_job else None
         return dict(
-            conversation_id=conversation_id, messages=items, total=total, limit=limit, offset=offset
+            conversation_id=conversation_id,
+            messages=items,
+            total=total,
+            limit=limit,
+            offset=offset,
+            scope=scope,
         )
 
     def artifact(self, artifact_id):

@@ -345,3 +345,20 @@ class ConversationResponse(Schema):
     total: int
     limit: int
     offset: int
+    scope: Scope | None = None
+
+
+class ConversationSummary(Schema):
+    conversation_id: str
+    title: str
+    created_at: str
+    updated_at: str
+    message_count: int
+    video_ids: list[str]
+
+
+class ConversationList(Schema):
+    items: list[ConversationSummary]
+    total: int
+    limit: int
+    offset: int
