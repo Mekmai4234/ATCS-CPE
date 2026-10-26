@@ -181,6 +181,7 @@ export interface ProgressEvent {
   timestamp: string;
 }
 export interface ConversationPage {
+  scope?: Scope | null;
   conversation_id: string;
   total: number;
   limit: number;
@@ -194,5 +195,13 @@ export interface ConversationPage {
     scope: { video_id: string; generation?: number; transcript_version?: string }[];
     state: JobState;
   }[];
+}
+export interface ConversationSummary {
+  conversation_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  video_ids: string[];
 }
 export type TaskType = 'chat' | 'summary' | 'compare' | 'research' | Artifact['type'];

@@ -51,7 +51,7 @@ async function setup(page: Page, chat: (route: Route) => Promise<void>) {
   await page.route('**/api/chat', chat);
   await page.goto(liveWeb);
   await page.getByRole('checkbox').check();
-  await page.getByRole('button', { name: 'ถามจากคลิปที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
   await page.getByLabel('คำถามของคุณ').fill('RAG คืออะไร');
 }
 test('real mode sends selected scope, carries conversation and renders text safely', async ({
@@ -198,7 +198,7 @@ test('comparison blocks a single selected video before creating work', async ({ 
     calls++;
     return fulfill(route, { job_id: 'j1', state: 'queued' }, 202);
   });
-  await page.getByRole('button', { name: 'วิเคราะห์และเรียนรู้', exact: true }).click();
+  await page.getByRole('button', { name: 'สรุปและแบบฝึกหัด', exact: true }).click();
   await page.getByLabel('ประเภทงาน').selectOption('compare');
   await expect(page.getByRole('button', { name: 'เริ่มงาน', exact: true })).toBeDisabled();
   await expect(page.getByRole('status').filter({ hasText: 'อย่างน้อย 2 คลิป' })).toBeVisible();

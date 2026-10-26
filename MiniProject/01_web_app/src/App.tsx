@@ -25,12 +25,14 @@ import InteractiveBuddy from './InteractiveBuddy';
 import { scopeFingerprint } from './buddyModel';
 import { UiIcon } from './Visuals';
 import { importMessage, serviceMessage, userMessages } from './userMessages';
+import ChatHistory from './ChatHistory';
 
-type WorkspaceView = 'home' | 'library' | 'chat' | 'learn';
+type WorkspaceView = 'home' | 'library' | 'chat' | 'learn' | 'history';
 interface WorkspaceProps {
   api?: Api;
   member?: Member;
   initialView?: WorkspaceView;
+  initialConversationId?: string;
   onNavigate?: (path: string) => void;
   onLogout?: () => void;
   adminEnabled?: boolean;
@@ -38,7 +40,7 @@ interface WorkspaceProps {
 
 const demo = import.meta.env.VITE_DEMO_MODE === 'true';
 const taskNames: Record<TaskType, string> = {
-  chat: 'ถามจากคลิป',
+  chat: 'แชตกับ Buddy',
   summary: 'สรุปเนื้อหา',
   compare: 'เปรียบเทียบคลิป',
   research: 'ค้นคว้าหลายขั้นตอน',
@@ -57,6 +59,7 @@ interface Operation {
   sources: SourceSnapshot[];
 }
 interface Turn {
+  unanswered?: string;
   type?: TaskType;
   id: string;
   label: string;
@@ -153,6 +156,7 @@ export default function App({
   api: suppliedApi,
   member,
   initialView = 'library',
+  initialConversationId,
   onNavigate,
   onLogout,
   adminEnabled = false,
@@ -197,6 +201,14 @@ export default function App({
   const [scopeNotice, setScopeNotice] = useState('');
   const [historyPending, setHistoryPending] = useState(false);
   const [buddyOpen, setBuddyOpen] = useState(false);
+  const [sourcesExpanded, setSourcesExpanded] = useState(true);
+  const [viewingHistory, setViewingHistory] = useState(false);
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [archiveError, setArchiveError] = useState('');
+  const [archiveAttempt, setArchiveAttempt] = useState(0);
+  const loadedArchive = useRef<string | null>(null);
+  const responseAnchor = useRef<HTMLDivElement>(null);
+  const latestAnswer = useRef<HTMLElement>(null);
   const followResults = useRef(true);
   const resultsViewport = useRef<HTMLDivElement>(null);
   const [newResults, setNewResults] = useState(false);
@@ -303,18 +315,39 @@ export default function App({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (!turns.length || buddyOpen) return;
+    if (!turns.length || buddyOpen || viewingHistory || archiveLoading) return;
     if (followResults.current)
-      resultsEnd.current?.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+      latestAnswer.current?.scrollIntoView({ behavior: 'instant', block: 'start' });
     else setNewResults(true);
   }, [turns.length]);
   useEffect(() => {
-    const track = () => {
-      followResults.current = document.documentElement.scrollHeight - scrollY - innerHeight < 140;
+    const track = (event: WheelEvent) => {
+      if (event.deltaY < 0) followResults.current = false;
     };
-    window.addEventListener('scroll', track, { passive: true });
-    return () => window.removeEventListener('scroll', track);
+    const touch = () => {
+      followResults.current = false;
+    };
+    const key = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (
+        !target.closest('input, textarea, select, [contenteditable="true"]') &&
+        (['PageUp', 'Home', 'ArrowUp'].includes(event.key) || (event.key === ' ' && event.shiftKey))
+      )
+        followResults.current = false;
+    };
+    window.addEventListener('wheel', track, { passive: true });
+    window.addEventListener('touchmove', touch, { passive: true });
+    window.addEventListener('keydown', key);
+    return () => {
+      window.removeEventListener('wheel', track);
+      window.removeEventListener('touchmove', touch);
+      window.removeEventListener('keydown', key);
+    };
   }, []);
+  useEffect(() => {
+    if (busy && !buddyOpen)
+      responseAnchor.current?.scrollIntoView({ behavior: 'instant', block: 'start' });
+  }, [busy, buddyOpen]);
 
   async function watchImport(id: string) {
     if (watchers.current.has(id)) return;
@@ -531,6 +564,7 @@ export default function App({
   function submitTask(event: FormEvent, forcedType?: TaskType) {
     event.preventDefault();
     if (busyRef.current || operationRef.current) return;
+    if (archiveLoading || ((forcedType === 'chat' || tab === 'chat') && viewingHistory)) return;
     setTaskError('');
     try {
       if (libraryError || loading) throw new Error('กรุณาโหลดคลังคลิปให้สำเร็จก่อนส่งคำถาม');
@@ -577,6 +611,9 @@ export default function App({
               ? '/api/research'
               : '/api/learning-artifacts';
       setEvents([]);
+      followResults.current = true;
+      setNewResults(false);
+      setSourcesExpanded(false);
       void execute({
         key: crypto.randomUUID(),
         path,
@@ -599,6 +636,10 @@ export default function App({
     setTaskError('');
     setCanRetry(false);
     setNewResults(false);
+    setViewingHistory(false);
+    setArchiveError('');
+    loadedArchive.current = null;
+    onNavigate?.('/chat');
     updateTurns((previous) => previous.filter((turn) => turn.type !== 'chat'));
   }
   async function loadHistory() {
@@ -657,6 +698,102 @@ export default function App({
       if (alive.current) setHistoryPending(false);
     }
   }
+  useEffect(() => {
+    if (!initialConversationId) {
+      loadedArchive.current = null;
+      return;
+    }
+    if (loadedArchive.current === initialConversationId) return;
+    if (busyRef.current || operationRef.current) {
+      setArchiveError('รอให้งานปัจจุบันสิ้นสุดก่อนเปิดบทสนทนาอื่น');
+      return;
+    }
+    const controller = newRequest();
+    setArchiveLoading(true);
+    setArchiveError('');
+    setViewingHistory(true);
+    setTaskError('');
+    updateTurns((previous) => previous.filter((turn) => turn.type !== 'chat'));
+    setConversation(null);
+    conversationId.current = null;
+    followResults.current = false;
+    void (async () => {
+      const messages: import('./types').ConversationPage['messages'] = [];
+      let scope: import('./types').Scope | null | undefined;
+      let offset = 0;
+      while (true) {
+        const data = await api.history(initialConversationId, offset, controller.signal);
+        scope = data.scope;
+        messages.push(...data.messages);
+        offset += data.messages.length;
+        if (offset >= data.total) break;
+        if (!data.messages.length) throw new Error('โหลดประวัติไม่ครบ กรุณาลองเปิดอีกครั้ง');
+      }
+      if (controller.signal.aborted || !alive.current) return;
+      const restored: Turn[] = messages
+        .filter((m) => m.role === 'user')
+        .map((message) => {
+          const reply = messages.find((m) => m.job_id === message.job_id && m.role === 'assistant');
+          const sources = message.scope.map((s) => ({
+            video_id: s.video_id,
+            generation: s.generation,
+            indexed_version: s.transcript_version,
+            accessRevision: 0,
+          }));
+          return {
+            id: `history-${message.message_id}`,
+            type: 'chat',
+            jobId: message.job_id,
+            label: message.content,
+            sources,
+            partial: message.state === 'partial',
+            unanswered: reply
+              ? undefined
+              : statusLabels[message.state] || 'ยังไม่มีคำตอบที่บันทึกไว้',
+            result: reconcileSources(
+              { answer: reply?.content, citations: reply?.citations || [] },
+              sources,
+              { ...inventory.current, retired: retiredSources.current },
+            ),
+          };
+        });
+      updateTurns((previous) => [...previous.filter((t) => t.type !== 'chat'), ...restored]);
+      const savedScope = scope || {
+        video_ids: [...new Set(messages.at(-1)?.scope.map((s) => s.video_id) || [])],
+        channel_ids: [],
+        date_from: null,
+        date_to: null,
+      };
+      setSelected(savedScope.video_ids);
+      setChannel(savedScope.channel_ids[0] || '');
+      setFrom(savedScope.date_from || '');
+      setTo(savedScope.date_to || '');
+      setConversation(initialConversationId);
+      conversationId.current = initialConversationId;
+      conversationScope.current = scopeFingerprint(savedScope);
+      setQuestion('');
+      setNewResults(false);
+      setScopeNotice('');
+      setSourcesExpanded(false);
+      loadedArchive.current = initialConversationId;
+    })()
+      .catch((error) => {
+        if (!controller.signal.aborted && alive.current)
+          setArchiveError(
+            error instanceof ApiError && error.status === 404
+              ? 'ไม่พบบทสนทนานี้ หรือบัญชีของคุณไม่มีสิทธิ์เปิด'
+              : errorText(error),
+          );
+      })
+      .finally(() => {
+        requests.current.delete(controller);
+        if (!controller.signal.aborted && alive.current) setArchiveLoading(false);
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [initialConversationId, busy, operation, archiveAttempt]);
+
   async function jobAction(id: string, action: 'cancel' | 'retry') {
     setActionError('');
     try {
@@ -760,9 +897,9 @@ export default function App({
     (video) => selected.includes(video.video_id) && videoQueryable(video),
   );
   const scopeHelp = loading
-    ? 'กำลังโหลดคลังวิดีโอ กรุณารอสักครู่'
+    ? 'กำลังโหลดวิดีโอของฉัน กรุณารอสักครู่'
     : libraryError
-      ? 'โหลดคลังวิดีโอไม่สำเร็จ กรุณาลองโหลดอีกครั้ง'
+      ? 'โหลดวิดีโอของฉันไม่สำเร็จ กรุณาลองโหลดอีกครั้ง'
       : from && to && from > to
         ? 'วันเริ่มต้นต้องไม่อยู่หลังวันสิ้นสุด'
         : !selected.length
@@ -794,9 +931,9 @@ export default function App({
           <nav aria-label="เมนูหลัก">
             {(
               [
-                ['library', 'คลังวิดีโอ', 'library'],
-                ['chat', 'ถามจากคลิป', 'chat'],
-                ['learn', 'วิเคราะห์และเรียนรู้', 'learn'],
+                ['library', 'วิดีโอของฉัน', 'library'],
+                ['chat', 'แชตกับ Buddy', 'chat'],
+                ['learn', 'สรุปและแบบฝึกหัด', 'learn'],
               ] as const
             ).map(([id, label, icon]) => (
               <button
@@ -812,7 +949,7 @@ export default function App({
             ))}
           </nav>
           <div className="sidebar-tip">
-            <img src="/rag-buddy.png" alt="RAG Buddy มาสคอตผู้ช่วยเรียนรู้" />
+            <img src="/rag-buddy.png" alt="Video Buddy มาสคอตผู้ช่วยเรียนรู้" />
             <strong>ทุกคำตอบ มีที่มา</strong>
             <p>เลือกคลิปที่สนใจ แล้วเปลี่ยนสิ่งที่ดูให้เป็นความรู้ของคุณ</p>
           </div>
@@ -833,9 +970,10 @@ export default function App({
               {(
                 [
                   ['home', 'หน้าแรก'],
-                  ['library', 'คลังวิดีโอ'],
-                  ['chat', 'ถามจากคลิป'],
-                  ['learn', 'วิเคราะห์และเรียนรู้'],
+                  ['library', 'วิดีโอของฉัน'],
+                  ['chat', 'แชตกับ Buddy'],
+                  ['learn', 'สรุปและแบบฝึกหัด'],
+                  ['history', 'ประวัติแชต'],
                 ] as const
               ).map(([view, label]) => (
                 <button
@@ -852,7 +990,9 @@ export default function App({
                           ? 'library'
                           : view === 'chat'
                             ? 'chat'
-                            : 'learn'
+                            : view === 'history'
+                              ? 'clock'
+                              : 'learn'
                     }
                     size={20}
                   />
@@ -881,10 +1021,10 @@ export default function App({
               พื้นที่ทำงาน <span>/</span>{' '}
               <strong>
                 {tab === 'library'
-                  ? 'คลังวิดีโอ'
+                  ? 'วิดีโอของฉัน'
                   : tab === 'chat'
-                    ? 'ถามจากคลิป'
-                    : 'วิเคราะห์และเรียนรู้'}
+                    ? 'แชตกับ Buddy'
+                    : 'สรุปและแบบฝึกหัด'}
               </strong>
             </div>
             <span className="private-badge">◉ พื้นที่ส่วนตัว · ต้นแบบผู้ใช้เดียว</span>
@@ -918,20 +1058,30 @@ export default function App({
                   <span className="eyebrow">WATCH LESS. UNDERSTAND MORE.</span>
                   <h1>
                     {tab === 'library'
-                      ? 'คลังวิดีโอของคุณ'
+                      ? 'เพิ่มและจัดการวิดีโอ'
                       : tab === 'chat'
-                        ? 'ความรู้ เริ่มจากคำถาม'
-                        : 'ต่อยอดทุกการเรียนรู้'}
+                        ? 'ถามคำถามจากวิดีโอ'
+                        : tab === 'history'
+                          ? 'ประวัติแชต'
+                          : 'เลือกเครื่องมือช่วยเรียนรู้'}
                     <span className="heading-dot">.</span>
                   </h1>
                   <p>
                     {tab === 'library'
                       ? 'รวบรวมคลิปที่สนใจ แล้วค้นพบคำตอบจากสิ่งที่คุณเลือกดู'
-                      : 'คำตอบและการเรียนรู้ที่เชื่อมกลับไปยังหลักฐานในคลิปที่คุณเลือก'}
+                      : tab === 'history'
+                        ? 'คำถาม คำตอบ และบทสนทนาที่บันทึกไว้ในบัญชีของคุณ'
+                        : 'เรียนรู้จากวิดีโอพร้อมหลักฐานที่ย้อนกลับไปดูได้'}
                   </p>
                 </div>
                 <span className="section-number" aria-hidden="true">
-                  {tab === 'library' ? '01' : tab === 'chat' ? '02' : '03'}
+                  {tab === 'library'
+                    ? '01'
+                    : tab === 'chat'
+                      ? '02'
+                      : tab === 'history'
+                        ? '04'
+                        : '03'}
                 </span>
               </div>
             )}
@@ -1016,12 +1166,45 @@ export default function App({
                 })}
               </section>
             )}
-            <section className="library-section" aria-labelledby="library-title">
+            {tab === 'history' && (
+              <ChatHistory
+                api={api}
+                videos={videos}
+                locked={taskLocked}
+                open={(id) => onNavigate?.(`/chat/${encodeURIComponent(id)}`)}
+                start={() => {
+                  resetConversation();
+                  navigateTab('chat');
+                }}
+              />
+            )}
+            {tab === 'chat' && (
+              <div className="chat-source-bar">
+                <span>แหล่งข้อมูล · เลือกไว้ {selected.length} คลิป</span>
+                <button
+                  className="secondary"
+                  aria-expanded={sourcesExpanded}
+                  aria-controls="chat-sources"
+                  onClick={() => setSourcesExpanded((value) => !value)}
+                >
+                  {sourcesExpanded ? 'ย่อรายการวิดีโอ' : 'เลือกหรือเปลี่ยนวิดีโอ'}
+                </button>
+              </div>
+            )}
+            <section
+              id="chat-sources"
+              className="library-section"
+              aria-labelledby="library-title"
+              style={{
+                display:
+                  tab === 'history' || (tab === 'chat' && !sourcesExpanded) ? 'none' : undefined,
+              }}
+            >
               <div className="section-heading">
                 <div>
                   <h2 id="library-title">
                     {tab === 'home'
-                      ? 'คลังวิดีโอของคุณ'
+                      ? 'วิดีโอของฉัน'
                       : tab === 'library'
                         ? 'วิดีโอทั้งหมด'
                         : 'แหล่งข้อมูลสำหรับงานนี้'}{' '}
@@ -1179,7 +1362,7 @@ export default function App({
                     <span>พร้อมเป็นแหล่งข้อมูลของคุณ</span>
                   </div>
                   <button className="primary" onClick={() => navigateTab('chat')}>
-                    ถามจากคลิปที่เลือก
+                    ถามจากวิดีโอที่เลือก
                     <Icon name="arrow" />
                   </button>
                 </div>
@@ -1191,7 +1374,7 @@ export default function App({
                   <div>
                     <span className="eyebrow">GROUNDED IN YOUR VIDEOS</span>
                     <h2 id="task-title">
-                      {tab === 'chat' ? 'ถามสิ่งที่อยากรู้' : 'เลือกวิธีเรียนรู้'}
+                      {tab === 'chat' ? 'สนทนากับ Video Buddy' : 'ตั้งค่างานที่ต้องการ'}
                     </h2>
                   </div>
                   {tab === 'chat' && (
@@ -1204,7 +1387,38 @@ export default function App({
                     </button>
                   )}
                 </div>
-                <form onSubmit={submitTask}>
+                {archiveLoading && <p role="status">กำลังเปิดบทสนทนา…</p>}
+                {archiveError && (
+                  <p className="notice error" role="alert">
+                    {archiveError}
+                    <button
+                      className="text-button"
+                      disabled={taskLocked}
+                      onClick={() => setArchiveAttempt((value) => value + 1)}
+                    >
+                      ลองเปิดบทสนทนาอีกครั้ง
+                    </button>
+                  </p>
+                )}
+                {tab === 'chat' && viewingHistory && !archiveLoading && !archiveError && (
+                  <div className="history-resume" role="status">
+                    <span>กำลังอ่านบทสนทนาที่บันทึกไว้</span>
+                    <button
+                      className="primary"
+                      disabled={taskLocked}
+                      onClick={() => {
+                        setViewingHistory(false);
+                        setScopeNotice('พิมพ์คำถามเพื่อสนทนาต่อจากประวัตินี้');
+                      }}
+                    >
+                      ถามต่อในบทสนทนานี้
+                    </button>
+                  </div>
+                )}
+                <form
+                  onSubmit={submitTask}
+                  hidden={(tab === 'chat' && viewingHistory) || archiveLoading}
+                >
                   {tab === 'learn' && (
                     <div className="learning-controls">
                       <label>
@@ -1297,94 +1511,111 @@ export default function App({
                     </button>
                   </div>
                 </form>
-                {operation && (
-                  <div className="pending-panel" role="status">
-                    <strong>{busy ? 'กำลังติดตามงาน' : 'คำขอนี้ยังรอการตรวจสอบผล'}</strong>
-                    <span>{operation.label}</span>
-                    {pendingJob && (
-                      <span>
-                        {jobStatus(pendingJob)} · ครั้งที่ {pendingJob.attempt_count}/
-                        {pendingJob.max_attempts}
-                      </span>
-                    )}
-                    {operation.jobId && <small>Job ID: {operation.jobId}</small>}
-                    {operation.jobId && !terminal(pendingJob?.state || '') && (
-                      <button
-                        className="secondary"
-                        onClick={() => void jobAction(operation.jobId!, 'cancel')}
-                      >
-                        ขอยกเลิกงาน
-                      </button>
-                    )}
-                  </div>
-                )}
-                {taskError && (
-                  <div className="notice error" role="alert">
-                    {taskError}
-                  </div>
-                )}
-                {!busy && operation && canRetry && (
-                  <button
-                    className="secondary"
-                    onClick={() => void execute(operation, !!operation.jobId)}
-                  >
-                    {operation.jobId ? 'ติดตามผลอีกครั้ง' : 'ส่งคำขอเดิมซ้ำ'}
-                  </button>
-                )}
-                {events.length > 0 && (
-                  <details className="progress-events" open>
-                    <summary>ความคืบหน้าการค้นคว้า</summary>
-                    {events.map((event) => (
-                      <p key={event.event_id}>
-                        <strong>
-                          ขั้นที่ {event.step} · {event.tool_name}
-                        </strong>{' '}
-                        {event.summary}
-                      </p>
-                    ))}
-                  </details>
-                )}
-                {newResults && (
-                  <button
-                    className="text-button"
-                    onClick={() => {
-                      resultsEnd.current?.scrollIntoView({ behavior: 'instant', block: 'nearest' });
-                      followResults.current = true;
-                      setNewResults(false);
+                <div className="answer-zone" ref={responseAnchor}>
+                  {operation && (
+                    <div className="pending-panel" role="status">
+                      <strong>{busy ? 'Buddy กำลังหาคำตอบ…' : 'คำขอนี้ยังรอการตรวจสอบผล'}</strong>
+                      <span>{operation.label}</span>
+                      {pendingJob && (
+                        <span>
+                          {jobStatus(pendingJob)} · ครั้งที่ {pendingJob.attempt_count}/
+                          {pendingJob.max_attempts}
+                        </span>
+                      )}
+                      {operation.jobId && <small>Job ID: {operation.jobId}</small>}
+                      {operation.jobId && !terminal(pendingJob?.state || '') && (
+                        <button
+                          className="secondary"
+                          onClick={() => void jobAction(operation.jobId!, 'cancel')}
+                        >
+                          ขอยกเลิกงาน
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {taskError && (
+                    <div className="notice error" role="alert">
+                      {taskError}
+                    </div>
+                  )}
+                  {!busy && operation && canRetry && (
+                    <button
+                      className="secondary"
+                      onClick={() => void execute(operation, !!operation.jobId)}
+                    >
+                      {operation.jobId ? 'ติดตามผลอีกครั้ง' : 'ส่งคำขอเดิมซ้ำ'}
+                    </button>
+                  )}
+                  {events.length > 0 && (
+                    <details className="progress-events" open>
+                      <summary>ความคืบหน้าการค้นคว้า</summary>
+                      {events.map((event) => (
+                        <p key={event.event_id}>
+                          <strong>
+                            ขั้นที่ {event.step} · {event.tool_name}
+                          </strong>{' '}
+                          {event.summary}
+                        </p>
+                      ))}
+                    </details>
+                  )}
+                  {newResults && (
+                    <button
+                      className="text-button jump-latest"
+                      onClick={() => {
+                        latestAnswer.current?.scrollIntoView({
+                          behavior: 'instant',
+                          block: 'start',
+                        });
+                        followResults.current = true;
+                        setNewResults(false);
+                      }}
+                    >
+                      ไปคำตอบล่าสุด ↓
+                    </button>
+                  )}
+                  {tab === 'chat' && conversation && (
+                    <button
+                      className="text-button"
+                      disabled={historyPending}
+                      onClick={() => void loadHistory()}
+                    >
+                      โหลดประวัติบทสนทนานี้
+                    </button>
+                  )}
+                  <div
+                    className="turns"
+                    ref={resultsViewport}
+                    onWheel={(event) => {
+                      if (event.deltaY < 0) followResults.current = false;
+                    }}
+                    onTouchMove={() => {
+                      followResults.current = false;
                     }}
                   >
-                    มีผลลัพธ์ใหม่ ↓
-                  </button>
-                )}
-                {tab === 'chat' && conversation && (
-                  <button
-                    className="text-button"
-                    disabled={historyPending}
-                    onClick={() => void loadHistory()}
-                  >
-                    โหลดประวัติบทสนทนานี้
-                  </button>
-                )}
-                <div
-                  className="turns"
-                  ref={resultsViewport}
-                  onWheel={(event) => {
-                    if (event.deltaY < 0) followResults.current = false;
-                  }}
-                  onTouchMove={() => {
-                    followResults.current = false;
-                  }}
-                >
-                  {turns.map((turn) => (
-                    <article className="turn" key={turn.id}>
-                      <div className="user-question">{turn.label}</div>
-                      <div className="assistant-label">
-                        <InteractiveBuddy headOnly active={false} decorative /> Buddy AI
-                      </div>
-                      <ResultView result={turn.result} partial={turn.partial} />
-                    </article>
-                  ))}
-                  <div ref={resultsEnd} />
+                    {turns
+                      .filter((turn) => tab !== 'chat' || turn.type === 'chat')
+                      .map((turn, index, visible) => (
+                        <article
+                          className="turn"
+                          key={turn.id}
+                          ref={index === visible.length - 1 ? latestAnswer : undefined}
+                        >
+                          <div className="user-question">{turn.label}</div>
+                          <div className="assistant-label">
+                            <InteractiveBuddy headOnly active={false} decorative /> Buddy AI
+                          </div>
+                          {turn.unanswered ? (
+                            <p className="notice" role="status">
+                              {turn.unanswered} · ยังไม่มีคำตอบที่บันทึกไว้
+                            </p>
+                          ) : (
+                            <ResultView result={turn.result} partial={turn.partial} />
+                          )}
+                        </article>
+                      ))}
+                    <div ref={resultsEnd} />
+                  </div>
                 </div>
               </section>
             )}
@@ -1464,7 +1695,7 @@ export default function App({
                 <button onClick={() => navigateTab('chat')}>
                   <UiIcon name="chat" />
                   <span>
-                    ถามจากคลิป<small>สงสัยตรงไหน ถามได้เลย</small>
+                    แชตกับ Buddy<small>สงสัยตรงไหน ถามได้เลย</small>
                   </span>
                   <UiIcon name="arrow" size={18} />
                 </button>
@@ -1483,9 +1714,9 @@ export default function App({
               </section>
             )}
             <footer className="page-footer">
-              <span>YouTube Knowledge</span>
+              <span>Video Buddy</span>
               <p>คำตอบที่ดี เริ่มต้นจากหลักฐานที่ตรวจสอบได้</p>
-              <span>01 / WEB WORKSPACE</span>
+              <span>เพื่อนคู่คิดจากวิดีโอ</span>
             </footer>
           </div>
         </main>
@@ -1506,7 +1737,7 @@ export default function App({
             change={setQuestion}
             submit={(event) => submitTask(event, 'chat')}
             turns={turns.filter((turn) => turn.type === 'chat')}
-            locked={taskLocked || loading || !!libraryError}
+            locked={taskLocked || loading || !!libraryError || archiveLoading || viewingHistory}
             busy={busy}
             status={
               operation

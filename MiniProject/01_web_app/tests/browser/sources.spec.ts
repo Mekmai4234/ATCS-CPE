@@ -131,10 +131,11 @@ async function sourceServer(page: Page) {
   await page.goto('http://127.0.0.1:3002');
   await page.getByRole('checkbox').nth(0).check();
   await page.getByRole('checkbox').nth(1).check();
-  await page.getByRole('button', { name: 'ถามจากคลิปที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
   await page.getByLabel('คำถามของคุณ').fill('RAG คืออะไร');
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
   await expect(page.locator(linkTo(first))).toHaveCount(1);
+  await page.getByRole('button', { name: 'เลือกหรือเปลี่ยนวิดีโอ', exact: true }).click();
   return {
     replaceExternally: () => {
       generation++;
@@ -172,12 +173,12 @@ test('deletion invalidates old citations, preserves other sources and never revi
   await expect(
     page.locator('.turn').getByText('แหล่งข้อมูลเดิมถูกลบหรือเปลี่ยนแปลงแล้ว', { exact: true }),
   ).toBeVisible();
-  await page.getByRole('button', { name: /คลังวิดีโอ/ }).click();
+  await page.getByRole('button', { name: /วิดีโอของฉัน/ }).click();
   await page.getByLabel('ลิงก์วิดีโอ YouTube').fill(`https://youtu.be/${first}`);
   await page.getByRole('button', { name: 'เพิ่มวิดีโอ', exact: true }).click();
   await expect(page.getByRole('checkbox')).toHaveCount(2);
   await page.getByRole('checkbox', { name: 'เลือก บทเรียนแรก', exact: true }).check();
-  await page.getByRole('button', { name: 'ถามจากคลิปที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
   await expect(page.locator(linkTo(first))).toHaveCount(0);
   await page.getByLabel('คำถามของคุณ').fill('คำถามจากเวอร์ชันใหม่');
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
@@ -224,6 +225,7 @@ test('a late answer cannot publish live links to a source deleted while it was p
   const submitted = page.waitForRequest('**/api/chat');
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
   await submitted;
+  await page.getByRole('button', { name: 'เลือกหรือเปลี่ยนวิดีโอ', exact: true }).click();
   await page.getByRole('button', { name: 'ลบ บทเรียนแรก', exact: true }).click();
   await page.getByRole('button', { name: 'ยืนยันลบคลิป', exact: true }).click();
   await expect(page.getByRole('checkbox')).toHaveCount(1);

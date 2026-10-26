@@ -24,7 +24,7 @@ test('login is private and policy/help links have real readable destinations', a
   await page.getByRole('link', { name: 'ความเป็นส่วนตัว', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'ความเป็นส่วนตัว', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'ช่วยเหลือ', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'ช่วยเหลือ RAG Buddy' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'ช่วยเหลือ Video Buddy' })).toBeVisible();
 });
 test('drag is clamped, does not click, persists only coordinates and survives resize', async ({
   page,
@@ -115,6 +115,7 @@ test('floating and full chat share scope, conversation, messages and 202 status'
     .getByRole('button', { name: /ไปหน้าแชตเต็ม/ })
     .click();
   await expect(page.locator('.turn')).toHaveCount(1);
+  await page.getByRole('button', { name: 'เลือกหรือเปลี่ยนวิดีโอ', exact: true }).click();
   await expect(page.getByRole('checkbox').first()).toBeChecked();
   await page.getByLabel('คำถามของคุณ').fill('คำถามต่อเนื่อง');
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();

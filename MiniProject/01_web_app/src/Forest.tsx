@@ -23,7 +23,7 @@ export function BuddyLogo({ onClick }: { onClick?: () => void }) {
         <InteractiveBuddy headOnly active={false} decorative />
       </span>
       <span>
-        RAG <b>Buddy</b>
+        Video <b>Buddy</b>
         <small>YouTube Knowledge</small>
       </span>
     </a>

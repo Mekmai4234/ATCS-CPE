@@ -205,4 +205,7 @@ export function safeMemberSession(value: unknown): MemberSession {
 }
 
 export const safeWorkspacePath = (path: string) =>
-  ['/', '/library', '/chat', '/learning', '/admin'].includes(path) ? path : '/';
+  ['/', '/library', '/chat', '/learning', '/history', '/admin'].includes(path) ||
+  /^\/chat\/[A-Za-z0-9_-]{1,100}$/.test(path)
+    ? path
+    : '/';

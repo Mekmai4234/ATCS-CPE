@@ -93,7 +93,7 @@ test('new conversation clears the previous error in full and floating chat', asy
 
 test('a hidden invalid study duration cannot block summary or quiz', async ({ page }) => {
   const calls = await setup(page);
-  await page.getByRole('button', { name: 'วิเคราะห์และเรียนรู้', exact: true }).click();
+  await page.getByRole('button', { name: 'สรุปและแบบฝึกหัด', exact: true }).click();
   await page.getByRole('combobox', { name: 'ประเภทงาน', exact: true }).selectOption('study_plan');
   await page.getByLabel('จำนวนวัน', { exact: true }).fill('0');
   await page.getByRole('combobox', { name: 'ประเภทงาน', exact: true }).selectOption('summary');
@@ -184,7 +184,7 @@ test('import rejection explains the correction instead of rendering internal cod
       },
     }),
   );
-  await page.getByRole('button', { name: 'คลังวิดีโอ', exact: true }).click();
+  await page.getByRole('button', { name: 'วิดีโอของฉัน', exact: true }).click();
   await page.getByLabel('ลิงก์วิดีโอ YouTube', { exact: true }).fill('https://example.test/video');
   await page.getByRole('button', { name: 'เพิ่มวิดีโอ', exact: true }).click();
   await expect(page.getByLabel('ผลนำเข้ารายลิงก์')).toContainText('กรุณาใช้ลิงก์วิดีโอ YouTube');

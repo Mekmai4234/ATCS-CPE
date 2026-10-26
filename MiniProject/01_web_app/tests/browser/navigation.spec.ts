@@ -53,9 +53,9 @@ for (const [width, height] of [
     await openMemberHome(page);
     const nav = page.getByRole('navigation', { name: 'เมนูพื้นที่เรียนรู้' });
     for (const [label, url, title] of [
-      ['คลังวิดีโอ', '/library', 'คลังวิดีโอของคุณ'],
-      ['ถามจากคลิป', '/chat', 'ความรู้ เริ่มจากคำถาม'],
-      ['วิเคราะห์และเรียนรู้', '/learning', 'ต่อยอดทุกการเรียนรู้'],
+      ['วิดีโอของฉัน', '/library', 'เพิ่มและจัดการวิดีโอ'],
+      ['แชตกับ Buddy', '/chat', 'ถามคำถามจากวิดีโอ'],
+      ['สรุปและแบบฝึกหัด', '/learning', 'เลือกเครื่องมือช่วยเรียนรู้'],
     ]) {
       const button = nav.getByRole('button', { name: label, exact: true });
       const hit = await button.evaluate((el) => {
@@ -93,11 +93,11 @@ test('keyboard navigation and browser history preserve the chat draft and form a
   await page.getByLabel('วางลิงก์ YouTube', { exact: true }).fill('https://youtu.be/dQw4w9WgXcQ');
   await expect(page.getByRole('button', { name: 'เพิ่มวิดีโอ', exact: true })).toBeEnabled();
   const nav = page.getByRole('navigation', { name: 'เมนูพื้นที่เรียนรู้' });
-  const chat = nav.getByRole('button', { name: 'ถามจากคลิป', exact: true });
+  const chat = nav.getByRole('button', { name: 'แชตกับ Buddy', exact: true });
   await chat.focus();
   await page.keyboard.press('Enter');
   await page.getByLabel('คำถามของคุณ', { exact: true }).fill('คำถามที่ยังไม่ได้ส่ง');
-  await nav.getByRole('button', { name: 'วิเคราะห์และเรียนรู้', exact: true }).click();
+  await nav.getByRole('button', { name: 'สรุปและแบบฝึกหัด', exact: true }).click();
   await page.getByLabel('ประเภทงาน').selectOption('quiz');
   await nav.getByRole('button', { name: 'หน้าแรก', exact: true }).click();
   await page.goBack();

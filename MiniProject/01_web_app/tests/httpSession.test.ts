@@ -32,7 +32,7 @@ describe('module-02 HTTP session contract', () => {
     const a = await port.restore();
     expect(a?.member).toMatchObject({
       id: 'member-01',
-      name: 'สมาชิก RAG Buddy',
+      name: 'สมาชิก Video Buddy',
       email: 'ไม่ได้ระบุอีเมล',
     });
     expect(a?.sessionId).not.toBe(session.csrf_token);
