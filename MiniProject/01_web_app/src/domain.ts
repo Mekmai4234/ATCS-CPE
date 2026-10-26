@@ -45,17 +45,12 @@ export function jobStatus(job: Job) {
 }
 
 export function jobShouldPark(job: Job): boolean {
+  // Queued retries are still being processed by the server. Keep observing the
+  // original job so its eventual answer arrives without another user action.
+  // Only an explicit pause requires a manual follow-up; terminal state wins
+  // over presentation metadata left behind by a previous attempt.
   return (
-    job.state === 'paused' ||
-    job.presentation?.stage === 'quota_paused' ||
-    (job.state === 'queued' &&
-      [
-        'generation_rate_limited',
-        'generation_provider_busy',
-        'provider_rate_limited',
-        'provider_unavailable',
-        'quota_wait',
-      ].includes(job.error_code || ''))
+    !terminal(job.state) && (job.state === 'paused' || job.presentation?.stage === 'quota_paused')
   );
 }
 

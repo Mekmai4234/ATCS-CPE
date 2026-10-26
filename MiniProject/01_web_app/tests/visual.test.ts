@@ -183,7 +183,7 @@ describe('visual integration boundary', () => {
       error_code: 'quota_wait',
       wait: { time_source: 'estimate', estimated_retry_at: '2026-10-25T06:00:00Z' },
     } as Job;
-    expect(jobShouldPark(native)).toBe(true);
+    expect(jobShouldPark(native)).toBe(false);
     expect(jobStatus(native)).toContain('เวลาประมาณการของระบบ');
     expect(jobStatus(native)).not.toContain('ลองอีกครั้งได้หลัง');
     const known = {
@@ -191,6 +191,22 @@ describe('visual integration boundary', () => {
       wait: { time_source: 'provider' as const, retry_at: '2026-10-25T06:00:00Z' },
     };
     expect(jobStatus(known)).toContain('ลองอีกครั้งได้หลัง');
+  });
+  it('keeps observing transient provider retries and honors terminal state over stale pause metadata', () => {
+    for (const code of [
+      'generation_rate_limited',
+      'generation_provider_busy',
+      'provider_rate_limited',
+      'provider_unavailable',
+      'quota_wait',
+    ]) {
+      expect(jobShouldPark({ state: 'queued', stage: 'queued', error_code: code } as Job)).toBe(
+        false,
+      );
+    }
+    expect(
+      jobShouldPark({ state: 'completed', presentation: { stage: 'quota_paused' } } as Job),
+    ).toBe(false);
   });
   it('accepts a native paused job and parks it without treating it as a completed answer', async () => {
     const api = new Api('', async () =>
