@@ -179,3 +179,28 @@ Authentication, native ingestion and consumer handoff are described in
 04 PR #20, stop API/workers and run `yk-full rag-init --workers-stopped` with the
 same selected full env file. This performs additive 04 setup after pair validation;
 it preserves existing cursor keys and does not replace the backed-up auth migration.
+
+## Free Tier cutover for an existing local library
+
+The backend schema revision alone does not establish that additive module 04
+tables are present. After upgrading the code, stop the API and worker, take a cold
+SQLite/Chroma/media backup, then run the following from `MiniProject` with the
+same environment file used by both services:
+
+```powershell
+python -m youtube_backend.full --env-file .env.local rag-init --workers-stopped
+python -m youtube_backend.full --env-file .env.local quota-policy --workers-stopped
+```
+
+`rag-init` preserves existing transcripts, indexes and history while adding the
+embedding-cache and media tables. A ready video can otherwise fail during query
+embedding before any request reaches Gemini. Install quota policy only after
+reviewing current project-specific Free Tier evidence and confirming that the
+configured key belongs to that project. Keep the policy and evidence outside Git.
+Policy evidence expires after at most seven days; review current evidence before
+renewing it. Never reset usage counters or enable billing as a recovery step.
+
+Restart both services and submit one authenticated question about a ready video.
+Verify a completed job, citations and the actual returned model. Unexpected
+dependency failures log only the exception type and function/line locations;
+exception messages, source lines and local variables are intentionally omitted.

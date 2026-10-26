@@ -406,3 +406,8 @@ async def test_provider_exception_does_not_leak_secret(env, monkeypatch, caplog)
     assert response.status_code == 502
     assert "TOP_SECRET_TEST" not in response.text
     assert "TOP_SECRET_TEST" not in caplog.text
+    assert "dependency_failed job_id=" in caplog.text
+    assert "error_type=RuntimeError" in caplog.text
+    assert "explode:" in caplog.text
+    assert "provider.invalid" not in caplog.text
+    assert "Traceback (most recent call last)" not in caplog.text
