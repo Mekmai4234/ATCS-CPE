@@ -186,24 +186,21 @@ for (const provider of [
   'provider_unavailable',
   'quota_wait',
 ])
-  test(`${provider} releases UI and follows existing job without resubmitting`, async ({
+  test(`${provider} automatically follows existing job through recovery without resubmitting`, async ({
     page,
   }) => {
     const server = await fixture(page, 200, provider);
     await send(page);
     const waiting = page.getByRole('region', { name: 'งานที่พักติดตาม' });
-    await expect(waiting).toBeVisible();
-    await expect(waiting).toContainText(
-      ['generation_provider_busy', 'provider_unavailable'].includes(provider)
-        ? 'ไม่พร้อมให้บริการชั่วคราว'
-        : 'มีคำขอจำนวนมาก',
-    );
-    await expect(page.getByLabel('คำถามของคุณ')).toBeEnabled();
-    await page.waitForTimeout(1200);
-    expect(server.counts()).toMatchObject({ posts: 1, reads: 1 });
+    await expect(page.getByText('กำลังรอคิว ระบบจะติดตามผลให้อัตโนมัติ')).toBeVisible();
+    await expect(waiting).toHaveCount(0);
+    await expect(page.getByLabel('คำถามของคุณ')).toBeDisabled();
+    await expect.poll(() => server.counts().reads).toBeGreaterThanOrEqual(2);
+    expect(server.counts().posts).toBe(1);
     server.finish();
-    await waiting.getByRole('button', { name: 'ติดตามงานเดิมอีกครั้ง' }).click();
     await expect(page.getByText('คำตอบภาพยังอยู่', { exact: true })).toBeVisible();
+    await expect(waiting).toHaveCount(0);
+    await expect(page.getByLabel('คำถามของคุณ')).toBeEnabled();
     expect(server.counts().posts).toBe(1);
     expect(server.methods.some((value) => value.endsWith('/retry'))).toBe(false);
   });

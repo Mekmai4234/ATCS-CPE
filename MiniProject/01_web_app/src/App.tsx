@@ -1518,8 +1518,9 @@ export default function App({
                       <span>{operation.label}</span>
                       {pendingJob && (
                         <span>
-                          {jobStatus(pendingJob)} · ครั้งที่ {pendingJob.attempt_count}/
-                          {pendingJob.max_attempts}
+                          {pendingJob.state === 'queued'
+                            ? 'กำลังรอคิว ระบบจะติดตามผลให้อัตโนมัติ'
+                            : jobStatus(pendingJob)}
                         </span>
                       )}
                       {operation.jobId && <small>Job ID: {operation.jobId}</small>}
