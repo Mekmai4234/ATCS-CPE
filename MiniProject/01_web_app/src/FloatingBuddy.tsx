@@ -33,6 +33,7 @@ interface Props {
   error: string;
   waiting?: { id: string; label: string; status: string; follow: () => void }[];
   scopeNotice: string;
+  scopeHelp?: string;
   newConversation: () => void;
   cancel?: () => void;
   retry?: () => void;
@@ -506,7 +507,12 @@ export default function FloatingBuddy(props: Props) {
                     })
                   ) {
                     event.preventDefault();
-                    if (!props.locked && props.selected.length && props.question.trim())
+                    if (
+                      !props.locked &&
+                      !props.scopeHelp &&
+                      props.selected.length &&
+                      props.question.trim()
+                    )
                       event.currentTarget.form?.requestSubmit();
                   }
                 }}
@@ -514,15 +520,22 @@ export default function FloatingBuddy(props: Props) {
               />
               <button
                 className="primary"
-                disabled={props.locked || !props.selected.length || !props.question.trim()}
+                disabled={
+                  props.locked ||
+                  !!props.scopeHelp ||
+                  !props.selected.length ||
+                  !props.question.trim()
+                }
                 aria-label="ส่งข้อความถึง Buddy"
+                aria-describedby="buddy-scope-help"
               >
                 ➤
               </button>
             </form>
-            {!props.selected.length && (
-              <small className="buddy-scope-help">เลือกคลิปอย่างน้อย 1 คลิปก่อนส่งคำถาม</small>
-            )}
+            <small id="buddy-scope-help" className="buddy-scope-help" role="status">
+              {props.scopeHelp ||
+                (!props.selected.length ? 'เลือกคลิปอย่างน้อย 1 คลิปก่อนส่งคำถาม' : '')}
+            </small>
           </section>
         </>
       )}

@@ -28,3 +28,11 @@ export function serviceMessage(code: string | null | undefined, status?: number)
   if (status && status >= 500) return userMessages.unavailable;
   return null;
 }
+
+export function importMessage(code: string): string {
+  if (['invalid_youtube_url', 'invalid_url'].includes(code))
+    return 'กรุณาใช้ลิงก์วิดีโอ YouTube แบบ https://www.youtube.com/watch?v=… หรือ https://youtu.be/…';
+  if (code === 'video_deleting') return 'คลิปนี้กำลังถูกลบ กรุณารอให้เสร็จแล้วนำเข้าใหม่';
+  if (code === 'source_unavailable') return 'คลิปนี้ยังนำเข้าไม่ได้ กรุณาตรวจสอบว่าลิงก์เปิดดูได้';
+  return serviceMessage(code) || 'นำเข้าคลิปนี้ไม่สำเร็จ กรุณาตรวจสอบลิงก์แล้วลองใหม่';
+}

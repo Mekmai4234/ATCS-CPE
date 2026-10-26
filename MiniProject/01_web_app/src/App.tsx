@@ -24,7 +24,7 @@ import FloatingBuddy from './FloatingBuddy';
 import InteractiveBuddy from './InteractiveBuddy';
 import { scopeFingerprint } from './buddyModel';
 import { UiIcon } from './Visuals';
-import { serviceMessage, userMessages } from './userMessages';
+import { importMessage, serviceMessage, userMessages } from './userMessages';
 
 type WorkspaceView = 'home' | 'library' | 'chat' | 'learn';
 interface WorkspaceProps {
@@ -550,7 +550,10 @@ export default function App({
         throw new Error('เลือกคลิปที่ตรงตัวกรองอย่างน้อย 2 คลิปเพื่อเปรียบเทียบ');
       if ((type === 'chat' || type === 'research') && !question.trim())
         throw new Error(type === 'chat' ? 'กรุณาพิมพ์คำถาม' : 'กรุณาระบุเป้าหมายค้นคว้า');
-      if (type !== 'chat' && (!Number.isInteger(days) || days < 1 || days > 90))
+      if (
+        ['research', 'study_plan'].includes(type) &&
+        (!Number.isInteger(days) || days < 1 || days > 90)
+      )
         throw new Error('จำนวนวันต้องเป็นเลขจำนวนเต็มตั้งแต่ 1–90');
       const text = question.trim();
       const sameScope = conversationScope.current === scopeFingerprint(scope);
@@ -564,7 +567,7 @@ export default function App({
             ? { type, scope, instruction: text }
             : type === 'research'
               ? { goal: text, scope, level, days }
-              : { type, scope, topic: text, level, days };
+              : { type, scope, topic: text, level, ...(type === 'study_plan' ? { days } : {}) };
       const path =
         type === 'chat'
           ? '/api/chat'
@@ -593,6 +596,9 @@ export default function App({
     conversationScope.current = '';
     setScopeNotice('');
     setQuestion('');
+    setTaskError('');
+    setCanRetry(false);
+    setNewResults(false);
     updateTurns((previous) => previous.filter((turn) => turn.type !== 'chat'));
   }
   async function loadHistory() {
@@ -656,7 +662,19 @@ export default function App({
     try {
       if (action === 'cancel') {
         const updated = await api.cancel(id);
+        if (!alive.current) return;
         setJobs((previous) => ({ ...previous, [id]: updated }));
+        // A stopped poller cannot observe cancellation on its next tick.
+        // Release the composer only after the server confirms a terminal state.
+        if (['cancelled', 'failed'].includes(updated.state)) {
+          setDeferred((previous) => previous.filter((item) => item.jobId !== id));
+          if (!busyRef.current && operationRef.current?.jobId === id) {
+            setOperation(null);
+            operationRef.current = null;
+            setCanRetry(false);
+            setTaskError(jobWarning(updated) || 'งานสิ้นสุดแล้ว');
+          }
+        }
       } else {
         if (!jobs[id] || !['import', 'delete'].includes(jobs[id].kind))
           throw new Error('API ยังไม่อนุญาตให้ retry งานชนิดนี้');
@@ -716,7 +734,7 @@ export default function App({
       await refresh();
       void watchImport(job.job_id);
     } catch (error) {
-      setActionError(errorText(error));
+      setActionError(`ลบไม่สำเร็จ: ${errorText(error)}`);
     }
   }
 
@@ -737,6 +755,23 @@ export default function App({
   const pendingJob = operation?.jobId ? jobs[operation.jobId] : null;
   const taskLocked = busy || !!operation;
   const synthetic = demo || mode === 'fixture';
+  const hasFilters = !!(channel || from || to);
+  const selectedInFilter = filtered.filter(
+    (video) => selected.includes(video.video_id) && videoQueryable(video),
+  );
+  const scopeHelp = loading
+    ? 'กำลังโหลดคลังวิดีโอ กรุณารอสักครู่'
+    : libraryError
+      ? 'โหลดคลังวิดีโอไม่สำเร็จ กรุณาลองโหลดอีกครั้ง'
+      : from && to && from > to
+        ? 'วันเริ่มต้นต้องไม่อยู่หลังวันสิ้นสุด'
+        : !selected.length
+          ? 'เลือกคลิปอย่างน้อย 1 คลิปก่อนส่งคำถาม'
+          : !selectedInFilter.length
+            ? 'คลิปที่เลือกไม่ตรงตัวกรอง กรุณาล้างตัวกรองหรือเลือกคลิปใหม่'
+            : selected.length > 100
+              ? 'เลือกแหล่งข้อมูลได้สูงสุด 100 คลิป'
+              : '';
 
   return (
     <EvidenceContext.Provider value={api.loadFrame}>
@@ -953,7 +988,13 @@ export default function App({
                             : 'ปฏิเสธ'}
                       </span>
                       <span className="import-url">{url}</span>
-                      <span>{job ? jobStatus(job) : item.error_code || ''}</span>
+                      <span>
+                        {job
+                          ? jobStatus(job)
+                          : item.error_code
+                            ? importMessage(item.error_code)
+                            : ''}
+                      </span>
                       {job?.state === 'failed' && job.retryable && job.kind === 'import' && (
                         <button
                           className="text-button"
@@ -988,13 +1029,14 @@ export default function App({
                   </h2>
                   <p>
                     {ready.length} คลิปพร้อมใช้งานในรายการที่โหลด · เลือกไว้ {selected.length} คลิป
+                    {hasFilters && ` · ตรงตัวกรอง ${selectedInFilter.length} คลิป`}
                   </p>
                 </div>
                 <button className="secondary" onClick={() => void refresh()} disabled={loading}>
                   {loading ? 'กำลังโหลด…' : '↻ รีเฟรชคลัง'}
                 </button>
               </div>
-              <div className="filters">
+              <div className={`filters${hasFilters ? ' has-active-filters' : ''}`}>
                 <label>
                   ช่อง
                   <select value={channel} onChange={(e) => setChannel(e.target.value)}>
@@ -1233,10 +1275,22 @@ export default function App({
                     }
                   />
                   <div className="form-footer">
-                    <small>อ้างอิงเฉพาะคลิปที่เลือกและตรงกับตัวกรอง</small>
+                    <small id="task-scope-help" role="status">
+                      {scopeHelp ||
+                        (tab === 'learn' && taskType === 'compare' && selectedInFilter.length < 2
+                          ? 'เลือกคลิปที่ตรงตัวกรองอย่างน้อย 2 คลิปเพื่อเปรียบเทียบ'
+                          : 'อ้างอิงเฉพาะคลิปที่เลือกและตรงกับตัวกรอง')}
+                    </small>
                     <button
                       className="primary"
-                      disabled={taskLocked || !selected.length || loading || !!libraryError}
+                      aria-describedby="task-scope-help"
+                      disabled={
+                        taskLocked ||
+                        !!scopeHelp ||
+                        (tab === 'chat' && !question.trim()) ||
+                        (tab === 'learn' && taskType === 'research' && !question.trim()) ||
+                        (tab === 'learn' && taskType === 'compare' && selectedInFilter.length < 2)
+                      }
                     >
                       {busy ? 'กำลังทำงาน…' : tab === 'chat' ? 'ส่งคำถาม' : 'เริ่มงาน'}
                       <Icon name="arrow" />
@@ -1375,8 +1429,7 @@ export default function App({
               .filter((job) => job.kind === 'delete' || job.kind === 'detach')
               .map((job) => (
                 <div className="notice" key={job.job_id}>
-                  {job.kind === 'detach' ? 'นำออกจากคลัง' : 'การลบคลิป'}: {statusLabels[job.state]}
-                  {job.error_code && ` · ${job.error_code}`}
+                  {job.kind === 'detach' ? 'นำออกจากคลัง' : 'การลบคลิป'}: {jobStatus(job)}
                   {job.state === 'failed' && job.retryable && job.kind === 'delete' && (
                     <button onClick={() => void jobAction(job.job_id, 'retry')}>ลองลบใหม่</button>
                   )}
@@ -1471,6 +1524,7 @@ export default function App({
               },
             }))}
             scopeNotice={scopeNotice}
+            scopeHelp={scopeHelp}
             newConversation={resetConversation}
             cancel={
               operation?.jobId && !terminal(pendingJob?.state || '')

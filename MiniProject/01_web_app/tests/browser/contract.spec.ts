@@ -185,9 +185,9 @@ test('date filters cannot silently widen a selected scope', async ({ page }) => 
     return fulfill(route, final);
   });
   await page.getByLabel('ตั้งแต่วันที่').fill('2026-10-02');
-  await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'ส่งคำถาม', exact: true })).toBeDisabled();
   await expect(
-    page.getByRole('alert').filter({ hasText: 'ไม่มีคลิปที่เลือกตรงกับตัวกรอง' }),
+    page.getByRole('status').filter({ hasText: 'คลิปที่เลือกไม่ตรงตัวกรอง' }),
   ).toBeVisible();
   expect(calls).toBe(0);
 });
@@ -200,8 +200,8 @@ test('comparison blocks a single selected video before creating work', async ({ 
   });
   await page.getByRole('button', { name: 'วิเคราะห์และเรียนรู้', exact: true }).click();
   await page.getByLabel('ประเภทงาน').selectOption('compare');
-  await page.getByRole('button', { name: 'เริ่มงาน', exact: true }).click();
-  await expect(page.getByRole('alert').filter({ hasText: 'อย่างน้อย 2 คลิป' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'เริ่มงาน', exact: true })).toBeDisabled();
+  await expect(page.getByRole('status').filter({ hasText: 'อย่างน้อย 2 คลิป' })).toBeVisible();
   expect(calls).toBe(0);
 });
 test('cancelled pending task observes cancellation and unlocks the form', async ({ page }) => {
