@@ -18,6 +18,15 @@ export const videoQueryable = (video: Video) =>
   (video.status === 'ready' ||
     !!(video.presentation?.queryable && video.presentation.kinds.length));
 export function jobStatus(job: Job) {
+  // A failed/cancelled job can retain its last processing stage and retry metadata.
+  // The durable terminal state must take precedence over that stale progress.
+  if (terminal(job.state)) {
+    if (job.state === 'cancelled') return statusLabels.cancelled;
+    if (job.state === 'completed' && ['ready', 'no_transcript'].includes(job.stage))
+      return statusLabels[job.stage];
+    const warning = jobWarning(job);
+    return warning ? `${statusLabels[job.state]} · ${warning}` : statusLabels[job.state];
+  }
   const extra = job.presentation;
   const provider = serviceMessage(job.error_code);
   const stage = extra

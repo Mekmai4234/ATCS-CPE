@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildScope, citationUrl, jobWarning, terminal, videoIdFromUrl } from '../src/domain';
+import {
+  buildScope,
+  citationUrl,
+  jobStatus,
+  jobWarning,
+  terminal,
+  videoIdFromUrl,
+} from '../src/domain';
 import type { Citation, Job, Video } from '../src/types';
 
 const video = {
@@ -56,6 +63,23 @@ describe('YouTube and citation validation', () => {
   });
 });
 describe('source scope', () => {
+  it.each(['failed', 'cancelled', 'completed', 'partial'])(
+    'shows terminal %s rather than a stale processing stage or retry time',
+    (state) => {
+      const text = jobStatus({
+        state,
+        stage: 'indexing',
+        error_code: 'generation_rate_limited',
+        wait: { time_source: 'provider', retry_at: '2099-01-01T00:00:00Z' },
+      } as Job);
+      expect(text).not.toContain('กำลังสร้างฐานความรู้');
+      expect(text).not.toContain('ลองอีกครั้งได้หลัง');
+      if (state === 'failed') expect(text).toContain('ไม่สำเร็จ');
+      if (state === 'cancelled') expect(text).toBe('ยกเลิกแล้ว');
+      if (state === 'completed') expect(text).toBe('เสร็จแล้ว');
+      if (state === 'partial') expect(text).toBe('ได้ผลบางส่วน');
+    },
+  );
   it('requires explicit ready videos', () => {
     expect(() => buildScope([], [video], '', '', '')).toThrow();
     expect(() =>
