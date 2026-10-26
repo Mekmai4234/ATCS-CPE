@@ -290,6 +290,33 @@ export function demoTransport(): Transport {
           })
         : error('ไม่พบสื่อเรียนรู้', 'not_found', 404);
     }
+    if (path === '/api/conversations' && method === 'GET') {
+      const grouped = new Map<string, import('./types').ConversationSummary>();
+      for (const job of jobs.values()) {
+        const id = job.kind === 'chat' ? job.result?.conversation_id : null;
+        if (!id) continue;
+        const previous = grouped.get(id);
+        grouped.set(id, {
+          conversation_id: id,
+          title:
+            previous?.title || String(job.payload?.question || 'บทสนทนาตัวอย่าง').slice(0, 160),
+          created_at: previous?.created_at || '2026-10-01T00:00:00Z',
+          updated_at: '2026-10-01T00:00:00Z',
+          message_count: (previous?.message_count || 0) + 2,
+          video_ids: (job.payload?.scope as Scope)?.video_ids || [],
+        });
+      }
+      const items = [...grouped.values()]
+        .reverse()
+        .filter((item) => item.title.includes(url.searchParams.get('q') || ''));
+      const offset = Number(url.searchParams.get('offset') || 0);
+      return json({
+        items: items.slice(offset, offset + 20),
+        total: items.length,
+        offset,
+        limit: 20,
+      });
+    }
     if (path.startsWith('/api/conversations/') && method === 'GET') {
       const id = decodeURIComponent(path.split('/')[3]);
       const messages = [...jobs.values()]
@@ -325,6 +352,9 @@ export function demoTransport(): Transport {
       const offset = Number(url.searchParams.get('offset') || 0);
       return json({
         conversation_id: id,
+        scope:
+          [...jobs.values()].filter((job) => job.result?.conversation_id === id).at(-1)?.payload
+            ?.scope || null,
         messages: messages.slice(offset, offset + 50),
         total: messages.length,
         limit: 50,

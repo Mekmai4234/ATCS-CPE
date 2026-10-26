@@ -15,13 +15,15 @@ const defaultPort: SessionPort =
     ? new DemoSessionPort()
     : new HttpSessionPort(import.meta.env.NEXT_PUBLIC_API_BASE_URL);
 const routeView = (path: string) =>
-  path === '/chat'
+  path === '/chat' || path.startsWith('/chat/')
     ? 'chat'
     : path === '/learning'
       ? 'learn'
       : path === '/library'
         ? 'library'
-        : 'home';
+        : path === '/history'
+          ? 'history'
+          : 'home';
 
 function MemberArea({
   session,
@@ -82,6 +84,7 @@ function MemberArea({
       api={api}
       member={session.member}
       initialView={routeView(path)}
+      initialConversationId={path.startsWith('/chat/') ? path.slice(6) : undefined}
       onNavigate={navigate}
       onLogout={logout}
       adminEnabled={session.member.role === 'admin' && !!session.adminSections.length}
@@ -242,11 +245,11 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
           <div className="login-mascot-stage">
             <Mascot />
           </div>
-          <span className="story-caption">พบกับ RAG Buddy · เพื่อนร่วมทางการเรียนรู้</span>
+          <span className="story-caption">พบกับ Video Buddy · เพื่อนร่วมทางการเรียนรู้</span>
         </section>
         <section className="login-card" aria-labelledby="sign-in-title">
           <span className="login-welcome-pill">
-            <UiIcon name="spark" size={18} /> เริ่มต้นเรียนรู้กับ RAG Buddy
+            <UiIcon name="spark" size={18} /> เริ่มต้นเรียนรู้กับ Video Buddy
           </span>
           <h2 id="sign-in-title">ยินดีต้อนรับ</h2>
           <p>เข้าสู่ระบบหรือสมัครสมาชิกด้วย Google</p>
@@ -319,10 +322,10 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
             <span aria-hidden="true">⌁</span> คลังคลิปและผลการเรียนรู้เป็นของบัญชีคุณ
           </div>
           <InfoLinks />
-          <small className="login-signature">RAG Buddy · Your learning companion</small>
+          <small className="login-signature">Video Buddy · Your learning companion</small>
         </section>
       </main>
-      <footer className="login-footer">RAG Buddy · เรียนรู้ในจังหวะของคุณ</footer>
+      <footer className="login-footer">Video Buddy · เรียนรู้ในจังหวะของคุณ</footer>
     </div>
   );
 }

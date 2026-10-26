@@ -61,11 +61,11 @@ export default function HomeHero({
           </p>
           <div className="hero-shortcuts">
             <button onClick={openLibrary}>
-              <span aria-hidden="true">▣</span> เปิดคลังวิดีโอ
+              <span aria-hidden="true">▣</span> เปิดวิดีโอของฉัน
             </button>
             <span className="shortcut-divider" />
             <button onClick={openChat}>
-              <span aria-hidden="true">▤</span> เริ่มถามจากคลิป
+              <span aria-hidden="true">▤</span> เริ่มแชตกับ Buddy
             </button>
           </div>
         </div>

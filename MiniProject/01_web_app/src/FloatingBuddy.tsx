@@ -11,6 +11,7 @@ import { statusLabels, videoQueryable } from './domain';
 import { SourceBadges } from './Evidence';
 
 export interface BuddyTurn {
+  unanswered?: string;
   id: string;
   label: string;
   result: TaskResult;
@@ -431,7 +432,13 @@ export default function FloatingBuddy(props: Props) {
                     <InteractiveBuddy headOnly active={false} decorative />
                     <strong>Buddy AI</strong>
                   </div>
-                  <ResultView result={turn.result} partial={turn.partial} />
+                  {turn.unanswered ? (
+                    <p className="notice" role="status">
+                      {turn.unanswered} · ยังไม่มีคำตอบที่บันทึกไว้
+                    </p>
+                  ) : (
+                    <ResultView result={turn.result} partial={turn.partial} />
+                  )}
                 </article>
               ))}
               {props.historyAvailable && (

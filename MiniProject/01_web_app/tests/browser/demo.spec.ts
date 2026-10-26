@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
 test('library → selected scope → chat → safe timestamp citation', async ({ page }) => {
   await expect(page.getByText('DEMO · ข้อมูลจำลอง', { exact: true })).toBeVisible();
   await page.getByRole('checkbox').first().check();
-  await page.getByRole('button', { name: 'ถามจากคลิปที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
   await page.getByLabel('คำถามของคุณ').fill('RAG คืออะไร');
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
   await expect(page.getByText('[คำตอบจำลอง] RAG', { exact: false })).toBeVisible();
@@ -31,7 +31,7 @@ test('import independently reports accepted/existing/rejected and no captions', 
 });
 test('pending 202 chat resolves and insufficient evidence is explicit', async ({ page }) => {
   await page.getByRole('checkbox').first().check();
-  await page.getByRole('button', { name: 'ถามจากคลิปที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
   await page.getByLabel('คำถามของคุณ').fill('รอผล RAG');
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
   await expect(page.getByText(/Job ID:/)).toBeVisible();
@@ -42,7 +42,7 @@ test('pending 202 chat resolves and insufficient evidence is explicit', async ({
 });
 test('analysis and every learning artifact render after polling', async ({ page }) => {
   await page.getByRole('checkbox').first().check();
-  await page.getByRole('button', { name: 'วิเคราะห์และเรียนรู้', exact: true }).click();
+  await page.getByRole('button', { name: 'สรุปและแบบฝึกหัด', exact: true }).click();
   await page.getByRole('button', { name: 'เริ่มงาน', exact: true }).click();
   await expect(page.getByText('[คำตอบจำลอง] RAG', { exact: false })).toBeVisible();
   for (const type of ['quiz', 'flashcards', 'study_plan']) {
@@ -59,7 +59,7 @@ test('analysis and every learning artifact render after polling', async ({ page 
 });
 test('research shows events and partial result honestly', async ({ page }) => {
   await page.getByRole('checkbox').first().check();
-  await page.getByRole('button', { name: 'วิเคราะห์และเรียนรู้', exact: true }).click();
+  await page.getByRole('button', { name: 'สรุปและแบบฝึกหัด', exact: true }).click();
   await page.getByLabel('ประเภทงาน').selectOption('research');
   await page.getByLabel('เป้าหมายค้นคว้า').fill('เรียน RAG');
   await page.getByRole('button', { name: 'เริ่มงาน', exact: true }).click();
@@ -87,7 +87,7 @@ test('mobile layout fits viewport and basic flow remains usable', async ({ page 
     true,
   );
   await page.getByRole('checkbox').first().check();
-  await page.getByRole('button', { name: 'ถามจากคลิปที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
   await expect(page.getByLabel('คำถามของคุณ')).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: 'runtime/screenshots/mobile.png', fullPage: true });
@@ -106,7 +106,7 @@ test('deleting a source updates already displayed learning artifact citations', 
 }) => {
   await page.getByRole('checkbox').nth(0).check();
   await page.getByRole('checkbox').nth(1).check();
-  await page.getByRole('button', { name: 'วิเคราะห์และเรียนรู้', exact: true }).click();
+  await page.getByRole('button', { name: 'สรุปและแบบฝึกหัด', exact: true }).click();
   await page.getByLabel('ประเภทงาน').selectOption('flashcards');
   await page.getByRole('button', { name: 'เริ่มงาน', exact: true }).click();
   await page.getByText('RAG คืออะไร?', { exact: true }).click();
