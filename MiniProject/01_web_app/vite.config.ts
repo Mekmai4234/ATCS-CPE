@@ -31,6 +31,26 @@ export default defineConfig(({ mode, command }) => {
         name: 'development-test-entry',
         apply: 'serve',
         configureServer(server) {
+          // The local Google OAuth client and backend trust localhost:3000.
+          // Normalize document navigations before GIS creates an origin-bound challenge.
+          if (mode === 'development') {
+            server.middlewares.use((req, res, next) => {
+              if (
+                req.method === 'GET' &&
+                req.headers.host === '127.0.0.1:3000' &&
+                req.headers.accept?.includes('text/html') &&
+                req.url?.startsWith('/')
+              ) {
+                res.writeHead(307, {
+                  Location: `http://localhost:3000${req.url}`,
+                  'Cache-Control': 'no-store',
+                });
+                res.end();
+                return;
+              }
+              next();
+            });
+          }
           if (!['workspace-tests', 'session-tests'].includes(mode)) return;
           server.middlewares.use((req, _res, next) => {
             const path = req.url?.split('?')[0] || '';
