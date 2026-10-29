@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import App from './App';
 import AdminView from './AdminView';
 import { Api, ApiError } from './api';
-import { BuddyLogo, ForestBackdrop, Mascot } from './Forest';
+import { BuddyLogo, ForestBackdrop } from './Forest';
 import GoogleButton from './GoogleButton';
 import { HttpSessionPort } from './httpSession';
 import { DemoSessionPort, safeMemberSession, safeWorkspacePath } from './session';
 import type { MemberSession, SessionPort } from './session';
 import PublicInfo, { InfoLinks, isInfoPath } from './PublicInfo';
 import { LoginBenefits, UiIcon } from './Visuals';
+import './auth-v5.css';
 
 const defaultPort: SessionPort =
   import.meta.env.VITE_DEMO_MODE === 'true'
@@ -227,7 +228,7 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
   const working = phase === 'checking' || phase === 'exchanging';
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
   return (
-    <div className="login-page">
+    <div className="login-page login-v5">
       <ForestBackdrop />
       <header className="login-header">
         <BuddyLogo />
@@ -237,27 +238,22 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
       </header>
       <main className="login-layout">
         <section className="login-story" aria-labelledby="login-intro">
-          <h1 id="login-intro">
-            เพื่อนคู่คิดจากคลิปโปรด
-            <span className="coral-stroke" />
-          </h1>
-          <p>ถาม สรุป และเรียนรู้ไปกับ Buddy</p>
+          <h1 id="login-intro">เพื่อนคู่คิด.</h1>
+          <p>จากคลิปที่คุณชอบ</p>
           <div className="login-mascot-stage">
-            <Mascot />
+            <img
+              className="login-v5-scene"
+              src="/buddy-v5/login-scene.webp"
+              alt="Buddy เพื่อนร่วมเรียนรู้ในสวนสีมิ้นต์"
+              width="1200"
+              height="1000"
+              fetchPriority="high"
+            />
           </div>
-          <span className="story-caption">พบกับ Video Buddy · เพื่อนร่วมทางการเรียนรู้</span>
         </section>
         <section className="login-card" aria-labelledby="sign-in-title">
-          <span className="login-welcome-pill">
-            <UiIcon name="spark" size={18} /> เริ่มต้นเรียนรู้กับ Video Buddy
-          </span>
           <h2 id="sign-in-title">ยินดีต้อนรับ</h2>
-          <p>เข้าสู่ระบบหรือสมัครสมาชิกด้วย Google</p>
-          {message && (
-            <p className={`notice ${message === 'ออกจากระบบแล้ว' ? '' : 'warning'}`} role="status">
-              {message}
-            </p>
-          )}
+          <p>เริ่มด้วยบัญชี Google</p>
           {working && (
             <p className="session-progress" role="status">
               {phase === 'checking' ? 'กำลังตรวจสอบเซสชัน…' : 'กำลังตรวจสอบการเข้าสู่ระบบ…'}
@@ -306,26 +302,22 @@ export default function SessionShell({ port = defaultPort }: { port?: SessionPor
               </button>
             </div>
           )}
-          <p className="signup-note">
-            ครั้งแรก? ระบบจะสร้างบัญชีให้คุณอัตโนมัติ
-            <br />
-            มีบัญชีแล้ว? ใช้ Google เดิมเพื่อเข้าสู่ระบบ
-          </p>
+          {message && (
+            <p
+              className={`notice login-v5-status ${message === 'ออกจากระบบแล้ว' ? 'is-signed-out' : 'warning'}`}
+              role="status"
+            >
+              {message === 'ออกจากระบบแล้ว' && <span aria-hidden="true">✓</span>}
+              {message}
+            </p>
+          )}
+          <p className="signup-note">ใช้งานครั้งแรก? สร้างบัญชีให้อัตโนมัติ</p>
           <div className="login-divider" />
           <LoginBenefits />
-          <p className="login-privacy">
-            ใช้ Google เพื่อยืนยันตัวตนเท่านั้น
-            <br />
-            ไม่มีรหัสผ่านของเว็บ และไม่ขอสิทธิ์อ่าน Gmail
-          </p>
-          <div className="login-assurance">
-            <span aria-hidden="true">⌁</span> คลังคลิปและผลการเรียนรู้เป็นของบัญชีคุณ
-          </div>
+          <p className="login-privacy">ใช้ Google ยืนยันตัวตน ไม่ขอสิทธิ์อ่าน Gmail</p>
           <InfoLinks />
-          <small className="login-signature">Video Buddy · Your learning companion</small>
         </section>
       </main>
-      <footer className="login-footer">Video Buddy · เรียนรู้ในจังหวะของคุณ</footer>
     </div>
   );
 }

@@ -26,6 +26,7 @@ import { scopeFingerprint } from './buddyModel';
 import { UiIcon } from './Visuals';
 import { importMessage, serviceMessage, userMessages } from './userMessages';
 import ChatHistory from './ChatHistory';
+import { BuddyArt } from './BuddyArt';
 
 type WorkspaceView = 'home' | 'library' | 'chat' | 'learn' | 'history';
 interface WorkspaceProps {
@@ -48,6 +49,20 @@ const taskNames: Record<TaskType, string> = {
   flashcards: 'แฟลชการ์ด',
   study_plan: 'แผนเรียน',
 };
+const workspaceMenu = [
+  ['home', 'หน้าแรก', 'home'],
+  ['library', 'วิดีโอของฉัน', 'library'],
+  ['learn', 'สรุปและแบบฝึกหัด', 'learn'],
+  ['history', 'ประวัติแชท', 'clock'],
+] as const;
+const learningTools = [
+  ['summary', 'สรุป', 'library'],
+  ['compare', 'เทียบ', 'learn'],
+  ['research', 'ค้นคว้า', 'spark'],
+  ['quiz', 'ทดสอบ', 'quiz'],
+  ['flashcards', 'ทบทวน', 'library'],
+  ['study_plan', 'วางแผน', 'clock'],
+] as const;
 interface Operation {
   detached?: boolean;
   key: string;
@@ -175,6 +190,7 @@ export default function App({
   }, [initialView]);
   function navigateTab(view: WorkspaceView) {
     setTab(view);
+    if (view !== 'learn') setLearningFocus(false);
     onNavigate?.(view === 'home' ? '/' : view === 'learn' ? '/learning' : `/${view}`);
   }
   const [videos, setVideos] = useState<Video[]>([]);
@@ -193,6 +209,7 @@ export default function App({
   const [watchErrors, setWatchErrors] = useState<Record<string, string>>({});
   const [question, setQuestion] = useState('');
   const [taskType, setTaskType] = useState<TaskType>('summary');
+  const [learningFocus, setLearningFocus] = useState(false);
   const [days, setDays] = useState(7);
   const [level, setLevel] = useState('beginner');
   const [conversation, setConversation] = useState<string | null>(null);
@@ -201,7 +218,7 @@ export default function App({
   const [scopeNotice, setScopeNotice] = useState('');
   const [historyPending, setHistoryPending] = useState(false);
   const [buddyOpen, setBuddyOpen] = useState(false);
-  const [sourcesExpanded, setSourcesExpanded] = useState(true);
+  const [sourcesExpanded, setSourcesExpanded] = useState(false);
   const [viewingHistory, setViewingHistory] = useState(false);
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [archiveError, setArchiveError] = useState('');
@@ -454,6 +471,7 @@ export default function App({
     setOperation(null);
     operationRef.current = null;
     setCanRetry(false);
+    if (op.type !== 'chat') setLearningFocus(true);
   }
   async function execute(op: Operation, resume = false) {
     if (busyRef.current) return;
@@ -912,122 +930,98 @@ export default function App({
 
   return (
     <EvidenceContext.Provider value={api.loadFrame}>
-      <div className={`app-shell forest-workspace view-${tab}`}>
+      <div
+        className={`app-shell forest-workspace v5-workspace view-${tab}${tab === 'learn' && learningFocus ? ' learning-result' : ''}`}
+      >
         <ForestBackdrop />
         <a className="skip-link" href="#workspace">
           ข้ามไปเนื้อหา
         </a>
-        <aside className="sidebar">
-          <a className="brand" href="#workspace" aria-label="YouTube Knowledge หน้าหลัก">
-            <span className="brand-mark">▶</span>
-            <span>
-              YouTube
-              <strong>
-                Knowledge<span className="brand-dot">.</span>
-              </strong>
-            </span>
-          </a>
-          <div className="sidebar-caption">พื้นที่ความรู้ของคุณ</div>
+        <aside className="sidebar v5-sidebar">
+          <BuddyLogo onClick={() => navigateTab('home')} />
           <nav aria-label="เมนูหลัก">
-            {(
-              [
-                ['library', 'วิดีโอของฉัน', 'library'],
-                ['chat', 'แชตกับ Buddy', 'chat'],
-                ['learn', 'สรุปและแบบฝึกหัด', 'learn'],
-              ] as const
-            ).map(([id, label, icon]) => (
+            {workspaceMenu.map(([id, label, icon]) => (
               <button
                 key={id}
-                className={tab === id ? 'nav-item active' : 'nav-item'}
+                className={
+                  tab === id || (id === 'history' && tab === 'chat')
+                    ? 'nav-item active'
+                    : 'nav-item'
+                }
+                aria-current={
+                  tab === id || (id === 'history' && tab === 'chat') ? 'page' : undefined
+                }
                 onClick={() => navigateTab(id)}
-                aria-current={tab === id ? 'page' : undefined}
               >
-                <Icon name={icon} />
-                {label}
-                {id === 'library' && <span>{total}</span>}
+                <UiIcon name={icon} />
+                <span>{label}</span>
               </button>
             ))}
           </nav>
-          <div className="sidebar-tip">
-            <img src="/rag-buddy.png" alt="Video Buddy มาสคอตผู้ช่วยเรียนรู้" />
-            <strong>ทุกคำตอบ มีที่มา</strong>
-            <p>เลือกคลิปที่สนใจ แล้วเปลี่ยนสิ่งที่ดูให้เป็นความรู้ของคุณ</p>
-          </div>
-          <div className="sidebar-footer">
-            <span className={`connection-dot ${synthetic ? 'demo' : ''}`} />
-            {synthetic
-              ? 'โหมดข้อมูลจำลอง'
-              : mode === 'unknown'
-                ? 'รอเชื่อมต่อ API'
-                : 'เชื่อมต่อ API'}
-            <small>YOUR VIDEO LEARNING SPACE</small>
+          <div className="v5-sidebar-bottom">
+            <a href="/help">
+              <UiIcon name="help" />
+              ช่วยเหลือ
+            </a>
+            {adminEnabled && (
+              <button onClick={() => onNavigate?.('/admin')}>
+                <UiIcon name="learn" />
+                จัดการระบบ
+              </button>
+            )}
+            {member && (
+              <div className="v5-account">
+                <span className="avatar" aria-hidden="true">
+                  {member.name.slice(0, 1)}
+                </span>
+                <strong>{member.name}</strong>
+                <button onClick={onLogout} aria-label="ออกจากระบบ">
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    aria-hidden="true"
+                  >
+                    <path d="M9 4H4v16h5M9 12h11m-4-4 4 4-4 4" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
         </aside>
         <main id="workspace" className="workspace" tabIndex={-1}>
-          <header className="topbar">
+          <header className="topbar v5-topbar">
             <BuddyLogo onClick={() => navigateTab('home')} />
-            <nav className="forest-nav" aria-label="เมนูพื้นที่เรียนรู้">
-              {(
-                [
-                  ['home', 'หน้าแรก'],
-                  ['library', 'วิดีโอของฉัน'],
-                  ['chat', 'แชตกับ Buddy'],
-                  ['learn', 'สรุปและแบบฝึกหัด'],
-                  ['history', 'ประวัติแชต'],
-                ] as const
-              ).map(([view, label]) => (
-                <button
-                  key={view}
-                  className={tab === view ? 'active' : ''}
-                  aria-current={tab === view ? 'page' : undefined}
-                  onClick={() => navigateTab(view)}
-                >
-                  <UiIcon
-                    name={
-                      view === 'home'
-                        ? 'home'
-                        : view === 'library'
-                          ? 'library'
-                          : view === 'chat'
-                            ? 'chat'
-                            : view === 'history'
-                              ? 'clock'
-                              : 'learn'
-                    }
-                    size={20}
-                  />
-                  {label}
-                </button>
-              ))}
-            </nav>
-            <div className="profile-controls">
-              {adminEnabled && (
-                <button className="admin-link" onClick={() => onNavigate?.('/admin')}>
-                  จัดการระบบ
-                </button>
-              )}
+            <div className="v5-top-actions">
+              <button
+                aria-label="เปิดแชทกับ Buddy"
+                onClick={() => (member ? setBuddyOpen(true) : navigateTab('chat'))}
+              >
+                <UiIcon name="chat" />
+              </button>
+              <a href="/help" aria-label="ช่วยเหลือ">
+                <UiIcon name="help" />
+              </a>
               {member && (
-                <div className="profile-pill">
-                  <span className="avatar" aria-hidden="true">
-                    {member.name.slice(0, 1)}
-                  </span>
-                  <span>{member.name}</span>
-                  <span className="profile-separator" />
-                  <button onClick={onLogout}>ออกจากระบบ</button>
-                </div>
+                <details className="v5-account-menu">
+                  <summary aria-label="บัญชีผู้ใช้">
+                    <span className="avatar" aria-hidden="true">
+                      {member.name.slice(0, 1)}
+                    </span>
+                  </summary>
+                  <div>
+                    <strong>{member.name}</strong>
+                    {adminEnabled && (
+                      <button onClick={() => onNavigate?.('/admin')}>จัดการระบบ</button>
+                    )}
+                    <button onClick={onLogout}>ออกจากระบบ</button>
+                  </div>
+                </details>
               )}
             </div>
-            <div className="breadcrumb">
-              พื้นที่ทำงาน <span>/</span>{' '}
-              <strong>
-                {tab === 'library'
-                  ? 'วิดีโอของฉัน'
-                  : tab === 'chat'
-                    ? 'แชตกับ Buddy'
-                    : 'สรุปและแบบฝึกหัด'}
-              </strong>
-            </div>
-            <span className="private-badge">◉ พื้นที่ส่วนตัว · ต้นแบบผู้ใช้เดียว</span>
           </header>
           {synthetic && (
             <div className="demo-banner" role="status">
@@ -1052,76 +1046,131 @@ export default function App({
                 openChat={() => navigateTab('chat')}
               />
             )}
-            {tab !== 'home' && (
-              <div className="page-heading">
-                <div>
-                  <span className="eyebrow">WATCH LESS. UNDERSTAND MORE.</span>
-                  <h1>
-                    {tab === 'library'
-                      ? 'เพิ่มและจัดการวิดีโอ'
-                      : tab === 'chat'
-                        ? 'ถามคำถามจากวิดีโอ'
-                        : tab === 'history'
-                          ? 'ประวัติแชต'
-                          : 'เลือกเครื่องมือช่วยเรียนรู้'}
-                    <span className="heading-dot">.</span>
-                  </h1>
-                  <p>
-                    {tab === 'library'
-                      ? 'รวบรวมคลิปที่สนใจ แล้วค้นพบคำตอบจากสิ่งที่คุณเลือกดู'
-                      : tab === 'history'
-                        ? 'คำถาม คำตอบ และบทสนทนาที่บันทึกไว้ในบัญชีของคุณ'
-                        : 'เรียนรู้จากวิดีโอพร้อมหลักฐานที่ย้อนกลับไปดูได้'}
-                  </p>
-                </div>
-                <span className="section-number" aria-hidden="true">
-                  {tab === 'library'
-                    ? '01'
-                    : tab === 'chat'
-                      ? '02'
-                      : tab === 'history'
-                        ? '04'
-                        : '03'}
-                </span>
-              </div>
-            )}
             {tab === 'library' && (
-              <section className="import-panel" aria-labelledby="import-title">
-                <div className="import-description">
-                  <span className="plus-tile">
-                    <Icon name="plus" />
-                  </span>
-                  <h2 id="import-title">เพิ่มวิดีโอเข้าคลัง</h2>
-                  <p>
-                    วางลิงก์ YouTube เพื่อเริ่มสร้างฐานความรู้
-                    <br />
-                    รองรับหลายลิงก์ แยกบรรทัดละ 1 ลิงก์
-                  </p>
-                  <span className="tiny-label">YOUTUBE → KNOWLEDGE</span>
+              <section className="v5-library-stage" aria-labelledby="library-page-title">
+                <div className="v5-library-copy">
+                  <h1 id="library-page-title">
+                    คลังคลิป<span className="v5-dot">.</span>
+                  </h1>
+                  <form onSubmit={importUrls} className="v5-url-form v5-library-form">
+                    <label htmlFor="video-urls">ลิงก์วิดีโอ YouTube</label>
+                    <div>
+                      <textarea
+                        id="video-urls"
+                        placeholder="วางลิงก์คลิปที่นี่"
+                        value={urls}
+                        onChange={(e) => setUrls(e.target.value)}
+                        rows={1}
+                        disabled={importing}
+                      />
+                      <button
+                        className="primary"
+                        aria-label="เพิ่มคลิป (เพิ่มวิดีโอ)"
+                        disabled={importing || !urls.trim()}
+                      >
+                        {importing ? 'กำลังเพิ่ม…' : 'เพิ่มคลิป'}
+                        <Icon name="plus" />
+                      </button>
+                    </div>
+                    <details className="v5-import-hint">
+                      <summary>เพิ่มหลายคลิป</summary>
+                      <p>แยกบรรทัดละ 1 ลิงก์ · สูงสุด 50 ลิงก์</p>
+                    </details>
+                    {importError && (
+                      <p className="error" role="alert">
+                        {importError}
+                      </p>
+                    )}
+                  </form>
                 </div>
-                <form onSubmit={importUrls} className="import-form">
-                  <label htmlFor="video-urls">ลิงก์วิดีโอ YouTube</label>
-                  <textarea
-                    id="video-urls"
-                    placeholder={'https://www.youtube.com/watch?v=...\nhttps://youtu.be/...'}
-                    value={urls}
-                    onChange={(e) => setUrls(e.target.value)}
-                    rows={3}
-                    disabled={importing}
-                  />
-                  <div className="form-footer">
-                    <small>HTTPS · watch / youtu.be · สูงสุด 50 ลิงก์</small>
-                    <button className="primary" disabled={importing || !urls.trim()}>
-                      {importing ? 'กำลังส่ง…' : 'เพิ่มวิดีโอ'}
-                      <Icon name="arrow" />
+                <div className="v5-library-art">
+                  <span aria-hidden="true" />
+                  <BuddyArt pose={videos.length ? 'library' : 'empty-library'} />
+                </div>
+              </section>
+            )}
+            {tab === 'learn' && !learningFocus && (
+              <section className="v5-learning-stage" aria-labelledby="learning-title">
+                <div className="v5-learning-copy">
+                  <h1 id="learning-title">
+                    เรียนรู้<span className="v5-dot">.</span>
+                  </h1>
+                  <div className="v5-source-select">
+                    <UiIcon name="library" />
+                    <span>
+                      จาก <b>{selectedInFilter.length} คลิป</b>
+                    </span>
+                    <button
+                      onClick={() => setSourcesExpanded((value) => !value)}
+                      aria-expanded={sourcesExpanded}
+                      aria-controls="chat-sources"
+                    >
+                      {sourcesExpanded ? 'ย่อคลิป' : 'เปลี่ยน'}
+                      <UiIcon name="arrow" size={16} />
                     </button>
                   </div>
-                  {importError && (
-                    <p className="error" role="alert">
-                      {importError}
-                    </p>
-                  )}
-                </form>
+                  <div className="v5-tool-grid">
+                    {learningTools.map(([id, label, icon]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        className={'v5-tool v5-tool-' + id + (taskType === id ? ' active' : '')}
+                        aria-pressed={taskType === id}
+                        aria-label={
+                          id === 'flashcards'
+                            ? 'ทบทวนด้วยแฟลชการ์ด'
+                            : id === 'study_plan'
+                              ? 'วางแผนเรียน'
+                              : taskNames[id]
+                        }
+                        disabled={taskLocked}
+                        onClick={() => setTaskType(id)}
+                      >
+                        <UiIcon name={icon} />
+                        <span>{label}</span>
+                        <UiIcon name="arrow" size={18} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="v5-learning-art">
+                  <span aria-hidden="true" />
+                  <BuddyArt pose="learning" />
+                </div>
+              </section>
+            )}
+            {tab === 'learn' && learningFocus && (
+              <>
+                <h1 className="visually-hidden">{taskNames[taskType]}</h1>
+                <nav className="v5-result-nav" aria-label="ผลลัพธ์การเรียนรู้">
+                  <button onClick={() => setLearningFocus(false)}>กลับไปเรียนรู้</button>
+                  {learningTools.map(([id, label]) => (
+                    <button
+                      key={id}
+                      className={taskType === id ? 'active' : ''}
+                      aria-current={taskType === id ? 'page' : undefined}
+                      disabled={taskLocked}
+                      onClick={() => {
+                        setTaskType(id);
+                        setLearningFocus(turns.some((turn) => turn.type === id));
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  <button onClick={() => setLearningFocus(false)}>สร้างใหม่</button>
+                </nav>
+              </>
+            )}
+            {tab === 'chat' && (
+              <section className="v5-chat-intro">
+                <h1>
+                  คุยกัน<span className="v5-dot">.</span>
+                </h1>
+                <div className="v5-chat-art">
+                  <span aria-hidden="true" />
+                  <BuddyArt pose="chat" />
+                </div>
               </section>
             )}
             {tab === 'library' && imports.length > 0 && (
@@ -1197,16 +1246,18 @@ export default function App({
               aria-labelledby="library-title"
               style={{
                 display:
-                  tab === 'history' || (tab === 'chat' && !sourcesExpanded) ? 'none' : undefined,
+                  tab === 'history' || ((tab === 'chat' || tab === 'learn') && !sourcesExpanded)
+                    ? 'none'
+                    : undefined,
               }}
             >
               <div className="section-heading">
                 <div>
                   <h2 id="library-title">
                     {tab === 'home'
-                      ? 'วิดีโอของฉัน'
+                      ? 'เรียนต่อ'
                       : tab === 'library'
-                        ? 'วิดีโอทั้งหมด'
+                        ? 'ทั้งหมด'
                         : 'แหล่งข้อมูลสำหรับงานนี้'}{' '}
                     <span className="count">{total}</span>
                   </h2>
@@ -1219,38 +1270,41 @@ export default function App({
                   {loading ? 'กำลังโหลด…' : '↻ รีเฟรชคลัง'}
                 </button>
               </div>
-              <div className={`filters${hasFilters ? ' has-active-filters' : ''}`}>
-                <label>
-                  ช่อง
-                  <select value={channel} onChange={(e) => setChannel(e.target.value)}>
-                    <option value="">ทุกช่อง</option>
-                    {channels.map(([id, title]) => (
-                      <option value={id} key={id}>
-                        {title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  ตั้งแต่วันที่
-                  <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-                </label>
-                <label>
-                  ถึงวันที่
-                  <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-                </label>
-                <button
-                  className="text-button"
-                  onClick={() => {
-                    setChannel('');
-                    setFrom('');
-                    setTo('');
-                  }}
-                >
-                  ล้างตัวกรอง
-                </button>
-                <span className="selection-caption">เลือกเฉพาะคลิปที่พร้อมใช้งาน</span>
-              </div>
+              <details className="v5-filter-disclosure" open={hasFilters || undefined}>
+                <summary>ตัวกรอง</summary>
+                <div className={`filters${hasFilters ? ' has-active-filters' : ''}`}>
+                  <label>
+                    ช่อง
+                    <select value={channel} onChange={(e) => setChannel(e.target.value)}>
+                      <option value="">ทุกช่อง</option>
+                      {channels.map(([id, title]) => (
+                        <option value={id} key={id}>
+                          {title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    ตั้งแต่วันที่
+                    <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+                  </label>
+                  <label>
+                    ถึงวันที่
+                    <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+                  </label>
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      setChannel('');
+                      setFrom('');
+                      setTo('');
+                    }}
+                  >
+                    ล้างตัวกรอง
+                  </button>
+                  <span className="selection-caption">เลือกเฉพาะคลิปที่พร้อมใช้งาน</span>
+                </div>
+              </details>
               {from && to && from > to && (
                 <p className="error" role="alert">
                   วันเริ่มต้นต้องไม่อยู่หลังวันสิ้นสุด
@@ -1266,7 +1320,7 @@ export default function App({
               )}
               {!loading && !libraryError && !filtered.length && (
                 <div className="empty-state">
-                  <Icon name="library" />
+                  <BuddyArt pose="empty-library" />
                   <h3>
                     {videos.length ? 'ไม่พบคลิปที่ตรงตัวกรอง' : 'เริ่มคลังความรู้คลิปแรกของคุณ'}
                   </h3>
@@ -1359,11 +1413,18 @@ export default function App({
                 <div className="selection-bar">
                   <div>
                     <strong>เลือกไว้ {selected.length} คลิป</strong>
-                    <span>พร้อมเป็นแหล่งข้อมูลของคุณ</span>
                   </div>
-                  <button className="primary" onClick={() => navigateTab('chat')}>
-                    ถามจากวิดีโอที่เลือก
+                  <button
+                    className="primary"
+                    aria-label="ถาม Buddy จากวิดีโอที่เลือก"
+                    onClick={() => navigateTab('chat')}
+                  >
+                    ถาม Buddy
                     <Icon name="arrow" />
+                  </button>
+                  <button className="primary" onClick={() => navigateTab('learn')}>
+                    เรียนรู้
+                    <UiIcon name="arrow" />
                   </button>
                 </div>
               )}
@@ -1372,10 +1433,7 @@ export default function App({
               <section className="chat-panel" aria-labelledby="task-title">
                 <div className="section-heading">
                   <div>
-                    <span className="eyebrow">GROUNDED IN YOUR VIDEOS</span>
-                    <h2 id="task-title">
-                      {tab === 'chat' ? 'สนทนากับ Video Buddy' : 'ตั้งค่างานที่ต้องการ'}
-                    </h2>
+                    <h2 id="task-title">{tab === 'chat' ? 'บทสนทนา' : taskNames[taskType]}</h2>
                   </div>
                   {tab === 'chat' && (
                     <button
@@ -1417,56 +1475,63 @@ export default function App({
                 )}
                 <form
                   onSubmit={submitTask}
-                  hidden={(tab === 'chat' && viewingHistory) || archiveLoading}
+                  hidden={
+                    (tab === 'chat' && viewingHistory) ||
+                    (tab === 'learn' && learningFocus) ||
+                    archiveLoading
+                  }
                 >
                   {tab === 'learn' && (
-                    <div className="learning-controls">
-                      <label>
-                        ประเภทงาน
-                        <select
-                          value={taskType}
-                          disabled={taskLocked}
-                          onChange={(e) => setTaskType(e.target.value as TaskType)}
-                        >
-                          {Object.entries(taskNames)
-                            .filter(([key]) => key !== 'chat')
-                            .map(([key, name]) => (
-                              <option key={key} value={key}>
-                                {name}
-                              </option>
-                            ))}
-                        </select>
-                      </label>
-                      {['research', 'quiz', 'flashcards', 'study_plan'].includes(taskType) && (
-                        <>
-                          <label>
-                            ระดับ
-                            <select
-                              value={level}
-                              disabled={taskLocked}
-                              onChange={(e) => setLevel(e.target.value)}
-                            >
-                              <option value="beginner">เริ่มต้น</option>
-                              <option value="intermediate">ปานกลาง</option>
-                              <option value="advanced">ขั้นสูง</option>
-                            </select>
-                          </label>
-                          {['research', 'study_plan'].includes(taskType) && (
+                    <details className="v5-learning-settings">
+                      <summary>ปรับรายละเอียด</summary>
+                      <div className="learning-controls">
+                        <label>
+                          ประเภทงาน
+                          <select
+                            value={taskType}
+                            disabled={taskLocked}
+                            onChange={(e) => setTaskType(e.target.value as TaskType)}
+                          >
+                            {Object.entries(taskNames)
+                              .filter(([key]) => key !== 'chat')
+                              .map(([key, name]) => (
+                                <option key={key} value={key}>
+                                  {name}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+                        {['research', 'quiz', 'flashcards', 'study_plan'].includes(taskType) && (
+                          <>
                             <label>
-                              จำนวนวัน
-                              <input
-                                type="number"
-                                min="1"
-                                max="90"
-                                value={days}
+                              ระดับ
+                              <select
+                                value={level}
                                 disabled={taskLocked}
-                                onChange={(e) => setDays(Number(e.target.value))}
-                              />
+                                onChange={(e) => setLevel(e.target.value)}
+                              >
+                                <option value="beginner">เริ่มต้น</option>
+                                <option value="intermediate">ปานกลาง</option>
+                                <option value="advanced">ขั้นสูง</option>
+                              </select>
                             </label>
-                          )}
-                        </>
-                      )}
-                    </div>
+                            {['research', 'study_plan'].includes(taskType) && (
+                              <label>
+                                จำนวนวัน
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="90"
+                                  value={days}
+                                  disabled={taskLocked}
+                                  onChange={(e) => setDays(Number(e.target.value))}
+                                />
+                              </label>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </details>
                   )}
                   <label htmlFor="question">
                     {tab === 'chat'
@@ -1514,6 +1579,7 @@ export default function App({
                 <div className="answer-zone" ref={responseAnchor}>
                   {operation && (
                     <div className="pending-panel" role="status">
+                      <BuddyArt pose="states" />
                       <strong>{busy ? 'Buddy กำลังหาคำตอบ…' : 'คำขอนี้ยังรอการตรวจสอบผล'}</strong>
                       <span>{operation.label}</span>
                       {pendingJob && (
@@ -1595,7 +1661,9 @@ export default function App({
                     }}
                   >
                     {turns
-                      .filter((turn) => tab !== 'chat' || turn.type === 'chat')
+                      .filter((turn) =>
+                        tab === 'chat' ? turn.type === 'chat' : turn.type === taskType,
+                      )
                       .map((turn, index, visible) => (
                         <article
                           className="turn"
@@ -1611,7 +1679,11 @@ export default function App({
                               {turn.unanswered} · ยังไม่มีคำตอบที่บันทึกไว้
                             </p>
                           ) : (
-                            <ResultView result={turn.result} partial={turn.partial} />
+                            <ResultView
+                              result={turn.result}
+                              partial={turn.partial}
+                              kind={turn.type}
+                            />
                           )}
                         </article>
                       ))}
@@ -1675,52 +1747,21 @@ export default function App({
                   )}
                 </div>
               ))}
-            {tab === 'home' && (
-              <section className="home-actions" aria-label="ทางลัดเรียนรู้">
-                <div>
-                  <h2>ลองทำสิ่งนี้ดู</h2>
-                  <p>ต่อยอดจากคลิปที่คุณเลือก</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setTaskType('summary');
-                    navigateTab('learn');
-                  }}
-                >
-                  <UiIcon name="library" />{' '}
-                  <span>
-                    สรุปประเด็นสำคัญ<small>สรุปเนื้อหาจากคลิปที่เลือก</small>
-                  </span>
-                  <UiIcon name="arrow" size={18} />
-                </button>
-                <button onClick={() => navigateTab('chat')}>
-                  <UiIcon name="chat" />
-                  <span>
-                    แชตกับ Buddy<small>สงสัยตรงไหน ถามได้เลย</small>
-                  </span>
-                  <UiIcon name="arrow" size={18} />
-                </button>
-                <button
-                  onClick={() => {
-                    setTaskType('quiz');
-                    navigateTab('learn');
-                  }}
-                >
-                  <UiIcon name="quiz" />
-                  <span>
-                    สร้างแบบทดสอบ<small>เปลี่ยนสิ่งที่ดูเป็นคำถามให้ลองทำ</small>
-                  </span>
-                  <UiIcon name="arrow" size={18} />
-                </button>
-              </section>
-            )}
-            <footer className="page-footer">
-              <span>Video Buddy</span>
-              <p>คำตอบที่ดี เริ่มต้นจากหลักฐานที่ตรวจสอบได้</p>
-              <span>เพื่อนคู่คิดจากวิดีโอ</span>
-            </footer>
           </div>
         </main>
+        <nav className="v5-mobile-nav" aria-label="เมนูมือถือ">
+          {workspaceMenu.map(([id, label, icon]) => (
+            <button
+              key={id}
+              className={tab === id || (id === 'history' && tab === 'chat') ? 'active' : ''}
+              aria-current={tab === id || (id === 'history' && tab === 'chat') ? 'page' : undefined}
+              onClick={() => navigateTab(id)}
+            >
+              <UiIcon name={icon} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
         {member && (
           <FloatingBuddy
             open={buddyOpen}

@@ -182,6 +182,7 @@ test('question submission reveals pending answer and completed answer without ma
   );
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto(`${base}/chat`);
+  await page.getByRole('button', { name: 'เลือกหรือเปลี่ยนวิดีโอ', exact: true }).click();
   await page.getByRole('checkbox', { name: 'เลือก บทเรียนส่วนตัว', exact: true }).check();
   await page.getByLabel('คำถามของคุณ', { exact: true }).fill('ช่วยอธิบายบทเรียน');
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
@@ -197,7 +198,8 @@ test('Video Buddy branding is consistent across public and member routes', async
   await fixture(page);
   for (const path of ['/', '/history', '/help', '/terms', '/privacy']) {
     await page.goto(`${base}${path}`);
-    await expect(page.locator('.buddy-logo')).toContainText('Video Buddy');
+    for (const logo of await page.locator('.buddy-logo').all())
+      await expect(logo).toContainText('Video Buddy');
     await expect(page.locator('body')).not.toContainText('RAG Buddy');
   }
 });
@@ -229,6 +231,7 @@ test('reading an older full-page answer is not interrupted when a new answer arr
     }),
   );
   await page.goto(`${base}/chat`);
+  await page.getByRole('button', { name: 'เลือกหรือเปลี่ยนวิดีโอ', exact: true }).click();
   await page.getByRole('checkbox').check();
   await page.getByLabel('คำถามของคุณ', { exact: true }).fill('คำถามแรก');
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();

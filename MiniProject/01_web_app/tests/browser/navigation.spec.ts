@@ -33,7 +33,7 @@ async function openMemberHome(page: Page) {
     }),
   );
   await page.goto('http://127.0.0.1:3003/');
-  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /รู้ให้/ })).toBeVisible();
   await expect(page.locator('.demo-banner')).toHaveCount(0);
   await page.evaluate(() => document.fonts.ready);
 }
@@ -51,11 +51,11 @@ for (const [width, height] of [
   test(`home artwork cannot cover navigation at ${width}x${height}`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await openMemberHome(page);
-    const nav = page.getByRole('navigation', { name: 'เมนูพื้นที่เรียนรู้' });
+    const nav = page.getByRole('navigation', { name: width <= 900 ? 'เมนูมือถือ' : 'เมนูหลัก' });
     for (const [label, url, title] of [
-      ['วิดีโอของฉัน', '/library', 'เพิ่มและจัดการวิดีโอ'],
-      ['แชตกับ Buddy', '/chat', 'ถามคำถามจากวิดีโอ'],
-      ['สรุปและแบบฝึกหัด', '/learning', 'เลือกเครื่องมือช่วยเรียนรู้'],
+      ['วิดีโอของฉัน', '/library', 'คลังคลิป.'],
+      ['ประวัติแชท', '/history', 'คุยต่อ.'],
+      ['สรุปและแบบฝึกหัด', '/learning', 'เรียนรู้.'],
     ]) {
       const button = nav.getByRole('button', { name: label, exact: true });
       const hit = await button.evaluate((el) => {
@@ -70,8 +70,9 @@ for (const [width, height] of [
       await expect(page).toHaveURL(new RegExp(url + '$'));
       await expect(page.getByRole('heading', { level: 1 })).toContainText(title);
       await nav.getByRole('button', { name: 'หน้าแรก', exact: true }).click();
-      await expect(page.getByRole('heading', { level: 1 })).toContainText('ดูน้อยลง');
+      await expect(page.getByRole('heading', { level: 1 })).toContainText('รู้ให้');
     }
+    if (width <= 900) await page.getByLabel('บัญชีผู้ใช้', { exact: true }).click();
     const logoutHit = await page
       .getByRole('button', { name: 'ออกจากระบบ', exact: true })
       .evaluate((el) => {
@@ -90,14 +91,18 @@ test('keyboard navigation and browser history preserve the chat draft and form a
 }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await openMemberHome(page);
-  await page.getByLabel('วางลิงก์ YouTube', { exact: true }).fill('https://youtu.be/dQw4w9WgXcQ');
-  await expect(page.getByRole('button', { name: 'เพิ่มวิดีโอ', exact: true })).toBeEnabled();
-  const nav = page.getByRole('navigation', { name: 'เมนูพื้นที่เรียนรู้' });
-  const chat = nav.getByRole('button', { name: 'แชตกับ Buddy', exact: true });
+  await page.getByLabel('ลิงก์ YouTube', { exact: true }).fill('https://youtu.be/dQw4w9WgXcQ');
+  await expect(
+    page.getByRole('button', { name: 'เพิ่มคลิป (เพิ่มวิดีโอ)', exact: true }),
+  ).toBeEnabled();
+  const nav = page.getByRole('navigation', { name: 'เมนูหลัก' });
+  const chat = page.getByRole('button', { name: 'เปิดแชทกับ Buddy', exact: true });
   await chat.focus();
   await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: /ไปหน้าแชตเต็ม/ }).click();
   await page.getByLabel('คำถามของคุณ', { exact: true }).fill('คำถามที่ยังไม่ได้ส่ง');
   await nav.getByRole('button', { name: 'สรุปและแบบฝึกหัด', exact: true }).click();
+  await page.locator('.v5-learning-settings > summary').click();
   await page.getByLabel('ประเภทงาน').selectOption('quiz');
   await nav.getByRole('button', { name: 'หน้าแรก', exact: true }).click();
   await page.goBack();

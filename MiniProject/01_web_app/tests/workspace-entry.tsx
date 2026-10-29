@@ -10,4 +10,8 @@ import '../src/styles.css';
 import '../src/theme.css';
 import '../src/mint.css';
 import '../src/polish.css';
+import '../src/v5.css';
+import '../src/results-v5.css';
+import '../src/secondary-v5.css';
+import '../src/auth-v5.css';
 createRoot(document.getElementById('root')!).render(<App />);

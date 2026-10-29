@@ -25,11 +25,11 @@ async function signIn(page: Page, sub: string) {
   await google(page, sub);
   await page.goto(web);
   await page.getByRole('button', { name: 'Google fixture sign-in' }).click();
-  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /รู้ให้/ })).toBeVisible();
 }
 async function importOne(page: Page) {
-  await page.getByLabel('วางลิงก์ YouTube', { exact: true }).fill('https://youtu.be/dQw4w9WgXcQ');
-  await page.getByRole('button', { name: 'เพิ่มวิดีโอ', exact: true }).click();
+  await page.getByLabel('ลิงก์ YouTube', { exact: true }).fill('https://youtu.be/dQw4w9WgXcQ');
+  await page.getByRole('button', { name: 'เพิ่มคลิป (เพิ่มวิดีโอ)', exact: true }).click();
   await expect.poll(async () => page.locator('input[type="checkbox"]:enabled').count()).toBe(1);
 }
 
@@ -45,11 +45,11 @@ test('private history survives reload and continues through real HTTP without re
       sent.push(request.postDataJSON());
   });
   await page.getByRole('checkbox').check();
-  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก', exact: true }).click();
+  await page.getByRole('button', { name: 'ถาม Buddy จากวิดีโอที่เลือก', exact: true }).click();
   await page.getByLabel('คำถามของคุณ', { exact: true }).fill('Explain RAG history');
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
   await expect(page.locator('.turn')).toHaveCount(1);
-  await page.getByRole('button', { name: 'ประวัติแชต', exact: true }).click();
+  await page.getByRole('button', { name: 'ประวัติแชท', exact: true }).click();
   await page.getByRole('button', { name: 'เปิดบทสนทนา Explain RAG history', exact: true }).click();
   await expect(page.getByRole('button', { name: 'ถามต่อในบทสนทนานี้', exact: true })).toBeVisible();
   const id = new URL(page.url()).pathname.split('/').at(-1);
@@ -64,9 +64,9 @@ test('private history survives reload and continues through real HTTP without re
   expect(sent[1].conversation_id).toBe(id);
   await page.getByRole('button', { name: 'ออกจากระบบ', exact: true }).click();
   await signIn(page, 'fixture-history-other');
-  await page.getByRole('button', { name: 'ประวัติแชต', exact: true }).click();
+  await page.getByRole('button', { name: 'ประวัติแชท', exact: true }).click();
   await expect(page.locator('.history-list article')).toHaveCount(0);
-  await expect(page.getByText('เริ่มบทสนทนาแรกกับ Video Buddy', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'เริ่มคุยกัน', exact: true })).toBeVisible();
 });
 
 test('real session cookie, nullable profile, challenge nonce and returning identity', async ({
@@ -83,7 +83,9 @@ test('real session cookie, nullable profile, challenge nonce and returning ident
       void response.json().then((value) => challenges.push(value.nonce));
   });
   await signIn(page, 'fixture-null');
-  await expect(page.getByText('สมาชิก Video Buddy', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('.v5-account').getByText('สมาชิก Video Buddy', { exact: true }),
+  ).toBeVisible();
   const me = await (await page.request.get(`${api}/api/auth/me`)).json();
   expect(me.user.role).toBe('user');
   expect(me.user.name).toBeNull();
@@ -99,12 +101,12 @@ test('real session cookie, nullable profile, challenge nonce and returning ident
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
   await page.getByRole('button', { name: 'ออกจากระบบ', exact: true }).click();
   await page.getByRole('button', { name: 'Google fixture sign-in' }).click();
-  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /รู้ให้/ })).toBeVisible();
   expect((await (await page.request.get(`${api}/api/auth/me`)).json()).user.user_id).toBe(
     me.user.user_id,
   );
   await page.reload();
-  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /รู้ให้/ })).toBeVisible();
 });
 
 test('floating Buddy uses the actual checkout API, shared conversation, history and logout boundary', async ({
@@ -124,7 +126,7 @@ test('floating Buddy uses the actual checkout API, shared conversation, history 
   });
   await page.locator('.buddy-launcher').click();
   const buddy = page.getByRole('dialog', { name: 'Buddy AI แชตจากคลิป' });
-  await buddy.locator('summary').click();
+  await buddy.locator('.buddy-scope > summary').click();
   await buddy.getByRole('checkbox').check();
   await buddy.getByLabel('ข้อความถึง Buddy', { exact: true }).fill('Explain RAG from my clip');
   await buddy.getByLabel('ข้อความถึง Buddy', { exact: true }).press('Enter');
@@ -149,11 +151,11 @@ test('floating Buddy uses the actual checkout API, shared conversation, history 
   await expect(buddy.locator('.buddy-message')).toHaveCount(2);
   await buddy.getByRole('button', { name: 'ย่อหน้าต่างแชต' }).click();
   await page.getByRole('button', { name: 'หน้าแรก', exact: true }).click();
-  await page.getByLabel('วางลิงก์ YouTube', { exact: true }).fill('https://youtu.be/wD3NSzYtsMc');
-  await page.getByRole('button', { name: 'เพิ่มวิดีโอ', exact: true }).click();
+  await page.getByLabel('ลิงก์ YouTube', { exact: true }).fill('https://youtu.be/wD3NSzYtsMc');
+  await page.getByRole('button', { name: 'เพิ่มคลิป (เพิ่มวิดีโอ)', exact: true }).click();
   await expect.poll(async () => page.locator('input[type="checkbox"]:enabled').count()).toBe(2);
   await page.locator('.buddy-launcher').click();
-  await buddy.locator('summary').click();
+  await buddy.locator('.buddy-scope > summary').click();
   await buddy.getByRole('checkbox').nth(1).check();
   await buddy
     .getByLabel('ข้อความถึง Buddy', { exact: true })
@@ -201,7 +203,7 @@ test('a rejected nonce consumes its challenge and the UI obtains a fresh one bef
     (window as Window & { fixtureBadNonce?: boolean }).fixtureBadNonce = false;
   });
   await page.getByRole('button', { name: 'Google fixture sign-in' }).click();
-  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /รู้ให้/ })).toBeVisible();
 });
 
 test('HTTP source lifecycle, artifacts and account switching preserve privacy', async ({
@@ -216,7 +218,7 @@ test('HTTP source lifecycle, artifacts and account switching preserve privacy', 
   const libraryA = await (await page.request.get(`${api}/api/videos`)).json();
   const importData = await (await imported).json();
   await page.getByRole('checkbox').check();
-  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถาม Buddy จากวิดีโอที่เลือก' }).click();
   await page.getByLabel('คำถามของคุณ').fill('Explain RAG');
   const chatted = page.waitForResponse((response) => response.url().endsWith('/api/chat'));
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
@@ -230,22 +232,25 @@ test('HTTP source lifecycle, artifacts and account switching preserve privacy', 
     ? (await (await page.request.get(`${api}/api/jobs/${chatData.job_id}`)).json()).result
     : chatData;
   await page.getByRole('button', { name: 'สรุปและแบบฝึกหัด', exact: true }).click();
+  await learningSettings(page);
   await page.getByLabel('ประเภทงาน').selectOption('quiz');
   const saved = page.waitForResponse(
     (response) =>
       response.request().method() === 'GET' && response.url().includes('/api/learning-artifacts/'),
   );
   await page.getByRole('button', { name: 'เริ่มงาน', exact: true }).click();
-  await expect(page.locator('.turn')).toHaveCount(2);
+  await expect(page.locator('.turn')).toHaveCount(1);
   await expect(page.locator('.turn').last().locator('.artifact')).toHaveCount(1);
   const artifactUrl = (await saved).url();
+  await page.getByRole('button', { name: 'กลับไปเรียนรู้', exact: true }).click();
+  await page.locator('.v5-source-select button').click();
   await page.locator('.video-card').getByRole('button', { name: /^ลบ / }).click();
   await page.getByRole('button', { name: 'ยืนยันลบคลิป', exact: true }).click();
   await expect(page.locator('.turn').locator('a[href*="v=dQw4w9WgXcQ&"]')).toHaveCount(0);
   await expect(page.getByText(/^(การลบคลิป|นำออกจากคลัง): เสร็จแล้ว$/)).toBeVisible();
   await page.getByRole('button', { name: 'วิดีโอของฉัน', exact: true }).click();
   await page.getByLabel('ลิงก์วิดีโอ YouTube').fill('https://youtu.be/dQw4w9WgXcQ');
-  await page.getByRole('button', { name: 'เพิ่มวิดีโอ', exact: true }).click();
+  await page.getByRole('button', { name: 'เพิ่มคลิป (เพิ่มวิดีโอ)', exact: true }).click();
   await expect.poll(async () => page.locator('input[type="checkbox"]:enabled').count()).toBe(1);
   expect(libraryA.total).toBe(1);
   await page.getByRole('button', { name: 'ออกจากระบบ', exact: true }).click();
@@ -253,7 +258,7 @@ test('HTTP source lifecycle, artifacts and account switching preserve privacy', 
     (window as Window & { fixtureSub?: string }).fixtureSub = 'fixture-source-b';
   });
   await page.getByRole('button', { name: 'Google fixture sign-in' }).click();
-  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /รู้ให้/ })).toBeVisible();
   expect((await (await page.request.get(`${api}/api/videos`)).json()).total).toBe(0);
   expect(chatResult.conversation_id).toBeTruthy();
   for (const privatePath of [
@@ -297,9 +302,9 @@ test('an idle challenge refreshes and callbacks from its old Google button are i
       credential: 'old-callback',
     }),
   );
-  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: /รู้ให้/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Google fixture sign-in' }).click();
-  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /รู้ให้/ })).toBeVisible();
 });
 
 test('admin stats/users, role changes, CSRF, revocation and last-admin protection use real routes', async ({
@@ -318,7 +323,10 @@ test('admin stats/users, role changes, CSRF, revocation and last-admin protectio
     const stats = await (await page.request.get(`${api}/api/admin/stats`)).json();
     expect(stats.users).toBeGreaterThan(1);
     await expect(
-      page.locator('.admin-stats article').first().getByText(String(stats.users), { exact: true }),
+      page
+        .locator('.admin-stats article')
+        .filter({ hasText: 'สมาชิก' })
+        .getByText(String(stats.users), { exact: true }),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'ประวัติการจัดการ', exact: true })).toHaveCount(
       0,
@@ -328,14 +336,14 @@ test('admin stats/users, role changes, CSRF, revocation and last-admin protectio
     const row = page.getByRole('row').filter({ hasText: 'fixture-role-target' });
     await expect(row).toHaveCount(1);
     await row.getByRole('button', { name: 'ตั้งเป็นผู้ดูแล' }).click();
-    await expect(row.getByText('ผู้ดูแล', { exact: true })).toBeVisible();
+    await expect(row.getByRole('cell', { name: 'ผู้ดูแล', exact: true })).toBeVisible();
     expect((await target.request.get(`${api}/api/auth/me`)).status()).toBe(401);
     await target.goto(web);
     await expect(target.getByRole('button', { name: 'Google fixture sign-in' })).toBeVisible();
     await target.getByRole('button', { name: 'Google fixture sign-in' }).click();
     await expect(target.getByRole('button', { name: 'จัดการระบบ', exact: true })).toBeVisible();
     await row.getByRole('button', { name: 'เปลี่ยนเป็นสมาชิก' }).click();
-    await expect(row.getByText('สมาชิก', { exact: true })).toBeVisible();
+    await expect(row.getByRole('cell', { name: 'สมาชิก', exact: true })).toBeVisible();
     await target.getByRole('button', { name: 'จัดการระบบ', exact: true }).click();
     await expect(
       target.getByText('เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง', { exact: true }),
@@ -381,7 +389,7 @@ test('removing a shared source preserves the other member and never revives old 
     await importOne(other);
     const before = (await (await page.request.get(`${api}/api/videos`)).json()).items[0];
     await page.getByRole('checkbox').check();
-    await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
+    await page.getByRole('button', { name: 'ถาม Buddy จากวิดีโอที่เลือก' }).click();
     await page.getByLabel('คำถามของคุณ').fill('Explain shared RAG');
     await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
     await expect(page.locator('.turn')).toHaveCount(1);
@@ -396,11 +404,12 @@ test('removing a shared source preserves the other member and never revives old 
     );
     await page.getByRole('button', { name: 'วิดีโอของฉัน', exact: true }).click();
     await page.getByLabel('ลิงก์วิดีโอ YouTube').fill('https://youtu.be/dQw4w9WgXcQ');
-    await page.getByRole('button', { name: 'เพิ่มวิดีโอ', exact: true }).click();
+    await page.getByRole('button', { name: 'เพิ่มคลิป (เพิ่มวิดีโอ)', exact: true }).click();
     await expect.poll(async () => page.locator('input[type="checkbox"]:enabled').count()).toBe(1);
     const after = (await (await page.request.get(`${api}/api/videos`)).json()).items[0];
     expect(after.generation).toBe(before.generation); // Shared physical source was not deleted.
-    await page.getByRole('button', { name: 'แชตกับ Buddy', exact: true }).click();
+    await page.getByRole('button', { name: 'เปิดแชทกับ Buddy', exact: true }).click();
+    await page.getByRole('button', { name: /ไปหน้าแชตเต็ม/ }).click();
     await expect(page.locator('.turn')).toHaveCount(1);
     await expect(page.locator('.turn').locator('a[href*="v=dQw4w9WgXcQ&"]')).toHaveCount(0);
     await page.getByRole('checkbox').check();
@@ -419,3 +428,10 @@ test('removing a shared source preserves the other member and never revives old 
     await otherContext.close();
   }
 });
+
+async function learningSettings(page: Page) {
+  const create = page.getByRole('button', { name: 'สร้างใหม่', exact: true });
+  if (await create.isVisible()) await create.click();
+  const settings = page.locator('.v5-learning-settings');
+  if ((await settings.getAttribute('open')) === null) await settings.locator('summary').click();
+}

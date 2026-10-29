@@ -11,7 +11,7 @@ test('reference art loads, launcher starts bottom right and screenshots preserve
   await expect
     .poll(() =>
       page
-        .locator('.home-mascot .buddy-scene-image')
+        .locator('.v5-home-art .buddy-art')
         .evaluate((img) => (img as HTMLImageElement).naturalWidth),
     )
     .toBeGreaterThan(0);
