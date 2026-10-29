@@ -27,6 +27,8 @@ import { UiIcon } from './Visuals';
 import { importMessage, serviceMessage, userMessages } from './userMessages';
 import ChatHistory from './ChatHistory';
 import { BuddyArt } from './BuddyArt';
+import JobRecovery from './JobRecovery';
+import MediaEvidence from './MediaEvidence';
 
 type WorkspaceView = 'home' | 'library' | 'chat' | 'learn' | 'history';
 interface WorkspaceProps {
@@ -224,6 +226,7 @@ export default function App({
   const [archiveError, setArchiveError] = useState('');
   const [archiveAttempt, setArchiveAttempt] = useState(0);
   const loadedArchive = useRef<string | null>(null);
+  const archiveSequence = useRef(0);
   const responseAnchor = useRef<HTMLDivElement>(null);
   const latestAnswer = useRef<HTMLElement>(null);
   const followResults = useRef(true);
@@ -655,6 +658,8 @@ export default function App({
     setCanRetry(false);
     setNewResults(false);
     setViewingHistory(false);
+    archiveSequence.current++;
+    setArchiveLoading(false);
     setArchiveError('');
     loadedArchive.current = null;
     onNavigate?.('/chat');
@@ -717,8 +722,12 @@ export default function App({
     }
   }
   useEffect(() => {
+    const sequence = ++archiveSequence.current;
     if (!initialConversationId) {
       loadedArchive.current = null;
+      setArchiveLoading(false);
+      setViewingHistory(false);
+      setArchiveError('');
       return;
     }
     if (loadedArchive.current === initialConversationId) return;
@@ -747,7 +756,8 @@ export default function App({
         if (offset >= data.total) break;
         if (!data.messages.length) throw new Error('โหลดประวัติไม่ครบ กรุณาลองเปิดอีกครั้ง');
       }
-      if (controller.signal.aborted || !alive.current) return;
+      if (controller.signal.aborted || !alive.current || sequence !== archiveSequence.current)
+        return;
       const restored: Turn[] = messages
         .filter((m) => m.role === 'user')
         .map((message) => {
@@ -796,7 +806,7 @@ export default function App({
       loadedArchive.current = initialConversationId;
     })()
       .catch((error) => {
-        if (!controller.signal.aborted && alive.current)
+        if (!controller.signal.aborted && alive.current && sequence === archiveSequence.current)
           setArchiveError(
             error instanceof ApiError && error.status === 404
               ? 'ไม่พบบทสนทนานี้ หรือบัญชีของคุณไม่มีสิทธิ์เปิด'
@@ -805,7 +815,8 @@ export default function App({
       })
       .finally(() => {
         requests.current.delete(controller);
-        if (!controller.signal.aborted && alive.current) setArchiveLoading(false);
+        if (!controller.signal.aborted && alive.current && sequence === archiveSequence.current)
+          setArchiveLoading(false);
       });
     return () => {
       controller.abort();
@@ -1032,6 +1043,53 @@ export default function App({
             </div>
           )}
           <div className="page-body">
+            {member && !demo && (
+              <JobRecovery
+                api={api}
+                hasPending={
+                  !!operation ||
+                  deferred.length > 0 ||
+                  Object.values(jobs).some((job) => !terminal(job.state))
+                }
+                locked={taskLocked || archiveLoading}
+                restore={(job) => {
+                  if (job.kind === 'import' || job.kind === 'enrich') {
+                    void watchImport(job.job_id);
+                    return;
+                  }
+                  const type: TaskType =
+                    job.kind === 'chat'
+                      ? 'chat'
+                      : job.kind === 'research'
+                        ? 'research'
+                        : job.request.type || 'summary';
+                  setTaskType(type === 'chat' ? 'summary' : type);
+                  navigateTab(type === 'chat' ? 'chat' : 'learn');
+                  void execute(
+                    {
+                      key: `recovered-${job.job_id}`,
+                      jobId: job.job_id,
+                      type,
+                      path: '',
+                      payload: job.request,
+                      label:
+                        job.request.question ||
+                        job.request.goal ||
+                        job.request.topic ||
+                        job.request.instruction ||
+                        taskNames[type],
+                      sources: job.sources.map((source) => ({
+                        video_id: source.video_id,
+                        generation: source.generation,
+                        indexed_version: source.transcript_version,
+                        accessRevision: 0,
+                      })),
+                    },
+                    true,
+                  );
+                }}
+              />
+            )}
             {tab === 'home' && (
               <HomeHero
                 name={member?.name || 'ผู้เรียน'}
@@ -1365,6 +1423,7 @@ export default function App({
                     </div>
                     <div className="video-info">
                       <SourceBadges video={video} />
+                      {member && !demo && <MediaEvidence api={api} video={video} />}
                       <div className="video-title-row">
                         <label className="video-select">
                           <input
