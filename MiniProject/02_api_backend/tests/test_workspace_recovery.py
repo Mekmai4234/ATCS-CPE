@@ -72,3 +72,13 @@ def test_worker_readiness_expires(identity):
 async def test_idle_worker_publishes_heartbeat(identity):
     assert await identity.worker.run_once() is False
     assert worker_status(identity.settings)["ready"]
+
+
+def test_heartbeat_cannot_cross_sibling_database_files(identity):
+    original = identity.settings
+    sibling = original.model_copy(
+        update={"database_url": original.database_url.replace("app.db", "app.sqlite")}
+    )
+    assert heartbeat_path(original) != heartbeat_path(sibling)
+    beat(original)
+    assert not worker_status(sibling)["ready"]
