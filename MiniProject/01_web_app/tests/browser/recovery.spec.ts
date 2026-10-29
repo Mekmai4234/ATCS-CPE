@@ -75,6 +75,7 @@ async function setup(page: Page) {
     });
   });
   await page.goto(`${base}/chat`);
+  await page.getByRole('button', { name: 'เลือกหรือเปลี่ยนวิดีโอ', exact: true }).click();
   await page.getByRole('checkbox', { name: 'เลือก บทเรียนตัวอย่าง', exact: true }).check();
   return calls;
 }
@@ -94,12 +95,16 @@ test('new conversation clears the previous error in full and floating chat', asy
 test('a hidden invalid study duration cannot block summary or quiz', async ({ page }) => {
   const calls = await setup(page);
   await page.getByRole('button', { name: 'สรุปและแบบฝึกหัด', exact: true }).click();
+  await learningSettings(page);
   await page.getByRole('combobox', { name: 'ประเภทงาน', exact: true }).selectOption('study_plan');
   await page.getByLabel('จำนวนวัน', { exact: true }).fill('0');
+  await learningSettings(page);
   await page.getByRole('combobox', { name: 'ประเภทงาน', exact: true }).selectOption('summary');
   await page.getByRole('button', { name: 'เริ่มงาน', exact: true }).click();
   await expect.poll(() => calls.filter((c) => c.path === '/api/analysis').length).toBe(1);
-  await expect(page.getByRole('button', { name: 'เริ่มงาน', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'สร้างใหม่', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'สร้างใหม่', exact: true }).click();
+  await learningSettings(page);
   await page.getByRole('combobox', { name: 'ประเภทงาน', exact: true }).selectOption('quiz');
   await page.getByRole('button', { name: 'เริ่มงาน', exact: true }).click();
   await expect.poll(() => calls.filter((c) => c.path === '/api/learning-artifacts').length).toBe(1);
@@ -148,6 +153,7 @@ test('active filters remain visible on home and unusable selection is explained 
   page,
 }) => {
   await setup(page);
+  await page.locator('.v5-filter-disclosure > summary').click();
   await page.getByLabel('ตั้งแต่วันที่', { exact: true }).fill('2026-10-02');
   await expect(page.locator('.video-card')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'ส่งคำถาม', exact: true })).toBeDisabled();
@@ -186,7 +192,14 @@ test('import rejection explains the correction instead of rendering internal cod
   );
   await page.getByRole('button', { name: 'วิดีโอของฉัน', exact: true }).click();
   await page.getByLabel('ลิงก์วิดีโอ YouTube', { exact: true }).fill('https://example.test/video');
-  await page.getByRole('button', { name: 'เพิ่มวิดีโอ', exact: true }).click();
+  await page.getByRole('button', { name: 'เพิ่มคลิป (เพิ่มวิดีโอ)', exact: true }).click();
   await expect(page.getByLabel('ผลนำเข้ารายลิงก์')).toContainText('กรุณาใช้ลิงก์วิดีโอ YouTube');
   await expect(page.getByLabel('ผลนำเข้ารายลิงก์')).not.toContainText('invalid_youtube_url');
 });
+
+async function learningSettings(page: Page) {
+  const create = page.getByRole('button', { name: 'สร้างใหม่', exact: true });
+  if (await create.isVisible()) await create.click();
+  const settings = page.locator('.v5-learning-settings');
+  if ((await settings.getAttribute('open')) === null) await settings.locator('summary').click();
+}

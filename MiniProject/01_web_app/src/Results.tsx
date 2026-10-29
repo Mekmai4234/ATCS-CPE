@@ -1,7 +1,10 @@
+import { useId, useState } from 'react';
 import { citationUrl, timestamp } from './domain';
-import type { Artifact, Citation, Coverage, TaskResult } from './types';
+import type { Artifact, Citation, Coverage, TaskResult, TaskType } from './types';
 import { evidenceLabels } from './domain';
 import { FrameEvidence, validFrame, VisualCoverageNotice } from './Evidence';
+import { BuddyArt } from './BuddyArt';
+import './results-v5.css';
 
 export function Citations({
   citations,
@@ -91,59 +94,164 @@ export function CoverageNotice({
     </div>
   );
 }
-export function ArtifactView({ artifact }: { artifact: Artifact }) {
-  const refs = (ids: string[]) => (
+function ArtifactReferences({ artifact, ids }: { artifact: Artifact; ids: string[] }) {
+  return (
     <Citations
       citations={artifact.citations.filter((c) => ids.includes(c.citation_id))}
       available={artifact.sources_available !== false}
     />
   );
+}
+
+function ArtifactPager({
+  index,
+  count,
+  change,
+  noun,
+}: {
+  index: number;
+  count: number;
+  change: (value: number) => void;
+  noun: 'ข้อ' | 'การ์ด';
+}) {
   return (
-    <section className="artifact">
-      <h3>
-        {artifact.type === 'quiz'
-          ? 'แบบทดสอบ'
-          : artifact.type === 'flashcards'
-            ? 'แฟลชการ์ด'
-            : 'แผนเรียน'}
+    <nav className="v5r-pager" aria-label={`เปลี่ยน${noun}`}>
+      <button type="button" disabled={index === 0} onClick={() => change(index - 1)}>
+        <span aria-hidden="true">←</span> {noun}ก่อนหน้า
+      </button>
+      <span aria-live="polite" aria-atomic="true">
+        {noun} {index + 1} / {count}
+      </span>
+      <button type="button" disabled={index >= count - 1} onClick={() => change(index + 1)}>
+        {noun}ถัดไป <span aria-hidden="true">→</span>
+      </button>
+    </nav>
+  );
+}
+
+function QuizContent({ artifact }: { artifact: Artifact }) {
+  const [index, setIndex] = useState(0);
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const answerId = useId();
+  const questions = artifact.content.questions || [];
+  const current = Math.min(index, Math.max(0, questions.length - 1));
+  const question = questions[current];
+  if (!question) return <p className="v5r-empty">ยังไม่มีคำถามในผลลัพธ์นี้</p>;
+  return (
+    <div className="v5r-quiz-content">
+      <article className="learning-item v5r-question-card" key={current}>
+        <span className="v5r-position">
+          ข้อ {current + 1} / {questions.length}
+        </span>
+        <strong className="v5r-question-title">
+          {current + 1}. {question.question}
+        </strong>
+        <label htmlFor={answerId}>คำตอบของคุณ</label>
+        <textarea
+          id={answerId}
+          value={drafts[current] || ''}
+          onChange={(event) =>
+            setDrafts((previous) => ({ ...previous, [current]: event.target.value }))
+          }
+          rows={3}
+          placeholder="ลองตอบด้วยคำของคุณ"
+        />
+        <details className="v5r-explanation">
+          <summary>
+            ดูเฉลยและคำอธิบาย <span aria-hidden="true">+</span>
+          </summary>
+          <p>{question.answer}</p>
+          <p>{question.explanation}</p>
+          <ArtifactReferences artifact={artifact} ids={question.citations} />
+        </details>
+      </article>
+      <ArtifactPager index={current} count={questions.length} change={setIndex} noun="ข้อ" />
+    </div>
+  );
+}
+
+function FlashcardContent({ artifact }: { artifact: Artifact }) {
+  const [index, setIndex] = useState(0);
+  const cards = artifact.content.cards || [];
+  const current = Math.min(index, Math.max(0, cards.length - 1));
+  const card = cards[current];
+  if (!card) return <p className="v5r-empty">ยังไม่มีการ์ดในผลลัพธ์นี้</p>;
+  return (
+    <div className="v5r-flash-content">
+      <div className="v5r-flash-stack">
+        <details className="learning-item v5r-flash-card" key={current}>
+          <summary>
+            <span className="v5r-position">
+              {current + 1} / {cards.length}
+            </span>
+            <strong>{card.front}</strong>
+            <span className="v5r-flip-hint">
+              พลิกดูคำตอบ <span aria-hidden="true">↔</span>
+            </span>
+          </summary>
+          <div className="v5r-flash-back">
+            <p>{card.back}</p>
+            <ArtifactReferences artifact={artifact} ids={card.citations} />
+          </div>
+        </details>
+      </div>
+      <ArtifactPager index={current} count={cards.length} change={setIndex} noun="การ์ด" />
+    </div>
+  );
+}
+
+export function ArtifactView({ artifact }: { artifact: Artifact }) {
+  const isQuiz = artifact.type === 'quiz';
+  const isCards = artifact.type === 'flashcards';
+  const label = isQuiz ? 'ทดสอบ' : isCards ? 'ทบทวน' : 'วางแผน';
+  const fullLabel = isQuiz ? 'แบบทดสอบ' : isCards ? 'แฟลชการ์ด' : 'แผนเรียน';
+  return (
+    <section className={`artifact v5r-artifact v5r-artifact-${artifact.type}`}>
+      <h3 className="v5r-title" aria-label={fullLabel}>
+        {label}
+        <span aria-hidden="true">.</span>
       </h3>
-      {artifact.type === 'quiz' &&
-        artifact.content.questions?.map((q, i) => (
-          <article className="learning-item" key={i}>
-            <strong>
-              {i + 1}. {q.question}
-            </strong>
-            <details>
-              <summary>ดูเฉลยและคำอธิบาย</summary>
-              <p>{q.answer}</p>
-              <p>{q.explanation}</p>
-              {refs(q.citations)}
-            </details>
-          </article>
-        ))}
-      {artifact.type === 'flashcards' &&
-        artifact.content.cards?.map((c, i) => (
-          <details className="learning-item" key={i}>
-            <summary>{c.front}</summary>
-            <p>{c.back}</p>
-            {refs(c.citations)}
-          </details>
-        ))}
-      {artifact.type === 'study_plan' &&
-        artifact.content.days?.map((day) => (
-          <article className="learning-item" key={day.day}>
-            <strong>วันที่ {day.day}</strong>
-            <p>{day.topic}</p>
-            {refs(day.citations)}
-          </article>
-        ))}
+      {artifact.sources_available === false && (
+        <p className="notice warning">แหล่งข้อมูลเดิมถูกลบหรือเปลี่ยนแปลงแล้ว</p>
+      )}
+      <div className="v5r-artifact-layout">
+        <div className="v5r-art-stage" aria-hidden="true">
+          <BuddyArt pose={artifact.type} />
+        </div>
+        {isQuiz && <QuizContent artifact={artifact} />}
+        {isCards && <FlashcardContent artifact={artifact} />}
+        {artifact.type === 'study_plan' && (
+          <div className="v5r-plan-list">
+            {artifact.content.days?.map((day) => (
+              <article className="learning-item v5r-plan-day" key={day.day}>
+                <strong>วันที่ {day.day}</strong>
+                <p>{day.topic}</p>
+                <ArtifactReferences artifact={artifact} ids={day.citations} />
+              </article>
+            ))}
+            {!artifact.content.days?.length && <p className="v5r-empty">ยังไม่มีแผนในผลลัพธ์นี้</p>}
+          </div>
+        )}
+      </div>
       <CoverageNotice coverage={artifact.coverage} />
     </section>
   );
 }
-export function ResultView({ result, partial = false }: { result: TaskResult; partial?: boolean }) {
+export function ResultView({
+  result,
+  partial = false,
+  kind = 'chat',
+}: {
+  result: TaskResult;
+  partial?: boolean;
+  kind?: TaskType;
+}) {
+  const illustrated =
+    ['summary', 'compare', 'research'].includes(kind) && !result.artifacts?.length;
+  const answer = result.answer || (typeof result.content === 'string' ? result.content : '');
+  const label = kind === 'compare' ? 'เทียบ' : kind === 'research' ? 'ค้นคว้า' : 'สรุป';
   return (
-    <div className="result-content">
+    <div className={`result-content v5r-result v5r-result-${kind}`}>
       {partial && (
         <p className="notice warning" role="status">
           ได้ผลบางส่วน — งานนี้ยังไม่สำเร็จครบถ้วน
@@ -158,17 +266,35 @@ export function ResultView({ result, partial = false }: { result: TaskResult; pa
       {result.provider_metadata?.provider === 'fixture' && (
         <span className="tag">คำตอบสังเคราะห์ · ไม่ใช่ AI จริง</span>
       )}
-      <p className="answer-text">
-        {result.answer || (typeof result.content === 'string' ? result.content : '')}
-      </p>
-      {!!result.citations?.length && (
-        <>
-          <h4>
-            {result.status === 'insufficient_evidence' ? 'แหล่งข้อมูลที่ตรวจสอบ' : 'หลักฐานจากคลิป'}
-          </h4>
-          <Citations citations={result.citations} available={result.sources_available !== false} />
-        </>
-      )}
+      <div className={illustrated ? 'v5r-answer-layout' : 'v5r-answer-plain'}>
+        <div className="v5r-answer-copy">
+          {illustrated && (
+            <h3 className="v5r-title">
+              {label}
+              <span aria-hidden="true">.</span>
+            </h3>
+          )}
+          {answer && <p className="answer-text">{answer}</p>}
+          {!!result.citations?.length && (
+            <>
+              <h4>
+                {result.status === 'insufficient_evidence'
+                  ? 'แหล่งข้อมูลที่ตรวจสอบ'
+                  : 'หลักฐานจากคลิป'}
+              </h4>
+              <Citations
+                citations={result.citations}
+                available={result.sources_available !== false}
+              />
+            </>
+          )}
+        </div>
+        {illustrated && (
+          <aside className="v5r-answer-art" aria-hidden="true">
+            <BuddyArt pose={kind} />
+          </aside>
+        )}
+      </div>
       <CoverageNotice
         coverage={result.coverage}
         insufficient={result.status === 'insufficient_evidence'}

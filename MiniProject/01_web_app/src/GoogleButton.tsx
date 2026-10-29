@@ -83,6 +83,7 @@ export default function GoogleButton({
     const started = Date.now();
     const controller = new AbortController();
     let refresh: ReturnType<typeof setTimeout> | undefined;
+    let resizeObserver: ResizeObserver | undefined;
     setLoading(true);
     const prepare = async () => {
       const challenge = await prepareChallenge?.(controller.signal);
@@ -115,15 +116,27 @@ export default function GoogleButton({
             },
             Math.max(0, 230000 - (Date.now() - started)),
           );
-        window.google.accounts.id.renderButton(target.current, {
-          type: 'standard',
-          theme: 'outline',
-          size: 'large',
-          text: 'continue_with',
-          shape: 'pill',
-          width: Math.min(340, target.current.clientWidth || 280),
-          locale: 'th',
-        });
+        let renderedWidth = 0;
+        const renderButton = () => {
+          const host = target.current;
+          if (!active || !host || !window.google?.accounts.id) return;
+          const width = Math.min(400, Math.floor(host.clientWidth || 280));
+          if (width === renderedWidth) return;
+          renderedWidth = width;
+          host.replaceChildren();
+          window.google.accounts.id.renderButton(host, {
+            type: 'standard',
+            theme: 'outline',
+            size: 'large',
+            text: 'continue_with',
+            shape: 'pill',
+            width,
+            locale: 'th',
+          });
+        };
+        renderButton();
+        resizeObserver = new ResizeObserver(renderButton);
+        resizeObserver.observe(target.current);
       })
       .catch((error) => {
         if (active) {
@@ -135,6 +148,7 @@ export default function GoogleButton({
       active = false;
       controller.abort();
       clearTimeout(refresh);
+      resizeObserver?.disconnect();
       target.current?.replaceChildren();
     };
   }, [clientId, attempt, prepareChallenge]);
@@ -156,9 +170,10 @@ export default function GoogleButton({
           </button>
         </div>
       )}
-      <small>
-        หากหน้าต่างเลือกบัญชีถูกปิดหรือถูกบล็อก ให้อนุญาต popup แล้วกดปุ่ม Google อีกครั้ง
-      </small>
+      <details className="google-popup-help">
+        <summary>เข้าสู่ระบบไม่ได้?</summary>
+        <p>อนุญาตหน้าต่างป๊อปอัป แล้วกดปุ่ม Google อีกครั้ง</p>
+      </details>
     </div>
   );
 }

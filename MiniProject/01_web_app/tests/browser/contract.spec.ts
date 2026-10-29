@@ -51,7 +51,7 @@ async function setup(page: Page, chat: (route: Route) => Promise<void>) {
   await page.route('**/api/chat', chat);
   await page.goto(liveWeb);
   await page.getByRole('checkbox').check();
-  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถาม Buddy จากวิดีโอที่เลือก' }).click();
   await page.getByLabel('คำถามของคุณ').fill('RAG คืออะไร');
 }
 test('real mode sends selected scope, carries conversation and renders text safely', async ({
@@ -184,6 +184,8 @@ test('date filters cannot silently widen a selected scope', async ({ page }) => 
     calls++;
     return fulfill(route, final);
   });
+  await page.getByRole('button', { name: 'เลือกหรือเปลี่ยนวิดีโอ', exact: true }).click();
+  await page.locator('.v5-filter-disclosure > summary').click();
   await page.getByLabel('ตั้งแต่วันที่').fill('2026-10-02');
   await expect(page.getByRole('button', { name: 'ส่งคำถาม', exact: true })).toBeDisabled();
   await expect(
@@ -199,6 +201,7 @@ test('comparison blocks a single selected video before creating work', async ({ 
     return fulfill(route, { job_id: 'j1', state: 'queued' }, 202);
   });
   await page.getByRole('button', { name: 'สรุปและแบบฝึกหัด', exact: true }).click();
+  await learningSettings(page);
   await page.getByLabel('ประเภทงาน').selectOption('compare');
   await expect(page.getByRole('button', { name: 'เริ่มงาน', exact: true })).toBeDisabled();
   await expect(page.getByRole('status').filter({ hasText: 'อย่างน้อย 2 คลิป' })).toBeVisible();
@@ -286,7 +289,7 @@ test('retryable import follows replacement job and refreshes readiness', async (
   );
   await page.goto(liveWeb);
   await page.getByLabel('ลิงก์วิดีโอ YouTube').fill(video.canonical_url);
-  await page.getByRole('button', { name: 'เพิ่มวิดีโอ', exact: true }).click();
+  await page.getByRole('button', { name: 'เพิ่มคลิป (เพิ่มวิดีโอ)', exact: true }).click();
   await page.getByRole('button', { name: 'ลองนำเข้าใหม่' }).click();
   await expect(page.getByRole('checkbox')).toBeEnabled();
   await expect(
@@ -412,3 +415,10 @@ test('provider downtime explains the failure and allows an explicit new submissi
   await expect(page.getByText('คำตอบจาก API', { exact: true })).toBeVisible();
   expect(submissions).toBe(2);
 });
+
+async function learningSettings(page: Page) {
+  const create = page.getByRole('button', { name: 'สร้างใหม่', exact: true });
+  if (await create.isVisible()) await create.click();
+  const settings = page.locator('.v5-learning-settings');
+  if ((await settings.getAttribute('open')) === null) await settings.locator('summary').click();
+}
