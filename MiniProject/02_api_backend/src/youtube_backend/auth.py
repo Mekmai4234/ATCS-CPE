@@ -95,6 +95,11 @@ class AuthService:
             httponly=True, secure=self.settings.session_cookie_secure, samesite="lax", path="/"
         )
 
+    def challenge_cookie(self, csrf):
+        # Each tab keeps its own bounded, expiring challenge cookie. No stable
+        # shared browser cookie is rotated by another tab's challenge renewal.
+        return f"{self.login_cookie}_{hashed(csrf)[:24]}"
+
     def challenge(self, request, response):
         if not self.settings.google_client_id:
             raise AppError("auth_not_configured", "Configure GOOGLE_CLIENT_ID on the server", 503)
@@ -122,12 +127,17 @@ class AuthService:
                 )
             )
         response.set_cookie(self.login_cookie, token, max_age=300, **self.cookie_options())
+        response.set_cookie(
+            self.challenge_cookie(csrf), token, max_age=300, **self.cookie_options()
+        )
         response.headers["Cache-Control"] = "no-store"
         return dict(nonce=nonce, csrf_token=csrf, client_id=self.settings.google_client_id)
 
     def login(self, request, response, body):
         self.origin(request)
-        challenge_token = request.cookies.get(self.login_cookie, "")
+        challenge_token = request.cookies.get(
+            self.challenge_cookie(body.csrf_token), request.cookies.get(self.login_cookie, "")
+        )
         now = time.time()
         with self.db.write() as c:
             challenge = (
@@ -239,6 +249,7 @@ class AuthService:
             **self.cookie_options(),
         )
         response.delete_cookie(self.login_cookie, **self.cookie_options())
+        response.delete_cookie(self.challenge_cookie(body.csrf_token), **self.cookie_options())
         response.headers["Cache-Control"] = "no-store"
         return dict(user=public_user(user), csrf_token=csrf)
 
