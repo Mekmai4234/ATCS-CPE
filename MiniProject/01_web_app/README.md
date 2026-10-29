@@ -10,6 +10,11 @@
 
 ## เริ่มใช้งาน
 
+สำหรับเปิดใช้งานในเครื่องด้วยไฟล์ที่ optimize แล้ว ใช้ `pnpm build` ตามด้วย
+`pnpm preview` หน้าเว็บจะโหลด bundle ที่รวมแล้วแทนไฟล์ซอร์สและ HMR ของโหมดพัฒนา
+local preview มี `/api` proxy และเปลี่ยน origin เป็น `localhost:3000` เช่นเดียวกับ dev
+เมื่อแก้โค้ดต้อง build ใหม่ ส่วนการ deploy static files ต้องตั้ง reverse proxy เอง
+
 ดูภาพหน้าเว็บจริง: [Login](docs/screenshots/v5/login.png) · [หน้าแรก](docs/screenshots/v5/home.png) · [มือถือ](docs/screenshots/v5/mobile.png) · [สรุป](docs/screenshots/v5/summary.png) (ภาพภายในระบบใช้ข้อมูล DEMO)
 
 ใช้ Node.js 22.12+ หรือ 24 LTS และ pnpm 11.25.0 คำสั่งทั้งหมดด้านล่างรันจาก `MiniProject/01_web_app`:
