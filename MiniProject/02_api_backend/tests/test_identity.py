@@ -325,6 +325,12 @@ def test_google_library_checks_signature_audience_issuer_and_expiry(monkeypatch)
         return jwt.encode(signer, values, key_id="test-key").decode()
 
     assert verify_google(encode(claims), "test-client")["sub"] == "subject"
+    assert (
+        verify_google(encode({**claims, "iat": int(time.time()) + 30}), "test-client")["sub"]
+        == "subject"
+    )
+    with pytest.raises((ValueError, GoogleAuthError)):
+        verify_google(encode({**claims, "iat": int(time.time()) + 120}), "test-client")
     for change in ({"aud": "attacker"}, {"iss": "https://attacker"}, {"exp": 1}):
         with pytest.raises((ValueError, GoogleAuthError)):
             verify_google(encode({**claims, **change}), "test-client")

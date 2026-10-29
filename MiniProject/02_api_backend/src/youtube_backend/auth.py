@@ -1,6 +1,7 @@
 """Server-verified Google identity; opaque hashed sessions and synchronizer CSRF."""
 
 import hashlib
+import logging
 import secrets
 import time
 from contextvars import ContextVar
@@ -13,6 +14,7 @@ from . import database as db
 from .errors import AppError
 
 actor_id = ContextVar("authenticated_actor_id", default=None)
+logger = logging.getLogger(__name__)
 
 
 def hashed(value):
@@ -40,7 +42,33 @@ def verify_google(credential, audience):
 
     transport = BoundedRequest()
     try:
-        return verify_oauth2_token(credential, transport, audience=audience)
+        # Match the bounded iat tolerance enforced again by AuthService.login.
+        # The service still rejects expired tokens, wrong audience/issuer and nonce.
+        return verify_oauth2_token(
+            credential, transport, audience=audience, clock_skew_in_seconds=60
+        )
+    except Exception as error:
+        # Never log credentials, claims, or the raw exception (which may contain claims).
+        message = str(error).lower()
+        reason = next(
+            (
+                name
+                for name in (
+                    "used too early",
+                    "expired",
+                    "audience",
+                    "certificate",
+                    "signature",
+                    "ssl",
+                    "issuer",
+                    "connection",
+                )
+                if name in message
+            ),
+            "unclassified",
+        )
+        logger.warning("google_verification_failed type=%s reason=%s", type(error).__name__, reason)
+        raise
     finally:
         transport.session.close()
 
@@ -138,6 +166,16 @@ class AuthService:
                     hashed(claims.get("nonce", "")), challenge["nonce_hash"]
                 )
             ):
+                logger.warning(
+                    "google_claims_rejected aud=%s iss=%s exp=%s iat=%s nonce=%s",
+                    claims.get("aud") == self.settings.google_client_id,
+                    claims.get("iss") in {"accounts.google.com", "https://accounts.google.com"},
+                    float(claims.get("exp", 0)) > now,
+                    float(claims.get("iat", now)) <= now + 60,
+                    secrets.compare_digest(
+                        hashed(claims.get("nonce", "")), challenge["nonce_hash"]
+                    ),
+                )
                 raise ValueError
         except Exception:
             raise AppError(
