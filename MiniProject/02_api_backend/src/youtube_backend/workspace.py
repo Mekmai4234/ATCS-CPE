@@ -14,7 +14,8 @@ from .errors import AppError
 
 
 def heartbeat_path(settings):
-    return Path(make_url(settings.database_url).database).resolve().with_suffix(".worker.json")
+    database_path = Path(make_url(settings.database_url).database).resolve()
+    return database_path.with_name(database_path.name + ".worker.json")
 
 
 def beat(settings):
