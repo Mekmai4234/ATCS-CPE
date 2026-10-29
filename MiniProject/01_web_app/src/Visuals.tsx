@@ -35,15 +35,15 @@ export function LoginBenefits() {
     <ul className="login-benefits">
       <li>
         <UiIcon name="chat" />
-        <span>ถามตอบจากวิดีโอของคุณ</span>
+        <span>ถามจากคลิป</span>
       </li>
       <li>
         <UiIcon name="library" />
-        <span>ดูแหล่งอ้างอิงพร้อมช่วงเวลา</span>
+        <span>ดูแหล่งอ้างอิง</span>
       </li>
       <li>
         <UiIcon name="clock" />
-        <span>เก็บประวัติการเรียนรู้ไว้ในบัญชี</span>
+        <span>เก็บประวัติแชท</span>
       </li>
     </ul>
   );
