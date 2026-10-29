@@ -1,9 +1,11 @@
-import asyncio
 import json
 import time
 
 from test_identity import ORIGIN, identity, login
+
 from youtube_backend.workspace import beat, heartbeat_path, worker_status
+
+__all__ = ["identity"]  # Re-export the shared pytest fixture.
 
 
 def test_two_tabs_and_single_use(identity):
@@ -55,13 +57,16 @@ def test_recovery_is_member_scoped(identity):
 
 def test_worker_readiness_expires(identity):
     assert not worker_status(identity.settings)["ready"]
+    assert identity.transport.get("/ready").status_code == 503
     beat(identity.settings)
     assert worker_status(identity.settings)["ready"]
+    assert identity.transport.get("/ready").status_code == 200
     heartbeat_path(identity.settings).write_text(
         json.dumps({"seen_at": time.time() - 10000}), encoding="utf-8"
     )
     assert worker_status(identity.settings) == {"status": "stale", "ready": False}
     assert identity.transport.get("/health").json()["worker"]["ready"] is False
+    assert identity.transport.get("/ready").status_code == 503
 
 
 async def test_idle_worker_publishes_heartbeat(identity):
