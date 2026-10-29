@@ -26,9 +26,22 @@ class Worker:
         self.repo = repository
         self.adapters = adapters
         self.settings = settings
+        self.last_pulse = 0.0
+
+    def pulse(self):
+        if time.monotonic() - self.last_pulse < 5:
+            return
+        from .workspace import beat
+
+        try:
+            beat(self.settings)
+            self.last_pulse = time.monotonic()
+        except OSError:
+            logger.warning("worker_heartbeat_write_failed")
 
     async def _heartbeat(self, context):
         while True:
+            self.pulse()
             await asyncio.sleep(self.settings.job_lease_seconds / 3)
             context.check()
             self.repo.heartbeat(context.job_id, context.lease_token)
@@ -120,6 +133,7 @@ class Worker:
         self.repo.finish(job_id, token, result.model_dump(mode="json"), state=state)
 
     async def run_once(self, job_id=None):
+        self.pulse()
         started = time.monotonic()
         job = self.repo.claim(job_id)
         if not job:
