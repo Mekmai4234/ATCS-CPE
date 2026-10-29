@@ -7,7 +7,7 @@ const launcher = (page: Page) => page.locator('.buddy-launcher');
 async function login(page: Page) {
   await page.goto(`${base}/login?demo=1`);
   await page.getByRole('button', { name: 'ทดลองด้วยบัญชี A' }).click();
-  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /รู้ให้/ })).toBeVisible();
 }
 async function open(page: Page) {
   await launcher(page).click();
@@ -22,7 +22,9 @@ test('login is private and policy/help links have real readable destinations', a
   await expect(launcher(page)).toHaveCount(0);
   expect(await page.locator('.forest-backdrop img').count()).toBe(0);
   await page.getByRole('link', { name: 'ความเป็นส่วนตัว', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'ความเป็นส่วนตัว', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'ความเป็นส่วนตัว', exact: true, level: 1 }),
+  ).toBeVisible();
   await page.getByRole('link', { name: 'ช่วยเหลือ', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'ช่วยเหลือ Video Buddy' })).toBeVisible();
 });
@@ -157,39 +159,30 @@ test('IME and Shift+Enter do not submit; cancellation is available for a pending
   await expect(dialog(page).getByRole('button', { name: 'ส่งข้อความถึง Buddy' })).toBeEnabled();
   await page.screenshot({ path: 'runtime/screenshots/mint-chat-cancelled.png', fullPage: true });
 });
-test('reference mascot follows the pointer within bounds and reduced motion stays static', async ({
+test('v5 home artwork loads as decoration and stays static with reduced motion', async ({
   page,
 }) => {
   await login(page);
-  const rig = page.locator('.home-mascot .buddy-rig');
-  const box = (await rig.boundingBox())!;
-  await page.mouse.move(box.x + box.width * 0.85, box.y + box.height * 0.3);
+  const art = page.locator('.v5-home-art .buddy-art');
+  await expect(art).toBeVisible();
+  await expect(art).toHaveAttribute('alt', '');
+  await expect(art).toHaveAttribute('src', '/buddy-v5/home.webp');
   await expect
-    .poll(() =>
-      rig.evaluate((node) => parseFloat((node as HTMLElement).style.getPropertyValue('--eye-x'))),
-    )
+    .poll(() => art.evaluate((img: HTMLImageElement) => img.naturalWidth))
     .toBeGreaterThan(0);
-  expect(
-    Math.abs(
-      await rig.evaluate((node) =>
-        parseFloat((node as HTMLElement).style.getPropertyValue('--eye-x')),
-      ),
-    ),
-  ).toBeLessThanOrEqual(6);
-  await page.locator('html').dispatchEvent('pointerleave');
-  await expect
-    .poll(() => rig.evaluate((node) => (node as HTMLElement).style.getPropertyValue('--eye-x')))
-    .toBe('0px');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.mouse.move(box.x + box.width * 0.9, box.y + box.height * 0.4);
-  expect(
-    await rig.locator('.buddy-scene-image').evaluate((node) => getComputedStyle(node).transform),
-  ).toBe('none');
+  expect(await art.evaluate((node) => getComputedStyle(node).animationName)).toBe('none');
+  expect(await art.evaluate((node) => getComputedStyle(node).transform)).toBe('none');
 });
-test('missing reference artwork falls back to the existing still image', async ({ page }) => {
-  await page.route('**/buddy-reference/scene-*.webp', (route) => route.abort());
+
+test('missing decorative artwork leaves the real import form usable', async ({ page }) => {
+  await page.route('**/buddy-v5/home.webp', (route) => route.abort());
   await login(page);
-  await expect(page.locator('.home-mascot .buddy-static')).toBeVisible();
+  await page.getByLabel('ลิงก์ YouTube', { exact: true }).fill('https://youtu.be/dQw4w9WgXcQ');
+  await expect(
+    page.getByRole('button', { name: 'เพิ่มคลิป (เพิ่มวิดีโอ)', exact: true }),
+  ).toBeEnabled();
+  await expect(page.getByRole('heading', { name: /รู้ให้/ })).toBeVisible();
 });
 
 test('blocked local storage does not prevent opening or repositioning Buddy', async ({ page }) => {

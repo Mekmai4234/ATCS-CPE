@@ -156,7 +156,7 @@ async function fixture(page: Page, initial: Account | null = null) {
 async function openChat(page: Page) {
   await page.getByRole('button', { name: 'วิดีโอของฉัน', exact: true }).click();
   await page.getByRole('checkbox').first().check();
-  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถาม Buddy จากวิดีโอที่เลือก' }).click();
   await page.getByLabel('คำถามของคุณ').fill('ถามจากแหล่งข้อมูลของฉัน');
 }
 
@@ -178,7 +178,7 @@ test('Google button exchanges only the credential and never persists credentials
   const server = await fixture(page);
   await page.goto(base);
   await page.getByRole('button', { name: 'Continue with Google' }).click();
-  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /รู้ให้/ })).toBeVisible();
   const exchange = server.requests.find((request) => request.path === '/__test__/google')!;
   expect(exchange.body).toEqual({ credential: 'fixture-A' });
   expect(exchange.headers['x-test-login-csrf']).toBe('login-nonce');
@@ -335,7 +335,7 @@ test('a slow session check never flashes the private workspace', async ({ page }
   await expect(page.getByRole('checkbox')).toHaveCount(0);
   expect(server.requests.filter((request) => request.path.startsWith('/api/'))).toHaveLength(0);
   release();
-  await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /รู้ให้/ })).toBeVisible();
 });
 
 test('Google script network errors provide a retry without a password fallback', async ({
@@ -366,7 +366,7 @@ for (const width of [375, 768, 1440]) {
     );
     await page.screenshot({ path: `runtime/screenshots/login-${width}.png`, fullPage: true });
     await page.getByRole('button', { name: 'ทดลองด้วยบัญชี A' }).click();
-    await expect(page.getByRole('heading', { name: /ดูน้อยลง/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /รู้ให้/ })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );

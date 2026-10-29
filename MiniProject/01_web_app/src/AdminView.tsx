@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { AdminSection, AdminSnapshot, MemberSession, SessionPort } from './session';
-import { BuddyLogo, ForestBackdrop, Mascot } from './Forest';
+import { BuddyLogo } from './Forest';
+import { BuddyArt } from './BuddyArt';
+import { UiIcon } from './Visuals';
 import { ApiError } from './api';
+import './secondary-v5.css';
 
 const names: Record<AdminSection, string> = {
   overview: 'ภาพรวม',
@@ -73,24 +76,41 @@ export default function AdminView({
     }
   }
   return (
-    <div className="admin-shell">
-      <ForestBackdrop />
+    <div className="admin-shell vb-admin">
       <aside className="admin-sidebar">
         <BuddyLogo onClick={onHome} />
-        <h2>จัดการระบบ</h2>
-        <nav aria-label="เมนูผู้ดูแล">
-          {session.adminSections.map((key) => (
-            <button
-              key={key}
-              aria-current={section === key ? 'page' : undefined}
-              className={section === key ? 'active' : ''}
-              onClick={() => setSection(key)}
-            >
-              {names[key]}
-            </button>
-          ))}
+        <nav className="vb-admin-workspace-nav" aria-label="เมนูหลัก">
+          <button onClick={onHome}>
+            <UiIcon name="home" />
+            หน้าแรก
+          </button>
+          <a href="/library">
+            <UiIcon name="library" />
+            วิดีโอของฉัน
+          </a>
+          <a href="/learning">
+            <UiIcon name="learn" />
+            สรุปและแบบฝึกหัด
+          </a>
+          <a href="/history">
+            <UiIcon name="clock" />
+            ประวัติแชท
+          </a>
         </nav>
-        <Mascot />
+        <div className="vb-admin-side-bottom">
+          <a href="/help">
+            <UiIcon name="help" />
+            ช่วยเหลือ
+          </a>
+          <span className="vb-admin-location">
+            <UiIcon name="learn" />
+            จัดการระบบ
+          </span>
+          <div className="vb-admin-profile">
+            <span>{session.member.name.slice(0, 1)}</span>
+            <strong>{session.member.name}</strong>
+          </div>
+        </div>
       </aside>
       <main className="admin-main">
         <div className="admin-top">
@@ -104,10 +124,75 @@ export default function AdminView({
         {port.demo && (
           <div className="demo-banner">DEMO · ข้อมูลสมาชิกและการจัดการจำลอง ไม่เชื่อมระบบจริง</div>
         )}
+        <nav className="vb-admin-tabs" aria-label="เมนูผู้ดูแล">
+          {session.adminSections.map((key) => (
+            <button
+              key={key}
+              aria-current={section === key ? 'page' : undefined}
+              className={section === key ? 'active' : ''}
+              onClick={() => setSection(key)}
+            >
+              {names[key]}
+            </button>
+          ))}
+        </nav>
         <section className="admin-card">
-          <span className="eyebrow">RAG BUDDY ADMINISTRATION</span>
-          <h1>{names[section]}</h1>
-          <p className="admin-subtitle">จัดการสมาชิกและสถานะระบบ โดยไม่เปิดเนื้อหาบทสนทนาส่วนตัว</p>
+          <div className={`vb-admin-hero vb-admin-hero-${section}`}>
+            <div className="vb-admin-hero-copy">
+              <h1>{names[section]}</h1>
+              {section === 'overview' && data && (
+                <div className="admin-stats">
+                  <article>
+                    <strong>
+                      {data.stats
+                        ? data.stats.jobs.running || 0
+                        : data.jobs?.filter((job) => job.state === 'running').length || 0}
+                    </strong>
+                    <span>กำลังทำงาน</span>
+                  </article>
+                  <article>
+                    <strong>
+                      {data.stats
+                        ? data.stats.jobs.queued || 0
+                        : data.jobs?.filter((job) => job.state === 'queued').length || 0}
+                    </strong>
+                    <span>รอคิว</span>
+                  </article>
+                  <article>
+                    <strong>{data.stats?.users ?? data.members.length}</strong>
+                    <span>สมาชิก</span>
+                  </article>
+                </div>
+              )}
+              {section === 'members' && (
+                <label className="member-search">
+                  ค้นหาสมาชิก
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                      setOffset(0);
+                    }}
+                    placeholder="ค้นหาชื่อหรืออีเมล"
+                  />
+                </label>
+              )}
+            </div>
+            <div className="vb-admin-art">
+              <BuddyArt
+                pose={
+                  section === 'members'
+                    ? 'members'
+                    : section === 'videos'
+                      ? 'library'
+                      : section === 'jobs'
+                        ? 'states'
+                        : 'admin'
+                }
+              />
+            </div>
+          </div>
           {error && (
             <p role="alert" className="notice error">
               {error}
@@ -116,43 +201,18 @@ export default function AdminView({
           {!data && !error && <p role="status">กำลังโหลดข้อมูล…</p>}
           {data && (
             <>
-              {section === 'overview' && (
-                <div className="admin-stats">
-                  <article>
-                    <strong>{data.stats?.users ?? data.members.length}</strong>
-                    <span>สมาชิก</span>
-                  </article>
-                  {!data.stats && data.videos && (
-                    <article>
-                      <strong>{data.videos.length}</strong>
-                      <span>วิดีโอในระบบ</span>
-                    </article>
-                  )}
-                  <article>
-                    <strong>
-                      {data.stats
-                        ? (data.stats.jobs.queued || 0) + (data.stats.jobs.running || 0)
-                        : data.jobs?.filter((job) => ['queued', 'running'].includes(job.state))
-                            .length || 0}
-                    </strong>
-                    <span>งานที่กำลังทำ</span>
-                  </article>
-                </div>
-              )}
-              {section === 'members' && (
+              {(section === 'members' || section === 'overview') && (
                 <>
-                  <label className="member-search">
-                    ค้นหาสมาชิก
-                    <input
-                      type="search"
-                      value={query}
-                      onChange={(event) => {
-                        setQuery(event.target.value);
-                        setOffset(0);
-                      }}
-                      placeholder="ค้นหาชื่อหรืออีเมล"
-                    />
-                  </label>
+                  {section === 'overview' && (
+                    <div className="vb-admin-table-heading">
+                      <h2>สมาชิก</h2>
+                      {session.adminSections.includes('members') && (
+                        <button className="text-button" onClick={() => setSection('members')}>
+                          ดูทั้งหมด <UiIcon name="arrow" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <div className="table-scroll">
                     <table>
                       <caption className="visually-hidden">รายชื่อและสถานะสมาชิก</caption>
@@ -174,8 +234,18 @@ export default function AdminView({
                           .map((member) => (
                             <tr key={member.id}>
                               <td>
-                                <strong>{member.name}</strong>
-                                <small>{member.email}</small>
+                                <div className="vb-admin-person">
+                                  <span className="vb-admin-avatar" aria-hidden="true">
+                                    {member.name.slice(0, 1)}
+                                  </span>
+                                  <div>
+                                    <strong>{member.name}</strong>
+                                    <small title={member.email}>{member.email}</small>
+                                    <span className="vb-admin-mobile-role">
+                                      {member.role === 'admin' ? 'ผู้ดูแล' : 'สมาชิก'}
+                                    </span>
+                                  </div>
+                                </div>
                               </td>
                               <td>
                                 <span className={`role-chip ${member.role}`}>
@@ -188,33 +258,47 @@ export default function AdminView({
                                 </span>
                               </td>
                               <td>
-                                {(member.role !== 'admin' || port.setMemberRole) && (
-                                  <button
-                                    className="secondary"
-                                    disabled={pending}
-                                    onClick={() =>
-                                      void changeStatus(member.id, {
-                                        status: member.status === 'active' ? 'suspended' : 'active',
-                                      })
-                                    }
-                                  >
-                                    {member.status === 'active' ? 'ระงับบัญชี' : 'เปิดใช้บัญชี'}
-                                  </button>
-                                )}
-                                {port.setMemberRole && (
-                                  <button
-                                    className="secondary"
-                                    disabled={pending}
-                                    onClick={() =>
-                                      void changeStatus(member.id, {
-                                        role: member.role === 'admin' ? 'user' : 'admin',
-                                      })
-                                    }
-                                  >
-                                    {member.role === 'admin'
-                                      ? 'เปลี่ยนเป็นสมาชิก'
-                                      : 'ตั้งเป็นผู้ดูแล'}
-                                  </button>
+                                {section === 'overview' ? (
+                                  session.adminSections.includes('members') && (
+                                    <button
+                                      className="secondary"
+                                      onClick={() => setSection('members')}
+                                    >
+                                      จัดการ <UiIcon name="arrow" size={16} />
+                                    </button>
+                                  )
+                                ) : (
+                                  <div className="vb-admin-actions">
+                                    {(member.role !== 'admin' || port.setMemberRole) && (
+                                      <button
+                                        className="secondary"
+                                        disabled={pending}
+                                        onClick={() =>
+                                          void changeStatus(member.id, {
+                                            status:
+                                              member.status === 'active' ? 'suspended' : 'active',
+                                          })
+                                        }
+                                      >
+                                        {member.status === 'active' ? 'ระงับบัญชี' : 'เปิดใช้บัญชี'}
+                                      </button>
+                                    )}
+                                    {port.setMemberRole && (
+                                      <button
+                                        className="secondary"
+                                        disabled={pending}
+                                        onClick={() =>
+                                          void changeStatus(member.id, {
+                                            role: member.role === 'admin' ? 'user' : 'admin',
+                                          })
+                                        }
+                                      >
+                                        {member.role === 'admin'
+                                          ? 'เปลี่ยนเป็นสมาชิก'
+                                          : 'ตั้งเป็นผู้ดูแล'}
+                                      </button>
+                                    )}
+                                  </div>
                                 )}
                               </td>
                             </tr>
@@ -222,7 +306,7 @@ export default function AdminView({
                       </tbody>
                     </table>
                   </div>
-                  {data.memberPage && (
+                  {section === 'members' && data.memberPage && (
                     <div className="member-pagination">
                       <button
                         className="secondary"

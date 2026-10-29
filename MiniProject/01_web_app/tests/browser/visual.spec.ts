@@ -136,7 +136,7 @@ async function send(page: Page) {
   await expect(page.getByRole('checkbox').nth(2)).toBeDisabled();
   await page.getByRole('checkbox').first().check();
   await expect(page.getByText('ถามจากบทถอดเสียงได้แล้ว ส่วนข้อมูลภาพยังไม่ครบ')).toBeVisible();
-  await page.getByRole('button', { name: 'ถามจากวิดีโอที่เลือก' }).click();
+  await page.getByRole('button', { name: 'ถาม Buddy จากวิดีโอที่เลือก' }).click();
   await page.getByLabel('คำถามของคุณ').fill('ในภาพมีอะไร');
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
 }
