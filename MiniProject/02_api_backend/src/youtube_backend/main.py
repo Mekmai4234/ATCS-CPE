@@ -180,8 +180,11 @@ def create_app(settings=None, database=None, adapters=None):
             policy_state = "operator_attested"
         except AppError:
             policy_state = "unverified"
+        from .workspace import worker_status
+
         return dict(
             status="ok",
+            worker=worker_status(settings),
             schema_revision=SCHEMA_REVISION,
             mode=settings.adapter_mode,
             adapters_configured=settings.adapter_mode != "unavailable",
@@ -367,6 +370,20 @@ def create_app(settings=None, database=None, adapters=None):
         if not callable(getattr(runtime.adapter, "enrich", None)):
             raise AppError("dependency_unavailable", "Local media adapter is not connected", 503)
         return accepted(MediaStore(repository).enqueue(video_id, idempotency_key=idempotency_key))
+
+    @app.get("/api/member/jobs")
+    def member_work(limit: Limit = 50, offset: Offset = 0, include_completed: bool = False):
+        from .workspace import member_jobs
+
+        return member_jobs(
+            repository, limit=limit, offset=offset, include_completed=include_completed
+        )
+
+    @app.get("/api/worker-status")
+    def processing_status():
+        from .workspace import worker_status
+
+        return worker_status(settings)
 
     @app.post("/api/auth/google")
     def google_login(body: GoogleLogin, request: Request, response: Response):
