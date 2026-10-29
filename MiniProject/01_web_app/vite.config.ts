@@ -1,5 +1,23 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+
+function canonicalLocalNavigation(req: IncomingMessage, res: ServerResponse, next: () => void) {
+  if (
+    req.method === 'GET' &&
+    req.headers.host === '127.0.0.1:3000' &&
+    req.headers.accept?.includes('text/html') &&
+    req.url?.startsWith('/')
+  ) {
+    res.writeHead(307, {
+      Location: `http://localhost:3000${req.url}`,
+      'Cache-Control': 'no-store',
+    });
+    res.end();
+    return;
+  }
+  next();
+}
 
 export default defineConfig(({ mode, command }) => {
   if (command === 'build' && ['workspace-tests', 'session-tests'].includes(mode))
@@ -10,7 +28,7 @@ export default defineConfig(({ mode, command }) => {
   const apiUrl =
     local.NEXT_PUBLIC_API_BASE_URL || shared.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
   // Same-origin /api also preserves readable 401/403 responses and host-only cookies.
-  // Production must provide the equivalent reverse proxy; Vite's proxy is dev-only.
+  // Local dev/preview provide the proxy; deployed static files need a reverse proxy.
   const sameOrigin = local.VITE_API_SAME_ORIGIN !== 'false';
   const parsed = new URL(apiUrl);
   if (
@@ -30,27 +48,13 @@ export default defineConfig(({ mode, command }) => {
       {
         name: 'development-test-entry',
         apply: 'serve',
+        configurePreviewServer(server) {
+          server.middlewares.use(canonicalLocalNavigation);
+        },
         configureServer(server) {
           // The local Google OAuth client and backend trust localhost:3000.
           // Normalize document navigations before GIS creates an origin-bound challenge.
-          if (mode === 'development') {
-            server.middlewares.use((req, res, next) => {
-              if (
-                req.method === 'GET' &&
-                req.headers.host === '127.0.0.1:3000' &&
-                req.headers.accept?.includes('text/html') &&
-                req.url?.startsWith('/')
-              ) {
-                res.writeHead(307, {
-                  Location: `http://localhost:3000${req.url}`,
-                  'Cache-Control': 'no-store',
-                });
-                res.end();
-                return;
-              }
-              next();
-            });
-          }
+          if (mode === 'development') server.middlewares.use(canonicalLocalNavigation);
           if (!['workspace-tests', 'session-tests'].includes(mode)) return;
           server.middlewares.use((req, _res, next) => {
             const path = req.url?.split('?')[0] || '';
@@ -71,6 +75,10 @@ export default defineConfig(({ mode, command }) => {
       'import.meta.env.NEXT_PUBLIC_API_BASE_URL': JSON.stringify(
         sameOrigin ? '' : apiUrl.replace(/\/$/, ''),
       ),
+    },
+    preview: {
+      strictPort: true,
+      ...(sameOrigin ? { proxy: { '/api': { target: parsed.origin, changeOrigin: false } } } : {}),
     },
     server: {
       strictPort: true,
