@@ -36,6 +36,7 @@ export class Api {
   onMode?: (mode: string) => void;
   private controllers = new Set<AbortController>();
   private disposed = false;
+  private mediaSnapshots = new Map<string, import('./types').MediaEvidenceData>();
   constructor(
     private base: string,
     private transport: Transport = (input, init) => fetch(input, init),
@@ -59,6 +60,24 @@ export class Api {
   });
   loadFrame = async (frame: FrameReference, signal: AbortSignal): Promise<Blob> => {
     if (this.disposed) throw new DOMException('Session ended', 'AbortError');
+    if (frame.assetId) {
+      const evidence =
+        this.mediaSnapshots.get(frame.videoId) || (await this.mediaEvidence(frame.videoId, signal));
+      const match = evidence.evidence.some(
+        (item) =>
+          item.frame_id === frame.frameId &&
+          item.asset_id === frame.assetId &&
+          item.evidence_version === frame.evidenceVersion &&
+          item.timestamp_seconds === frame.timeSeconds,
+      );
+      if (
+        evidence.generation !== frame.generation ||
+        !match ||
+        !/^[a-f0-9]{64}$/.test(frame.assetId)
+      )
+        throw new ApiError('หลักฐานภาพเปลี่ยนแปลงหรือไม่มีสิทธิ์เปิด', 'source_changed', false);
+      return this.readEvidenceAsset(`/api/media/assets/${frame.assetId}`, signal);
+    }
     if (!this.evidence)
       throw new ApiError(
         'ยังรอ API หลักฐานภาพที่ตรวจสิทธิ์',
@@ -118,6 +137,7 @@ export class Api {
   };
   dispose() {
     this.disposed = true;
+    this.mediaSnapshots.clear();
     this.controllers.forEach((controller) => controller.abort());
     this.controllers.clear();
   }
@@ -201,6 +221,64 @@ export class Api {
       ...data,
       items: data.items.map((video) => ({ ...video, presentation: this.evidence?.source(video) })),
     };
+  }
+  async mediaEvidence(videoId: string, signal?: AbortSignal) {
+    if (!/^[\w-]{11}$/.test(videoId))
+      throw new ApiError('รหัสคลิปไม่ถูกต้อง', 'invalid_source', false);
+    const { data } = await this.request<import('./types').MediaEvidenceData>(
+      `/api/v2/videos/${videoId}/evidence`,
+      { signal },
+    );
+    if (
+      data.contract_version !== 2 ||
+      data.video_id !== videoId ||
+      !Number.isInteger(data.generation) ||
+      data.generation < 1 ||
+      !Array.isArray(data.evidence) ||
+      data.evidence.length > 200 ||
+      data.evidence.some(
+        (item) =>
+          !/^[a-f0-9]{64}$/.test(item.frame_id) ||
+          !/^[a-f0-9]{64}$/.test(item.asset_id) ||
+          !/^[a-f0-9]{64}$/.test(item.evidence_version) ||
+          !Number.isFinite(item.timestamp_seconds) ||
+          item.timestamp_seconds < 0 ||
+          typeof item.text !== 'string' ||
+          !['ocr', 'visual'].includes(item.kind),
+      )
+    )
+      throw new ApiError('ข้อมูลภาพไม่ตรงกับคลิป', 'invalid_response', false);
+    if (this.mediaSnapshots.size >= 50)
+      this.mediaSnapshots.delete(this.mediaSnapshots.keys().next().value!);
+    this.mediaSnapshots.set(videoId, data);
+    return data;
+  }
+  async memberJobs(includeCompleted = false, offset = 0, signal?: AbortSignal) {
+    const { data } = await this.request<Page<import('./types').RecoverableJob>>(
+      `/api/member/jobs?limit=50&offset=${offset}&include_completed=${includeCompleted}`,
+      { signal },
+    );
+    if (
+      !Array.isArray(data.items) ||
+      !Number.isInteger(data.total) ||
+      data.total < 0 ||
+      data.items.some(
+        (job) =>
+          !job ||
+          typeof job.job_id !== 'string' ||
+          !job.request ||
+          typeof job.request !== 'object' ||
+          !Array.isArray(job.sources) ||
+          job.sources.some((source) => !source || !/^[\w-]{11}$/.test(source.video_id)),
+      )
+    )
+      throw new ApiError('รายการงานไม่ถูกต้อง', 'invalid_response', false);
+    return data;
+  }
+  async workerStatus(signal?: AbortSignal) {
+    return (
+      await this.request<{ status: string; ready: boolean }>('/api/worker-status', { signal })
+    ).data;
   }
   async importVideos(urls: string[], signal?: AbortSignal) {
     const { data } = await this.request<{ jobs: ImportItem[]; mode: string }>(
