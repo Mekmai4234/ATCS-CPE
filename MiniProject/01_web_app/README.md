@@ -1,8 +1,8 @@
 # 01 · YouTube Knowledge Web
 
-## RAG Buddy mint UI / Floating Buddy — 24 October 2026
+## Video Buddy v5 — 29 October 2026
 
-ปรับตามภาพชุดล่าสุด `D:\Web\New folder` เป็นพื้นมิ้นต์สว่าง มาสคอตแยกชั้นที่มองตาม pointer และแชต Buddy ลากย้ายได้หลัง login ใช้ state/API/conversation ร่วมกับหน้าแชตเต็ม ดู [รายงานรอบนี้](MINT_BUDDY_REPORT.md) และ [ที่มา assets/rig](design/buddy-rig/README.md) ส่วนรายงานฉากป่าเดิมเก็บไว้เป็นประวัติ
+ปรับหน้าเว็บจริงตามแบบเสนอ v5: หัวข้อสั้นตัวใหญ่ มาสคอตแยกท่าตามหน้า โทนมิ้นต์/ครีม/ฟ้า เมนูหลักสี่หัวข้อด้านซ้าย และเมนูด้านล่างบนมือถือ แชต Buddy ลากย้ายได้และใช้ state/API/conversation ร่วมกับหน้าแชตเต็ม ดู [รายละเอียดและผลตรวจ v5](V5_IMPLEMENTATION.md) ส่วน [รายงาน mint เดิม](MINT_BUDDY_REPORT.md) เก็บไว้เป็นประวัติ
 
 **ใช้ HttpSessionPort เดิม:** challenge nonce, Google exchange, session/CSRF และ Admin API มาจากงานทีม 02 ซึ่งรวมใน develop แล้ว ไม่สร้าง auth client ซ้ำ การทดสอบอัตโนมัติจำลอง external Google verifier; การใช้บัญชี Google จริงและการตั้งค่า HTTPS/origins ยังต้องตรวจแยกก่อนประกาศพร้อม deploy
 
@@ -10,7 +10,7 @@
 
 ## เริ่มใช้งาน
 
-ดูภาพตัวอย่าง: [หน้าคลังวิดีโอบนคอมพิวเตอร์](docs/screenshots/desktop.png) · [หน้าแชตบนมือถือ](docs/screenshots/mobile.png)
+ดูภาพหน้าเว็บจริง: [Login](docs/screenshots/v5/login.png) · [หน้าแรก](docs/screenshots/v5/home.png) · [มือถือ](docs/screenshots/v5/mobile.png) · [สรุป](docs/screenshots/v5/summary.png) (ภาพภายในระบบใช้ข้อมูล DEMO)
 
 ใช้ Node.js 22.12+ หรือ 24 LTS และ pnpm 11.25.0 คำสั่งทั้งหมดด้านล่างรันจาก `MiniProject/01_web_app`:
 
