@@ -371,6 +371,18 @@ def create_app(settings=None, database=None, adapters=None):
             raise AppError("dependency_unavailable", "Local media adapter is not connected", 503)
         return accepted(MediaStore(repository).enqueue(video_id, idempotency_key=idempotency_key))
 
+    @app.get("/ready")
+    def ready():
+        from .workspace import worker_status
+
+        database.check_schema()
+        status = worker_status(settings)
+        return JSONResponse(
+            dict(status="ready" if status["ready"] else "degraded", worker=status),
+            status_code=200 if status["ready"] else 503,
+            headers={"Cache-Control": "no-store"},
+        )
+
     @app.get("/api/member/jobs")
     def member_work(limit: Limit = 50, offset: Offset = 0, include_completed: bool = False):
         from .workspace import member_jobs
