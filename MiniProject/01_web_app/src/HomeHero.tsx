@@ -1,15 +1,11 @@
 import type { FormEvent } from 'react';
-import { Mascot } from './Forest';
+import { BuddyArt } from './BuddyArt';
 import { UiIcon } from './Visuals';
-
 export default function HomeHero({
-  name,
   value,
   busy,
   change,
   submit,
-  openLibrary,
-  openChat,
 }: {
   name: string;
   value: string;
@@ -20,60 +16,37 @@ export default function HomeHero({
   openChat: () => void;
 }) {
   return (
-    <section className="home-hero" aria-labelledby="home-title">
-      <div className="home-story">
-        <span className="forest-eyebrow">
-          <UiIcon name="spark" size={16} /> YOUR PERSONAL LEARNING BUDDY
-        </span>
+    <section className="home-hero v5-home-stage" aria-labelledby="home-title">
+      <div className="v5-home-copy">
         <h1 id="home-title">
-          ดูน้อยลง
-          <br />
-          เข้าใจมากขึ้น
-          <span className="coral-stroke" />
+          รู้ให้<span>ลึกขึ้น.</span>
         </h1>
-        <p>
-          เปลี่ยนคลิปโปรดให้เป็นความรู้
-          <br />
-          ถาม สรุป และเรียนรู้ไปกับ Buddy
-        </p>
-        <div className="hero-import-card">
-          <label className="hero-import-label" htmlFor="home-urls">
-            <UiIcon name="link" /> เริ่มจากลิงก์ YouTube
-          </label>
-          <form onSubmit={submit}>
-            <label className="visually-hidden" htmlFor="home-urls">
-              วางลิงก์ YouTube
-            </label>
-            <textarea
+        <form className="v5-url-form" onSubmit={submit}>
+          <label htmlFor="home-urls">ลิงก์ YouTube</label>
+          <div>
+            <input
               id="home-urls"
-              rows={2}
+              type="url"
               value={value}
-              onChange={(event) => change(event.target.value)}
-              placeholder="วางลิงก์ YouTube ที่นี่…"
+              onChange={(e) => change(e.target.value)}
+              placeholder="วางลิงก์คลิปที่นี่"
               disabled={busy}
+              required
             />
-            <button className="primary" disabled={busy || !value.trim()}>
-              {busy ? 'กำลังเพิ่ม…' : 'เพิ่มวิดีโอ'} <span aria-hidden="true">→</span>
-            </button>
-          </form>
-          <p className="hero-import-hint">
-            <UiIcon name="spark" size={18} /> นำเข้าแล้วถาม พร้อมอ้างอิงช่วงเวลาในคลิป
-          </p>
-          <div className="hero-shortcuts">
-            <button onClick={openLibrary}>
-              <span aria-hidden="true">▣</span> เปิดวิดีโอของฉัน
-            </button>
-            <span className="shortcut-divider" />
-            <button onClick={openChat}>
-              <span aria-hidden="true">▤</span> เริ่มแชตกับ Buddy
+            <button
+              className="primary"
+              aria-label="เพิ่มคลิป (เพิ่มวิดีโอ)"
+              disabled={busy || !value.trim()}
+            >
+              {busy ? 'กำลังเพิ่ม…' : 'เพิ่มคลิป'}
+              <UiIcon name="arrow" />
             </button>
           </div>
-        </div>
-        <span className="home-small-note">ยินดีต้อนรับคุณ{name} · เรียนรู้จากคลิปในคลังของคุณ</span>
+        </form>
       </div>
-      <div className="home-mascot">
-        <Mascot />
-        <span className="buddy-speech">ไปเรียนรู้กัน!</span>
+      <div className="v5-home-art">
+        <span className="v5-halo" aria-hidden="true" />
+        <BuddyArt pose="home" />
       </div>
     </section>
   );

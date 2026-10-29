@@ -9,6 +9,8 @@ import type { Point, Viewport } from './buddyModel';
 import type { TaskResult, Video } from './types';
 import { statusLabels, videoQueryable } from './domain';
 import { SourceBadges } from './Evidence';
+import { BuddyArt } from './BuddyArt';
+import './auth-v5.css';
 
 export interface BuddyTurn {
   unanswered?: string;
@@ -59,10 +61,19 @@ function storage() {
     return undefined;
   }
 }
+function launcherViewport(): Viewport {
+  const view = viewport();
+  const nav = document.querySelector('.v5-mobile-nav')?.getBoundingClientRect();
+  // Reserve the mobile navigation area for all pointer, keyboard and restored positions.
+  const bottom = nav?.height
+    ? Math.min(view.top + view.height, nav.top)
+    : view.top + view.height - (innerWidth <= 900 ? 80 : 0);
+  return { ...view, height: Math.max(0, bottom - view.top) };
+}
 export default function FloatingBuddy(props: Props) {
   const { open, onOpen } = props;
   const [view, setView] = useState(viewport);
-  const [point, setPoint] = useState(() => readPosition(storage(), viewport()));
+  const [point, setPoint] = useState(() => readPosition(storage(), launcherViewport()));
   const current = useRef(point);
   const preferred = useRef(point);
   const [dragging, setDragging] = useState(false);
@@ -88,7 +99,7 @@ export default function FloatingBuddy(props: Props) {
         ? 'success'
         : 'idle';
   const apply = (value: Point, save = false) => {
-    const next = clampPoint(value, viewport());
+    const next = clampPoint(value, launcherViewport());
     current.current = next;
     preferred.current = next;
     setPoint(next);
@@ -114,7 +125,7 @@ export default function FloatingBuddy(props: Props) {
         if (next.width <= 0 || next.height <= 0) return;
         setView(next);
         // Temporary viewport sizes must not overwrite the user's chosen position.
-        const visible = clampPoint(preferred.current, next);
+        const visible = clampPoint(preferred.current, launcherViewport());
         current.current = visible;
         setPoint(visible);
       });
@@ -137,7 +148,7 @@ export default function FloatingBuddy(props: Props) {
         rect.bottom > button.top &&
         rect.top < button.bottom
       ) {
-        const view = viewport();
+        const view = launcherViewport();
         const headerBottom = document.querySelector('.topbar')?.getBoundingClientRect().bottom || 0;
         for (const corner of ['bottom-right', 'bottom-left', 'top-left', 'top-right']) {
           let candidate = cornerPoint(corner, view);
@@ -162,6 +173,7 @@ export default function FloatingBuddy(props: Props) {
     window.visualViewport?.addEventListener('resize', resize);
     window.visualViewport?.addEventListener('scroll', resize);
     document.addEventListener('focusin', avoidFocus);
+    resize();
     return () => {
       cancelAnimationFrame(resizeFrame);
       cancelAnimationFrame(frame.current);
@@ -194,7 +206,7 @@ export default function FloatingBuddy(props: Props) {
       if (incoming) setNewMessage(true);
     }
   }, [props.turns.length, props.status, open]);
-  const width = Math.min(view.width >= 1200 ? 460 : 400, view.width - 24);
+  const width = Math.min(440, view.width - 24);
   const height = Math.min(700, view.height - (mobile ? 24 : 112));
   const x = mobile
     ? view.left + 12
@@ -227,7 +239,7 @@ export default function FloatingBuddy(props: Props) {
       event.currentTarget.releasePointerCapture(event.pointerId);
   };
   return createPortal(
-    <div className="buddy-widget">
+    <div className="buddy-widget buddy-v5">
       <button
         ref={launcher}
         className={`buddy-launcher ${dragging ? 'is-dragging' : ''}`}
@@ -246,7 +258,7 @@ export default function FloatingBuddy(props: Props) {
           };
           if (event.key === 'Home') {
             event.preventDefault();
-            apply(cornerPoint('bottom-right', viewport()), true);
+            apply(cornerPoint('bottom-right', launcherViewport()), true);
           } else if (steps[event.key]) {
             event.preventDefault();
             const delta = steps[event.key],
@@ -284,7 +296,7 @@ export default function FloatingBuddy(props: Props) {
               x: pending.origin.x + end.x - pending.start.x,
               y: pending.origin.y + end.y - pending.start.y,
             },
-            viewport(),
+            launcherViewport(),
           );
           if (!frame.current)
             frame.current = requestAnimationFrame(() => {
@@ -346,10 +358,8 @@ export default function FloatingBuddy(props: Props) {
             }}
           >
             <header className="buddy-chat-header">
-              <InteractiveBuddy headOnly active={false} decorative />
               <div>
-                <strong>Buddy AI</strong>
-                <small>ผู้ช่วยจากคลิปที่คุณเลือก</small>
+                <strong>Buddy</strong>
               </div>
               <button aria-label="ย่อหน้าต่างแชต" onClick={close}>
                 −
@@ -408,26 +418,27 @@ export default function FloatingBuddy(props: Props) {
                 if (atBottom.current) setNewMessage(false);
               }}
             >
-              {!props.turns.length && (
-                <div className="buddy-empty">
-                  <InteractiveBuddy headOnly active={false} decorative state={state} />
-                  <h3>เริ่มจากคลิปที่อยากเข้าใจ</h3>
-                  <p>เลือกคลิป แล้วถาม Buddy พร้อมเปิดหลักฐานจากช่วงเวลาจริงในคลิป</p>
-                </div>
-              )}
+              <div className="buddy-v5-welcome">
+                <BuddyArt pose="buddy" />
+                <h3>
+                  ถามได้เลย<span>.</span>
+                </h3>
+              </div>
               {props.turns.map((turn) => (
                 <article className="buddy-message" key={turn.id}>
                   <div className="buddy-question">{turn.label}</div>
-                  <small>
-                    คลิปในชุดคำถามนี้:{' '}
-                    {turn.sources
-                      .map(
-                        (source) =>
-                          props.videos.find((video) => video.video_id === source.video_id)?.title ||
-                          source.video_id,
-                      )
-                      .join(' · ')}
-                  </small>
+                  <details className="buddy-v5-sources">
+                    <summary>แหล่งข้อมูล · {turn.sources.length} คลิป</summary>
+                    <p>
+                      {turn.sources
+                        .map(
+                          (source) =>
+                            props.videos.find((video) => video.video_id === source.video_id)
+                              ?.title || source.video_id,
+                        )
+                        .join(' · ')}
+                    </p>
+                  </details>
                   <div className="buddy-reply-heading">
                     <InteractiveBuddy headOnly active={false} decorative />
                     <strong>Buddy AI</strong>
