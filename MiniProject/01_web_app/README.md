@@ -19,7 +19,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-เปิด `http://127.0.0.1:3000` เว็บจะตรวจ `/api/auth/me` และขอ challenge ก่อนแสดงปุ่ม GIS ไม่เปลี่ยนไปใช้ demo อัตโนมัติเมื่อ backend ไม่พร้อม โดยปริยาย Vite proxy `/api` ไป `NEXT_PUBLIC_API_BASE_URL` (เริ่มที่ `http://localhost:8000`) ส่วน production ต้องตั้ง reverse proxy `/api` เอง
+เปิด `http://localhost:3000` ให้ตรงกับ Authorized JavaScript origins ของ Google OAuth client และ trusted origin ของ backend โหมด development จะส่งการเปิดหน้า HTML จาก `127.0.0.1:3000` ไป `localhost:3000` อัตโนมัติ โดยรักษา path/query เดิม เว็บจะตรวจ `/api/auth/me` และขอ challenge ก่อนแสดงปุ่ม GIS ไม่เปลี่ยนไปใช้ demo อัตโนมัติเมื่อ backend ไม่พร้อม โดยปริยาย Vite proxy `/api` ไป `NEXT_PUBLIC_API_BASE_URL` (เริ่มที่ `http://localhost:8000`) ส่วน production ต้องตั้ง reverse proxy `/api` เอง
 
 Vite อ่านเฉพาะ `NEXT_PUBLIC_API_BASE_URL` จาก shared `.env` ที่ MiniProject และให้ค่าของ `01_web_app/.env` หรือ process environment มีลำดับเหนือกว่า โหลดค่าอื่นฝั่ง server เข้าหน้าเว็บไม่ได้ ต้องให้ backend ตั้ง `WEB_ORIGIN=http://127.0.0.1:3000` ตรงกับ origin ที่เปิดจริง หากเปิดผ่าน `localhost` ให้ตั้งค่า origin ให้ตรงกัน
 
