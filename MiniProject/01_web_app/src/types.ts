@@ -134,11 +134,38 @@ export interface SourcePresentation {
   limitation?: string;
 }
 export interface FrameReference {
+  assetId?: string;
   videoId: string;
   generation: number;
   evidenceVersion: string;
   frameId: string;
   timeSeconds: number;
+}
+export interface MediaEvidenceData {
+  contract_version: 2;
+  video_id: string;
+  generation: number;
+  state: string;
+  coverage?: { frame_ids?: string[] };
+  evidence: {
+    frame_id: string;
+    asset_id: string;
+    timestamp_seconds: number;
+    text: string;
+    kind: 'ocr' | 'visual';
+    evidence_version: string;
+  }[];
+}
+export interface RecoverableJob extends Job {
+  request: {
+    type?: TaskType;
+    question?: string;
+    instruction?: string;
+    goal?: string;
+    topic?: string;
+    scope?: Scope;
+  };
+  sources: { video_id: string; generation?: number; transcript_version?: string }[];
 }
 export interface CitationPresentation {
   kind: EvidenceKind;

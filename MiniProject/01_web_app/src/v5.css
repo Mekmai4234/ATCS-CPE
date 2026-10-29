@@ -1308,3 +1308,76 @@ body .v5-workspace .pending-panel {
     scroll-behavior: auto !important;
   }
 }
+/* Durable work and authorized media details use the same quiet v5 surfaces. */
+.recovery-panel {
+  margin: 0 0 20px;
+  min-width: 0;
+}
+.recovery-tools {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.recovery-panel > details {
+  margin-top: 12px;
+  border: 1px solid var(--v5-line);
+  border-radius: 18px;
+  padding: 16px 20px;
+  background: white;
+}
+.recovery-panel summary,
+.media-evidence-panel > summary {
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--v5-ink);
+}
+.recovered-jobs {
+  display: grid;
+  gap: 12px;
+}
+.recovered-jobs article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 0;
+  border-top: 1px solid var(--v5-line);
+}
+.recovered-jobs article > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.recovered-jobs article p {
+  margin: 8px 0;
+}
+.recovered-jobs article button {
+  flex-shrink: 0;
+}
+.media-evidence-panel {
+  margin: 12px 0;
+  font-size: 14px;
+}
+.media-evidence-list {
+  display: grid;
+  gap: 12px;
+}
+.media-evidence-list img {
+  max-width: 100%;
+  height: auto;
+}
+.media-evidence-list .evidence-text {
+  overflow-wrap: anywhere;
+  max-height: 220px;
+  overflow: auto;
+}
+body .v5-workspace.view-chat .recovery-panel {
+  grid-column: 1/-1;
+  grid-row: 3;
+}
+@media (max-width: 600px) {
+  .recovered-jobs article {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
