@@ -2,11 +2,24 @@
 
 Installation and runnable commands: README.md
 Executed checks and limits: TEST_REPORT.md
+Visual handoff and new executed checks: VISUAL_HANDOFF.md, VISUAL_TEST_REPORT.md
+
+E) Opt-in Internal Visual Consumer (not mounted on HTTP)
+------------------------------------------------------
+1. Require 02 authorization for frozen media snapshots and map prepared 03 frame metadata.
+2. Search authorized transcript/OCR/stored observations before inspecting new frames.
+3. Require externally verified Free Tier/model capability and shared broker leases.
+4. Reuse an authorized/versioned observation cache entry or load original bytes and check hash.
+5. Analyze at most three additional prepared frames per question, never a full video upload.
+6. Validate structured observations, separate original OCR and recheck permissions before caching.
+7. Validate cited mixed evidence and return kind/frame/time/API locators with sampled coverage.
+8. 02 must revalidate and publish atomically; no new public route/schema is owned by 05.
 
 A) Grounded Question Answering
 ------------------------------
 1. Receive request, frozen authorized Source records, history and ExecutionContext from 02.
-2. Validate matching video scope and retain bounded recent history as untrusted context.
+2. Verify the durable owner and grants. Use 02's filtered Source subset of the requested
+   scope and require history/conversation to match the durable job before generation.
 3. Add recent user context to the retrieval question within 04's query-byte budget.
 4. Obtain actual indexed inventory and scoped ranked search hits from 04.
 5. Validate each evidence video's identity/version; fit ranked evidence to the input guard
@@ -20,7 +33,8 @@ A) Grounded Question Answering
 
 B) Summary and Comparison
 -------------------------
-1. Validate the task and exact video IDs; comparison requires at least two selected videos.
+1. Verify owner/grants and the filtered authorized scope; comparison requires at least
+   two authorized videos. A research job may invoke the same analyzer through 06.
 2. Enumerate all available chunks through 04 pagination, checking inventory consistency.
 3. Partition each video's evidence into bounded batches and generate cited summaries.
 4. Record distinct original chunks supplied to successful batch generation.
@@ -43,5 +57,11 @@ D) Verification
 1. Run locked offline unit, SDK HTTP-mock and real 02/04/06 integration tests.
 2. Run Ruff lint and format checks.
 3. Inspect synthetic reference cases for semantic review requirements.
-4. Only when deliberately configured, run scripts/live_check.py --live for paid synthetic
-   generation checks. Real YouTube/embedding/team verification is a separate live exercise.
+4. Only when deliberately configured, run scripts/live_check.py --live --env-file PATH for
+   model lookup and paid synthetic generation. Catalog access does not prove generation access.
+5. Use 02's yk-full selected configuration consistently for runtime and reindex/GC.
+6. Load an existing session into YK_ACCEPTANCE_SESSION, select the trusted --origin,
+   complete the real acceptance plan and run yk-answers-acceptance --live against the live
+   API/worker. Follow-up cases reuse conversation IDs; 200/202 are both supported.
+7. Manually review every claim candidate against its transcript excerpts and original clip.
+   Record semantic decisions separately from automatic structural checks and fixture results.

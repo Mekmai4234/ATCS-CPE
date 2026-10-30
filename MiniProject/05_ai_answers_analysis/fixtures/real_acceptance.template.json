@@ -1,0 +1,63 @@
+{
+  "videos": [
+    "https://youtu.be/REPLACE_VIDEO_A_ID",
+    "https://youtu.be/REPLACE_VIDEO_B_ID"
+  ],
+  "expected_model": "gemini-3.5-flash",
+  "cases": [
+    {
+      "id": "supported-qa",
+      "category": "supported",
+      "kind": "chat",
+      "request": {"question": "REPLACE: a specific question supported by clip A", "scope": {"video_ids": ["REPLACE_VIDEO_A_ID"]}},
+      "expected_status": "answered",
+      "expected_complete": false,
+      "review_criteria": "Check every factual clause against the cited timestamp excerpts and by playing the original clip. Record missing qualifications and wrong attribution. Confirm that ranked/partial coverage is explained without claiming whole-video completeness."
+    },
+    {
+      "id": "unsupported-qa",
+      "category": "unsupported",
+      "kind": "chat",
+      "request": {"question": "REPLACE: a question with no answer anywhere in the selected transcripts", "scope": {"video_ids": ["REPLACE_VIDEO_A_ID", "REPLACE_VIDEO_B_ID"]}},
+      "expected_status": "insufficient_evidence",
+      "review_criteria": "Verify absence against the complete transcripts, not just retrieved passages. The answer must not guess."
+    },
+    {
+      "id": "followup-qa",
+      "category": "followup",
+      "kind": "chat",
+      "conversation_from": "supported-qa",
+      "request": {"question": "REPLACE: a follow-up referring to the earlier answer", "scope": {"video_ids": ["REPLACE_VIDEO_A_ID"]}},
+      "expected_status": "answered",
+      "review_criteria": "Check reference resolution using the same conversation ID. Previous model answers are not independent evidence."
+    },
+    {
+      "id": "long-summary",
+      "category": "long_summary",
+      "kind": "analysis",
+      "request": {"type": "summary", "instruction": "Summarize all major points and limitations in Thai.", "scope": {"video_ids": ["REPLACE_VIDEO_A_ID"]}},
+      "expected_status": "answered",
+      "expected_complete": true,
+      "min_processed_chunks": 9,
+      "review_criteria": "Choose a genuinely long clip with more than retrieval top-k chunks. Check full enumeration, important omissions, timestamps and whether the summary retains qualifications."
+    },
+    {
+      "id": "multi-summary",
+      "category": "multi_summary",
+      "kind": "analysis",
+      "request": {"type": "summary", "instruction": "Summarize each clip separately, with citations.", "scope": {"video_ids": ["REPLACE_VIDEO_A_ID", "REPLACE_VIDEO_B_ID"]}},
+      "expected_status": "answered",
+      "expected_complete": true,
+      "review_criteria": "Check source identity for both clips and avoid treating processed coverage as proof that all facts survived compression."
+    },
+    {
+      "id": "contradictory-comparison",
+      "category": "contradiction",
+      "kind": "analysis",
+      "request": {"type": "compare", "instruction": "REPLACE: compare a known disagreement in the two clips, keeping speaker/version/date context", "scope": {"video_ids": ["REPLACE_VIDEO_A_ID", "REPLACE_VIDEO_B_ID"]}},
+      "expected_status": "answered",
+      "expected_complete": true,
+      "review_criteria": "Select clips that actually disagree. Verify both positions against their own source intervals and record whether differences in date or context explain the disagreement."
+    }
+  ]
+}

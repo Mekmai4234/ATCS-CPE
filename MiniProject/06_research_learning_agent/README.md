@@ -19,7 +19,23 @@ uv run --project 06_research_learning_agent --locked ruff format --check 06_rese
 The module lockfile includes local packages 02 and 04. It does not modify their manifests,
 lockfiles or source. Tests use isolated temporary SQLite/Chroma data, labelled synthetic
 transcripts, deterministic embedding/model doubles and the real GenAI SDK with HTTP mocks.
-There are no paid calls or model downloads. See [TEST_REPORT.md](TEST_REPORT.md) for results.
+There are no paid calls or model downloads. The public agent manifest retains its original
+dependencies so consumers' existing locks remain valid. Tests requiring actual module 05
+live in the separate, non-package `acceptance/` environment, which has its own lockfile:
+
+```powershell
+uv sync --project 06_research_learning_agent/acceptance --locked
+uv run --project 06_research_learning_agent/acceptance --locked pytest -c 06_research_learning_agent/acceptance/pyproject.toml 06_research_learning_agent/tests 06_research_learning_agent/acceptance/tests -q -W error
+```
+
+Core checks run 75 tests with no 05 installation. The acceptance environment runs those
+same 75 plus the two actual-05 comparison/cancellation checks, for 77 total; no tests are
+silently skipped. The source mappings for 05 exist only in the acceptance manifest and
+do not add dependency metadata to the public agent package.
+
+See [DEPENDENCY_REVIEW_REPORT.md](DEPENDENCY_REVIEW_REPORT.md) for current checks,
+[ACCEPTANCE_REPORT.md](ACCEPTANCE_REPORT.md) for the previous 77-test acceptance run and
+[TEST_REPORT.md](TEST_REPORT.md) for the original 55-test baseline.
 
 Docker Desktop must be running with Linux containers. From `MiniProject`:
 
@@ -28,6 +44,8 @@ docker compose -f 06_research_learning_agent/compose.test.yaml -p yk06-check bui
 docker compose -f 06_research_learning_agent/compose.test.yaml -p yk06-check run --rm --no-deps tests
 docker compose -f 06_research_learning_agent/compose.test.yaml -p yk06-check run --rm --no-deps tests ruff check src tests
 docker compose -f 06_research_learning_agent/compose.test.yaml -p yk06-check run --rm --no-deps tests ruff format --check src tests
+docker compose -f 06_research_learning_agent/compose.test.yaml -p yk06-check build acceptance
+docker compose -f 06_research_learning_agent/compose.test.yaml -p yk06-check run --rm --no-deps acceptance
 ```
 
 The test container is non-root, has networking disabled, receives an empty Gemini key,
@@ -35,6 +53,8 @@ and mounts no application database. Each run is disposable. A Dockerfile-specifi
 allowlist excludes local keys, .env files, runtime data and unrelated project files.
 Root Compose files are unchanged. This image is a verification image, not a production
 deployment of the entire application.
+The `tests` target packages only 02/04/06. The optional `acceptance` target adds 05 and
+the isolated acceptance environment. Both install with --locked; neither uses --frozen.
 
 ## Configuration
 
@@ -55,6 +75,11 @@ process environment > `06_research_learning_agent/.env` > shared `MiniProject/.e
 
 The generation model is independent of 04's embedding model. Module 06 does not migrate
 existing indexes. No real key is included or needed for offline tests.
+
+The 06-owned `create_adapters` factory now builds AgentSettings and RagSettings from the
+backend's already-resolved Settings, so it does not reread conflicting 04/06 env overrides.
+Standalone `AgentSettings()` still uses the precedence above. Explicitly injected settings
+and the existing 05 team composition retain their own configuration ownership.
 
 ## Connection to 02 and 04
 
@@ -91,10 +116,11 @@ Initialize 02's schema and 04's manifest with the existing `yk-db upgrade head` 
 `yk-rag init` commands, targeting an intended development database. Supply 04's compatible
 configuration separately as described in its README.
 
-The default factory intentionally leaves 03 ingestion and 05 answer/analyze unavailable.
-Live URL import therefore requires the team's real 03 adapter; full application composition
-is a separate integration task. Existing fixture databases must not be relabelled as live.
-The tests seed labelled transcripts through a test-only ingestion adapter.
+The 06-only default factory leaves 03 ingestion and 05 answer/analyze unavailable.
+The existing `youtube_answers.team:create_adapters` factory in module 05 already connects
+03/04/05/06, supplies `answers.analyze` to the agent, and shares its RAG instance. Follow
+05's integration instructions for that composition; do not replace its configured factory
+with the 06-only factory. Existing fixture databases must not be relabelled as live.
 
 ## Runtime behavior
 
@@ -114,7 +140,15 @@ ownership propagate to 02. Research is not silently restarted after a crash.
 Artifacts follow 02's existing schemas. Each study day, quiz question or flashcard has
 supporting citation IDs; quiz questions include answers and explanations. Plans have
 consecutive days and exactly the requested day count. Citation URLs are constructed from
-trusted video IDs/times. 02 revalidates evidence/version/bounds before storing results.
+trusted video IDs/times. 06 re-reads exported citations and checks inventory before delivery,
+including partial findings and artifacts retained from previous steps. Changed/missing
+evidence or index-configuration failures cannot become a seemingly usable partial result.
+02 also revalidates evidence/version/bounds before storing results.
+
+Comparison observations include 05's citation-label-to-chunk mapping and declared coverage.
+Tool evidence is checked against the requested subset, not just the larger run scope.
+Backend channel/date filters may narrow the original request but cannot introduce videos
+absent from its explicit selection.
 
 Coverage counts distinct evidence supplied to a successful subsequent model decision or
 validated artifact generation, not merely fetched chunks. This is an operational processing
@@ -125,7 +159,42 @@ real vector inventory. Backend 02 currently requires complete research coverage 
 On step/context/time limits, partial research preserves existing artifacts and source
 excerpts with explicit limitations. It does not manufacture new synthesis. Finalization
 starts before the hard deadline; hard expiry or lost ownership may still cause 02 to record
-a failure/cancellation. Fatal errors before evidence is obtained use classified errors.
+a failure/cancellation. Terminal `run_controller` events use the last decision step and
+actual completed/partial outcome after source revalidation. A proposed finish stays in
+`validating` until that recheck succeeds. Cancellation is reported through the durable
+job state and never publishes a final result.
+
+## Reproducible quality-review preparation
+
+Run six synthetic Thai/English scenarios in a NEW isolated directory:
+
+```powershell
+uv run --project 06_research_learning_agent --locked python -m youtube_agent.evaluation --state 06_research_learning_agent/runtime/review-new --output 06_research_learning_agent/runtime/review.json
+```
+
+The runner covers research in both languages, multiple clips, quiz explanations,
+flashcards, seven-day study plans and a one-step partial result. It uses real backend
+jobs/validation and Chroma, with deterministic offline generation/embeddings. Its JSON
+report retains each result, wall latency, provider metadata/usage and a manual review
+checklist. A passing contract is not a passing semantic review: each checklist remains
+`passed=null`, and `semantic_quality_verified=false`.
+
+For real-video review, prepare a dataset matching `src/youtube_agent/data/acceptance.json` from authorized
+03 transcript exports. Set `provenance` to `exported_transcripts`, preserve actual segment
+IDs/timestamps, and update case scopes/topics/review criteria. Videos are explicit
+`TranscriptResult` records, not raw unfiltered API response objects. The runner does not
+fetch YouTube, overwrite an application database, or reuse a previous state directory.
+The default dataset is an installed package resource loaded with importlib.resources;
+no consumer Dockerfile needs a separate copy of a repository-level fixtures directory.
+
+With a configured account/model, adding `--dataset PATH --live` explicitly enables live
+Gemini generation AND embeddings on those exports. This mode makes paid requests and
+uses its own SQLite/Chroma pair; no live mode was invoked in this acceptance run.
+Actual module-05 comparison/cancellation are additionally covered by integration tests,
+which inject real `AnswerService` into the same RAG instance and mock only model responses.
+
+Module 04 owns maintenance/storage-pair safeguards. Follow its current README for
+`reindex/gc` and configuration checks; this 06 dependency repair changes no 04 code.
 
 ## Limits and next integration work
 
@@ -145,3 +214,50 @@ a failure/cancellation. Fatal errors before evidence is obtained use classified 
 
 Implementation references: [Gemini function calling](https://ai.google.dev/gemini-api/docs/function-calling)
 and [official Python SDK](https://github.com/googleapis/python-genai).
+
+## Member research and learning
+
+Authenticated backend contexts now bind a durable member identity and source scope to
+research/artifact execution, including direct AgentService composition in module 05.
+See [MEMBER_AUTHORIZATION.md](MEMBER_AUTHORIZATION.md) for the account-aware backend
+contract, quota/revocation policy, deployment dependencies and commands. Test evidence
+is recorded in [MEMBER_TEST_REPORT.md](MEMBER_TEST_REPORT.md). This module does not add
+Google login or replace backend ownership checks on HTTP results/events/artifacts.
+
+### Auth integration review (2026-10-22)
+
+Core and acceptance locks now target the account-aware 02 dependency metadata, alongside
+authorized 04 and member-aware 05. Use the dependency revisions in
+[AUTH_REVIEW_REPORT.md](AUTH_REVIEW_REPORT.md); the earlier unauthenticated develop
+checkout does not satisfy these locks. Other modules' manifests and locks are unchanged.
+
+Evaluation creates a synthetic member in its NEW isolated database by default. Imports,
+jobs and artifacts use that durable owner; the report labels it `isolated-member-fixture`,
+which does not establish real Google login. `--legacy-test` explicitly selects offline-only
+regression in a separate NEW database and cannot be combined with `--live`. Neither mode
+changes application auth settings. Authorization failures cannot count as successful
+evaluation cases merely by allowing a failed state in a dataset.
+
+HTTP fixtures use the real challenge/session/CSRF flow with fixture Google claims. Real 05
+comparison acceptance now uses actual backend member permissions, including revocation
+inside generation. The optional `contracts` Docker target runs the backend session/ownership
+suite against the same candidate:
+
+```powershell
+docker compose -p yk06-auth-review -f 06_research_learning_agent/compose.test.yaml build tests acceptance contracts
+docker compose -p yk06-auth-review -f 06_research_learning_agent/compose.test.yaml run --rm contracts
+```
+
+See the latest report for commands, dependency revisions and actual gate results.
+
+## Free Tier and media Agent (2026-10-25)
+
+Real Gemini planning/artifact requests now require 02's shared Free Tier admission,
+including countTokens. Defaults bound each run to four model operations and 32 tools,
+with protected finalization capacity. Stored OCR/visual evidence has an opt-in internal
+controller using native v2 frame/time citations and at most three extra frames.
+
+See [FREE_TIER_AGENT.md](FREE_TIER_AGENT.md) for contracts, policy, reservation limits
+and the remaining 02/04/05 public media wiring. The native media path currently permits
+enrichment leases; public multi-step media research is not enabled by this PR.
+See [FREE_TIER_REPORT.md](FREE_TIER_REPORT.md) for the tested common candidate and results.

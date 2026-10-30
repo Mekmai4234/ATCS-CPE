@@ -20,12 +20,17 @@ A) Indexing
 
 B) Retrieval
 ------------
+0. Require the durable 02 job owner, active account and current library memberships.
 1. Receive question and a nonempty subset of the current job's frozen sources.
 2. Reject widened scopes, invalid limits and old/incompatible index configurations.
 3. Prepare the query retrieval prefix, count it and embed with the same Gemini config.
 4. Filter Chroma by exact published run IDs before cosine ranking.
 5. Limit duplicates and return ranked evidence with original text and real timestamps.
 6. Recheck source/run identities after asynchronous operations. 05 decides sufficiency.
+7. Bind signed page cursors to account/job/source/grant/run snapshots; expire old or
+   tampered cursors. Reauthorize chunk/evidence/inventory reads before returning.
+8. Propagate revoked permissions as errors. Never widen empty scopes or hide denied
+   access as an ordinary no-evidence answer. Admin has no private-library bypass.
 
 C) Coverage, Replacement and Deletion
 ------------------------------------
@@ -34,4 +39,30 @@ C) Coverage, Replacement and Deletion
 3. Keep old indexes until replacement succeeds; never combine incompatible vector spaces.
 4. Hide authorized generations before deleting vectors; retain retryable failed cleanup.
 5. Stop API/workers for explicit per-video reindex and abandoned-staging GC.
-6. Back up compatible application DB and Chroma data together.
+6. Inspect yk-rag config with the runtime profile/env files before maintenance.
+7. Upgrade existing stores with init then verified bind-store while stopped.
+8. Reject mismatched SQLite/Chroma identities before changing any index metadata.
+9. Verify deletion before forgetting cleanup metadata; retry incomplete cleanup later.
+10. Back up the application DB and whole Chroma directory, including the pair marker,
+    together while stopped. Verify inventory/evidence after restoring both snapshots.
+11. Membership detach revokes only that account; leave shared vectors for other users.
+12. Before physical deletion, check zero refs and no other source jobs under the writer
+    fence. 02's deleting tombstone must reject reimport throughout the vector operation.
+13. Upgrade after 02 ownership migration, then stopped init for cursor signing state.
+    Existing vector/chunk metadata remains compatible; see AUTHORIZATION.md.
+14. For the full launcher use yk-full rag-init --workers-stopped with the selected
+    runtime configuration; repeating full init alone does not add the cursor table.
+15. Validate the actual consumer lock with the full pinned backend manifest, run
+    uv sync --locked, then test the same candidate on host and in a freshly built image.
+    Use the native 02/03 full-factory source contract; no separate member wrapper is enabled.
+
+D) OCR / Visual Evidence (24 October 2026)
+16. Apply the backed-up 02 schema-0003 upgrade, then additive stopped rag-init with matching settings.
+17. Consume published 02 v2 OCR/visual snapshots in the same live enrichment execution.
+18. index_snapshot(..., semantic=False) stores local evidence; search_snapshots uses literal SQLite
+    search until a complete semantic index exists. Report sample/time and semantic limitations.
+19. With an operator-approved policy, semantic indexing routes every count/embedding HTTP call
+    through 02. Successful item checkpoints survive quota waits; do not re-extract the source.
+20. Fetch original frames only through 02 authorized asset routes. Retain grant checks on cache hits.
+21. Use stopped GC for retired/staging vectors and durable 02 deletion for final generation cleanup.
+    Full visual-chat factory/UI wiring and mixed v2 scopes remain explicit upstream dependencies.

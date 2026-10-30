@@ -1,47 +1,93 @@
-### 01_web_app - Process & Techniques (README)
+### 01_web_app - Process & Techniques
 
 Overview
 --------
-The frontend is the user's entry point to YouTube Knowledge. It turns pasted video links
-into a manageable library, presents evidence-based answers, and displays learning artifacts.
-The interface shows planned system behavior; implementation is still pending.
+A runnable React/TypeScript workspace for importing YouTube URLs, selecting ready
+sources, asking grounded questions, and viewing analysis/research/learning outputs.
+Integration follows the actual local develop@25427fe contract initially inspected
+through Git. The branch was synchronized with develop before publishing the PR.
 
 Architecture
 ------------
-- VideoImportForm collects URLs and displays per-item validation results.
-- VideoLibrary shows cards, processing stages, selection filters, and deletion actions.
-- VideoPlayer displays a supported YouTube embed and timestamp navigation.
-- ChatWindow displays questions, grounded answers, and evidence cards.
-- LearningWorkspace presents research progress, plans, quizzes, and flashcards.
-- The frontend communicates with 02_api_backend, not directly with ChromaDB or Gemini.
+- SessionShell.tsx restores membership, gates routes, keys private state by account/session
+  revision, and unmounts the workspace before logout. HttpSessionPort is the default.
+- session.ts defines an internal frontend port, not an HTTP contract. DemoSessionPort uses
+  isolated synthetic account stores. httpSession.ts maps the inspected module-02 PR18
+  challenge, Google exchange, session/CSRF, logout, stats and member update endpoints.
+- GoogleButton.tsx renders the official GIS button; credentials are passed to the adapter
+  and are not written to localStorage or sessionStorage. No password forms are included.
+  Server nonce/client_id initialize GIS. Challenges refresh before expiry and after failed
+  exchange. Old callbacks are ignored and credentials are never automatically resubmitted.
+- Forest.tsx retains legacy export names but renders a plain CSS mint backdrop and the
+  layered InteractiveBuddy. mint.css supersedes the former forest surfaces. Existing
+  fonts, reading cards and real Admin capabilities remain in use.
+- InteractiveBuddy.tsx uses independent raster head/body/waving-hand layers, code pupils,
+  bounded transforms and requestAnimationFrame/ref tracking. Hidden/reduced-motion modes
+  reset tracking; head-only/minimized rigs have no tracking listener. Animations are finite.
+- FloatingBuddy.tsx portals the authenticated launcher/dialog while consuming App's shared
+  draft/scope/turns/conversation/Api. It does not create a second chat client or store.
+  The launcher captures pointers after down, separates click/drag, clamps to visualViewport,
+  handles cancellation and provides keyboard corner/reset/hide/restore alternatives.
+- buddyModel.ts validates the versioned coordinate preference, geometry, IME input and
+  canonical scope identity. No private conversation/token data is persisted locally.
+- api.history loads known conversation messages with pagination; App merges by job identity
+  and preserves citation invalidation. There is no invented account-wide history-list route.
+- App.tsx coordinates library, import, selection, task forms and lifecycle state.
+- api.ts is the typed HTTP boundary, classified errors and sequential job observer.
+  With session security it includes cookies/CSRF, expires on 401, refuses automatic 403
+  retries, and aborts outstanding requests on disposal.
+- domain.ts validates supported URLs, source constraints, timestamps and terminal states.
+- Results.tsx renders safe answer text, citations, coverage and typed learning content.
+- sources.ts retains source generation/index identity and invalidates stale citations
+  independently across answers and nested artifacts. Library refresh rechecks stored
+  result jobs; a partial library page alone is never interpreted as deletion.
+- demo.ts is explicitly enabled synthetic transport for development and acceptance.
+- vite.config.ts loads only public API configuration and builds static assets.
+- API_CONTRACT.md maps frontend operations to module 02 behavior.
+- AUTH_INTEGRATION.md records auth/admin mappings and same-origin deployment. The new
+  identity_smoke.py runs real auth-enabled backend routes with an external Google verifier
+  fixture. This verifies cookie/CSRF/ownership mechanics, not real Google authentication.
 
-Techniques Used
----------------
-- Job polling keeps video import responsive while background processing continues.
-- Query caching avoids unnecessary repeated library/history requests.
-- Optimistic display applies to the user's message only; AI results must come from the backend.
-- State-specific UI distinguishes missing captions, processing failures, and insufficient evidence.
-- Citation mapping connects source records to actual video IDs and time bounds.
-- Optional streaming is added only when the API defines event and final-validation semantics.
+Techniques and Contract
+-----------------------
+- Import returns per-input accepted/existing/rejected; 202 is not universal success.
+- Video stage is independent of queued/running/completed/partial/failed/cancelled job state.
+- Chat can return 200 or 202; analysis/research/artifacts return durable jobs.
+- Polling is sequential and cancellable, stops at terminal states, and bounds transient
+  read failures. A client observation timeout does not imply server task failure.
+- Logical task requests freeze payload/scope and reuse Idempotency-Key on uncertain
+  delivery. Once a job ID is known, retry observation instead of submitting new work.
+- Preserve ready-video scope, channels and inclusive dates; never widen empty results.
+- Pagination is explicit. Filters operate on loaded pages; playlist is unsupported.
+- Full-analysis coverage and partial outcomes stay visible, independent of HTTP success.
+- Stored artifact IDs are retrieved before displaying quizzes, cards and study plans.
+- Model text is escaped; citation links are built only from validated video ID/time.
+- Historical unavailable sources disable links, including sources of nested artifacts.
+- Fixture headers/body modes produce a persistent visible synthetic-data notice.
+- No automatic fallback to demo, provisional streaming or browser provider credentials.
 
-Communication With the Backend
-------------------------------
-- POST /api/videos/import: { urls[] } -> { jobs[] }.
-- GET /api/jobs/{job_id}: import stage, errors, and measured progress if available.
-- GET /api/videos and GET /api/videos/{video_id}/transcript: library and timestamped text.
-- POST /api/chat: { question, conversation_id, scope } -> answer and citations.
-- POST /api/analysis, POST /api/research, and POST /api/learning-artifacts:
-  summaries, comparisons, research runs, and study outputs.
+Verification and Boundaries
+---------------------------
+Vitest checks domain/HTTP/polling behavior; Playwright checks browser flows on desktop
+and mobile, state handling, escaping, scope, pagination and idempotent retries.
+The optional isolated smoke runner extracts module 02 into ignored runtime storage,
+uses its real HTTP/API/worker and a new fixture DB, then stops its own processes.
+This validates integration mechanics without claiming live YouTube/model quality.
+See TEST_REPORT.md for actual commands/results, not assumed acceptance.
 
-Design Rationale
-----------------
-Separate the library, chat, and learning views so users can understand which videos support
-each result. Keep processing state visible so metadata availability is not confused with
-AI readiness.
+Authentication/session restoration uses module-02 auth and private member APIs;
+an animated layered Buddy is implemented. Current workspace turns/pending job UI
+are not restored after reload. External YouTube playback and timestamp links are
+provided. Deployment is outside the verified frontend runtime.
 
-Things to Watch Out For
-----------------------
-- A video may allow normal playback but disallow embedding; offer its original link.
-- A missing transcript does not imply the video itself is unavailable.
-- Do not present mock answers as real results or invent processing percentages.
-- Chat history alone does not authorize searching outside the selected source scope.
+INTEGRATED MINT UI (24 October 2026)
+Use the shared SessionShell/API and conversation state for full and floating chat.
+polish.css refines the reference layout; Visuals.tsx supplies decorative learning objects and consistent icons.
+Keep decorative overflow inside its scene, preserve reduced-motion behavior and clamp the launcher/panel.
+
+PERSISTENT BUDDY AND TERMINAL JOB RECOVERY (24 October 2026)
+The floating mascot stays mounted for every signed-in workspace route. Closing the panel minimizes it; there is no separate top-bar restore button or hide action.
+After an HTTP task error with a durable job ID, reconcile its state. Terminal failed/cancelled jobs unlock the composer; ambiguous or active jobs remain recoverable without duplicate POSTs.
+
+VISUAL EVIDENCE AND PROVIDER QUEUES (24 October 2026)
+EvidenceBridge is an internal UI seam only; production remains transcript-based until module 02 publishes the contract. Shared evidence rendering escapes OCR, separates AI descriptions and reports sampled frames. Known queued provider-limit/outage jobs release the UI and resume by explicit GET; backend alone retries. See EVIDENCE_HANDOFF.md.

@@ -5,6 +5,19 @@ Includes a 03-owned factory for `ingest -> 02 persistence -> 04 index`, offline 
 real SQLite/Chroma integration tests, and an explicit public YouTube read check.
 Existing 02/04/06 source and factories are unchanged.
 
+The 2026-10-24 local media/OCR work is documented in
+[MEDIA_PREPARATION.md](MEDIA_PREPARATION.md) and [MEDIA_TEST_REPORT.md](MEDIA_TEST_REPORT.md).
+It is an opt-in internal preparation service with real local-engine tests. It does
+not yet enable video uploads or captionless imports through the web/API: those need
+02's new evidence contract and 04/05 integration. It creates no Gemini client or
+fake TranscriptResult and leaves the existing caption worker unchanged.
+
+Member ingestion now uses **02's native session/ownership flow and 04's authorized
+ExecutionContext**. The previous proposal-only backend and grants were removed.
+This requires the dependency branches/commits listed in [MEMBER_CONTRACT.md](MEMBER_CONTRACT.md);
+base develop does not yet include those PRs. See [MEMBER_REPORT.md](MEMBER_REPORT.md)
+for review fixes, actual test results and remaining release gates.
+
 ## Install and test
 
 From **MiniProject root**, with Python >=3.11,<3.14 and uv:
@@ -16,8 +29,9 @@ uv run --project 03_video_ingestion --locked ruff check 03_video_ingestion
 uv run --project 03_video_ingestion --locked ruff format --check 03_video_ingestion
 ```
 
-The lock installs local packages 02 and 04. Normal tests need no credentials or existing
-database. HTTP/embeddings/transcripts are doubles in integration tests; API/worker,
+The lock installs local packages 02 and 04 from the documented native dependency
+candidate. Normal tests need no credentials or existing database. Google verification,
+embeddings and transcript providers are doubles; HTTP API/worker,
 migrations, cancellation, SQLite and Chroma are real. The real caption SDK also runs
 against mocked HTTP, and real subprocesses verify timeout/cancellation cleanup.
 
@@ -38,15 +52,16 @@ Chroma indexing without paid embeddings, use a new isolated directory:
 
 ```powershell
 $ingestionCheckState = "runtime/ingestion-acceptance-$(Get-Date -Format yyyyMMdd-HHmmss)"
-uv run --project 03_video_ingestion --locked python 03_video_ingestion/scripts/acceptance_check.py --state $ingestionCheckState --video-id wD3NSzYtsMc --video-id dQw4w9WgXcQ --fixture-embeddings
+uv run --project 03_video_ingestion --locked python 03_video_ingestion/scripts/acceptance_check.py --state $ingestionCheckState --video-id wD3NSzYtsMc --video-id dQw4w9WgXcQ --fixture-identity --fixture-embeddings
 ```
 
 This explicitly uses real YouTube captions/oEmbed with **fixture embedding values**,
-real SQLite/Chroma and in-process HTTP. It verifies all stored segment timestamps
+a labelled fixture Google verifier, real session/cookie/CSRF, SQLite/Chroma and
+in-process HTTP. It verifies all stored segment timestamps
 against provider output and checks that duplicate URLs reuse the same job without
 another caption request. Existing nonempty directories are rejected. Its database
 has an acceptance-only identity and cannot be reused by the production live factory.
-The result is a mechanics check, not semantic retrieval/model-quality validation.
+The result checks mechanics. It does not verify real Google login or semantic retrieval/model quality.
 
 ## Configuration
 
@@ -93,7 +108,8 @@ Terminal 1, from MiniProject:
 
 ```powershell
 $env:ADAPTER_MODE = "custom"
-$env:ADAPTER_FACTORY = "youtube_ingestion.integration:create_adapters"
+$env:ADAPTER_FACTORY = "youtube_ingestion.member_adapters:create_member_adapters"
+$env:AUTH_ENABLED = "true"
 $env:BACKEND_INTEGRATION_PROFILE = "live"
 $env:DATABASE_URL = "sqlite:///./runtime/ingestion-live/app.db"
 uv run --project 03_video_ingestion --locked yk-db upgrade head
@@ -101,22 +117,40 @@ uv run --project 03_video_ingestion --locked yk-rag init
 uv run --project 03_video_ingestion --locked yk-api
 ```
 
-Terminal 2: set the **same four variables**, then:
+Configure 02 Google client ID, trusted web origins, session signing/cookie settings in
+both terminals as required by 02. Production requires HTTPS and Secure cookies.
+
+Terminal 2: set the **same backend variables**, then:
 
 ```powershell
 uv run --project 03_video_ingestion --locked yk-worker
 ```
 
+Sign in through 02's challenge/Google exchange using the configured web origin. Send
+the session cookie and X-CSRF-Token for mutations; anonymous imports return 401.
 Open [Swagger](http://127.0.0.1:8000/docs). Submit `POST /api/videos/import` with
 `{"urls":["https://youtu.be/dQw4w9WgXcQ"]}` and poll `GET /api/jobs/{job_id}`.
 Read `GET /api/videos/{video_id}/transcript`. Only successful verified indexing makes
-a clip `ready`. Existing deletion API cleans transcripts and vectors durably.
+a clip `ready`. Deletion detaches the current member; physical GC runs only after the
+last reference and active dependency are gone. Shared import cancellation returns 409;
+use detach to preserve another member's required work.
 
 The factory enables ingest/index/delete/evidence/inventory. Answer/analysis/research/
 artifacts remain explicitly unavailable through this factory. It does not implement 05
 or replace 02's separate 04/06 factory. Future team composition can delegate `ingest`
 to `IngestionService` while retaining other services. Root Compose does not package 03;
-these instructions use the local 03 environment, not the root backend-only image.
+these instructions use the local 03 environment. The separate 03 image uses its own lock:
+
+```powershell
+docker build -f 03_video_ingestion/Dockerfile -t ingestion03-native .
+```
+
+Build from a candidate with native 02/04 installed. The image runs as a non-root user,
+ships no .env/database/keys, and defaults to authenticated native ingestion. Supply
+02 auth/origin/HTTPS settings and provider keys at runtime; run migrations and 04 init
+explicitly on a dedicated writable DB/index pair. Override CMD with yk-worker for a
+worker sharing that pair. Docker build/run could not be verified on this machine
+because Docker CLI/Engine are unavailable; deployment acceptance remains pending.
 
 ## Contract and behavior
 
@@ -159,7 +193,8 @@ Unknown errors are redacted; no raw provider messages or credentials are returne
 YouTube can block public caption access. A block is not treated as missing captions.
 There is no proxy rotation, cookie authentication or automatic transcription fallback.
 No discovery, scheduler, ready-video refresh, ASR, visual understanding or new ownership
-model is implemented. The application retains 02's single-user prototype constraints.
+model is implemented in 03. Native membership and job ownership are supplied by 02;
+03 does not implement per-member pending/running quotas or fair worker scheduling.
 Full live ingestion with paid Gemini indexing has not been tested without a key.
 
 References: [caption SDK](https://github.com/jdepoix/youtube-transcript-api),

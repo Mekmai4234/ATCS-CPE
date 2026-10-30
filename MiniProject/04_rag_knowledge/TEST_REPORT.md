@@ -1,4 +1,93 @@
-# Module 04 — Gemini migration verification
+# Module 04 — Maintenance/store-pair verification
+
+For the 2026-10-24 media/Free Tier extension and current backend dependency,
+see [FREE_TIER_MEDIA.md](FREE_TIER_MEDIA.md) and
+[FREE_TIER_TEST_REPORT.md](FREE_TIER_TEST_REPORT.md).
+
+Latest 2026-10-22 locked-candidate evidence:
+[LOCK_HANDOFF_TEST_REPORT.md](LOCK_HANDOFF_TEST_REPORT.md).
+
+For the 2026-10-21 account-aware changes, see
+[AUTHORIZATION_TEST_REPORT.md](AUTHORIZATION_TEST_REPORT.md). The results below
+describe the earlier maintenance update and migration checks.
+
+Verified on 2026-10-19 against the current integrated checkout (`25427fe`). Changes
+are limited to module 04. No commit, push, PR, deployment or migration of existing
+application data was performed in this update.
+
+## Current executed results
+
+| Check | Observed result |
+|---|---|
+| Windows module 04, warnings treated as errors | **97 passed, 1 skipped**, 106.37 seconds |
+| Docker Linux module 04, warnings treated as errors | **97 passed, 1 skipped**, 116.57 seconds |
+| Existing 02 regression, warnings treated as errors | **68 passed**, 18.64 seconds |
+| Existing 03 regression, warnings treated as errors | **69 passed**, 18.81 seconds |
+| Ruff lint/format on host and Docker | Passed, 23 Python files |
+| `uv lock --check`, `git diff --check` | Passed; no dependency/lock changes |
+| Change-scope / credential-pattern audit | 11 changed/new files, all in 04; no matching credential patterns |
+| Docker seed -> separate verify container, shared isolated volume | Passed; 2 videos, 7 chunks, 8/8 fixture questions within top 3; scope preserved |
+| Live captions through unchanged 03 | One successful English manual transcript, 61 segments |
+| Real-caption 04 lifecycle smoke, host and Docker | Passed; 16 chunks, reindex/reopen, inventory/evidence/timestamp identity, scoped Thai/English queries and deletion |
+
+The 20 new regression cases cover runtime/maintenance env divergence, explicit file
+precedence, automatic 02/03/05 factory profiles, secret-free configuration output,
+wrong/missing/corrupt pair markers, incorrect SQLite paths, foreign populated stores,
+verified legacy adoption, retry after initial embedding failure, cleanup failures and
+post-delete verification, provider-free GC, stopped backup relocation/mismatched restore,
+and reindex/restart/bilingual scope/evidence/delete behavior. Existing tests continue
+covering lease/cancellation/lifecycle fencing, pagination and embedding migration.
+
+Wrong-store reindex/GC/delete leave the manifest unchanged and do not create the wrong
+directory. Legacy adoption rejects an absent or empty wrong store without changing the
+manifest. Failed/no-op vector deletion retains cleanup metadata for retry. Existing v1
+schema upgrades add only the 04-owned binding table and preserve chunks and active runs.
+
+## Current limitations and isolation
+
+- The Gemini live test was skipped because no key was configured for this run. No paid
+  Gemini request was made. Historical live checks below were not repeated in this update.
+- Real captions were read from public video `dQw4w9WgXcQ` using the unchanged 03 adapter,
+  then processed through real SQLite/Chroma with **fixture embeddings**. Thai/English
+  queries verify scope and evidence mechanics, not cross-language semantic relevance.
+  Native Thai live-caption retrieval and current live Gemini quality remain unverified.
+- A prior read of `aircAruvnKk` was rejected by 03 as `invalid_transcript`. No 03 code was
+  changed, and that transcript was not indexed. Both read results are retained locally.
+- Existing user `.env` files, application databases and indexes were not changed. All new
+  state is temporary or inside module 04's ignored `runtime/`. Read-only 02/03 source was
+  used for configuration compatibility; their suites were run without source changes.
+- Docker checks used non-root containers with networking disabled and no Gemini key.
+  The real-caption corpus/probe was mounted separately from ignored runtime data; it is
+  not baked into an image. The YouTube read itself ran on the host.
+- Existing stores require a stopped `init` then verified `bind-store` upgrade. The pair
+  marker is part of the backup. This was exercised on isolated copies, not deployed data.
+  Marker/SQLite creation is not a distributed transaction; interrupted pairing fails
+  closed as documented in README. `--workers-stopped` remains an operator assertion.
+
+## Reproduction and retained evidence
+
+From `MiniProject/04_rag_knowledge`:
+
+```powershell
+uv run --locked pytest tests -q -W error --junitxml=runtime/maintenance-local-tests.xml
+docker compose -f compose.test.yaml -p yk04-maintenance build tests persistence
+docker compose -f compose.test.yaml -p yk04-maintenance run --rm --no-deps tests pytest tests -q -W error -o cache_dir=/tmp/pytest-cache
+docker compose -f compose.test.yaml -p yk04-maintenance run --rm --no-deps persistence yk-rag evaluate --state /data --phase seed
+docker compose -f compose.test.yaml -p yk04-maintenance run --rm --no-deps persistence
+```
+
+Retained ignored evidence: `runtime/maintenance-local-tests.xml`,
+`runtime/maintenance-docker-tests.log`, `runtime/maintenance-backend-tests.xml`,
+`runtime/maintenance-ingestion-tests.xml`, `runtime/maintenance-docker-seed.log`,
+`runtime/maintenance-docker-restart.log`, `runtime/maintenance-audit.json`, and
+`runtime/real-captions/` ingestion and
+host/container lifecycle result JSON files. The isolated Docker volume is
+`yk04-maintenance_reference-data`. Real-caption probe scripts and their corpus remain
+local under `runtime/`; they are excluded from version control and the build context.
+
+## Earlier Gemini migration verification (historical)
+
+The following results describe the earlier migration, not the current October 19 run.
 
 Gemini is the only live embedding provider in this working tree. OpenAI SDK/adapter
 and tiktoken were removed. All repository changes are in `04_rag_knowledge`.

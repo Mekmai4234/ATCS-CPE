@@ -9,6 +9,19 @@ Installation, runnable commands and full integration are documented in README.md
 
 Architecture
 ------------
+- VisualAnswerService is an internal multimodal consumer behind an authorized 02/04 bridge.
+- 03-local-v1 prepared frames map to media snapshots without fake transcript versions.
+- OCR originals, AI observations, source/frame/time and sampling limitations remain distinct.
+- ObservationCache stores private SQLite entries keyed by scope/grants, content hash,
+  generation/evidence version, OCR, pinned returned model, prompt and schema.
+- Gemini count/generate/catalog requests require verified Free Tier broker leases.
+- No local broker, paid fallback, new billing action or full-video-per-question upload is added.
+- VISUAL_HANDOFF.md describes unimplemented upstream contracts and production blockers.
+- MemberContext verifies the durable job owner, frozen sources, active account, library
+  grant identity and conversation ownership before and after retrieval/provider awaits.
+- Only the durable job's history is accepted. Admin roles do not bypass private ownership.
+- 02 owns sessions, resource authorization and final publication; 04 owns evidence permissions.
+- 05 has no cross-request answer/history cache and introduces no separate identity store.
 - AnswerService coordinates ranked question answering and hierarchical analysis.
 - RagKnowledge adapts 04 search/read/inventory/evidence using BackendExecution.
 - Versioned prompts separate trusted policy from untrusted questions/history/evidence.
@@ -18,6 +31,10 @@ Architecture
   counts processed original chunks and aggregates provider metadata.
 - AnswerAdapters supplies 05 and 04 methods to 02 without changing existing factories.
 - Optional TeamAdapters composes existing 03/04/05/06 and passes analyze to 06.
+- Team services consume resolved backend settings without reading module dotenv files.
+- The main runtime/maintenance launcher is 02's yk-full, integrated from develop@6520b4c.
+- The real HTTP acceptance client imports/polls videos and produces pending human claim
+  review packets with actual transcript excerpts, exact source intervals and usage/latency.
 
 Techniques
 ----------
@@ -47,3 +64,11 @@ Limits
 - No internal provider retries; 02 alone owns durable retry policy.
 - Hard deadlines/context/call/chunk limits can fail a task; no resumable 05 checkpoints.
 - Live generation, real-video quality and production deployment require further evaluation.
+- Real semantic acceptance is never inferred from mock passes or citation identity alone.
+- The acceptance client uses configurable finite positive HTTP/poll budgets (210/300 seconds
+  by default), records them, and classifies request timeouts separately from failed jobs.
+
+LIVE GEMINI STRUCTURED OUTPUT COMPATIBILITY (24 October 2026)
+Keep high-cardinality maxItems bounds out of the provider decoder schema.
+Validate the returned JSON with the complete GeneratedAnswer model before publication; local size, citation and outcome checks remain mandatory.
+Do not switch model identifiers or disable validation to bypass a provider error.

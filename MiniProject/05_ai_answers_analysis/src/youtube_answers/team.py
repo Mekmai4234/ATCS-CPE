@@ -1,24 +1,12 @@
 """Optional 05-owned full team composition; shares one RAG instance for all tools."""
 
-from youtube_backend.config import PROJECT_ROOT
 from youtube_backend.integrations import UnavailableAdapters
-from youtube_rag.config import RagSettings
 
-from .config import AnswerSettings
+from .configuration import load_team_configuration
 from .gemini import GeminiModel
 from .integration import AnswerAdapters, RagKnowledge
 from .models import error
-
-ENV_FILES = tuple(
-    PROJECT_ROOT / path
-    for path in (
-        ".env",
-        "04_rag_knowledge/.env",
-        "03_video_ingestion/.env",
-        "06_research_learning_agent/.env",
-        "05_ai_answers_analysis/.env",
-    )
-)
+from .quota import ExecutionBroker
 
 
 class TeamAdapters(UnavailableAdapters):
@@ -39,6 +27,23 @@ class TeamAdapters(UnavailableAdapters):
 
     def __init__(self, answers, ingestion, agent):
         self.answers, self.ingestion, self.agent = answers, ingestion, agent
+        self.provider_operations = dict(answers.provider_operations)
+        answer_mode = (
+            "gemini-broker-v1"
+            if isinstance(getattr(answers.answers.model, "broker", None), ExecutionBroker)
+            else "unverified"
+        )
+        agent_mode = (
+            "gemini-broker-v1"
+            if type(agent.model).__module__ == "youtube_agent.gemini"
+            else "unverified"
+        )
+        self.provider_operations.update(
+            answer=answer_mode, analyze=answer_mode, research=agent_mode, artifact=agent_mode
+        )
+        declared = getattr(type(self), "provider_operations", None)
+        if isinstance(declared, dict):
+            self.provider_operations = dict(declared)
         self.closed = False
 
     async def ingest(self, video_id, context):
@@ -83,42 +88,35 @@ class TeamAdapters(UnavailableAdapters):
 
 async def create_adapters(*, settings, repository):
     try:
-        from youtube_agent.config import AgentSettings
         from youtube_agent.gemini import GeminiModel as AgentModel
         from youtube_agent.service import AgentService
-        from youtube_ingestion.config import IngestionSettings
         from youtube_ingestion.service import IngestionService
     except ImportError:
         raise error(
             "integration_not_installed", "Install module 05 with --extra team", status=503
         ) from None
-    if settings.backend_integration_profile != "live":
-        raise error(
-            "integration_configuration", "Team factory requires the live profile", status=503
-        )
-    config = AnswerSettings(_env_file=ENV_FILES)
-    rag_config = RagSettings(_env_file=ENV_FILES)
-    if rag_config.embedding_provider != "gemini":
-        raise error("integration_configuration", "Live team requires Gemini embeddings", status=503)
-    gateway = GeminiModel(config)
+    config = load_team_configuration(settings)
+    gateway = GeminiModel(config.answers, broker=ExecutionBroker(repository, config.answers))
     try:
         answers = AnswerAdapters(
             settings=settings,
             repository=repository,
-            answer_settings=config,
+            answer_settings=config.answers,
             model=gateway,
-            rag_settings=rag_config,
+            rag_settings=config.rag,
         )
     except BaseException:
         await gateway.close()
         raise
     ingestion, agent_model = None, None
     try:
-        ingestion = IngestionService(IngestionSettings(_env_file=ENV_FILES))
-        agent_config = AgentSettings(_env_file=ENV_FILES)
-        agent_model = AgentModel(agent_config)
+        ingestion = IngestionService(config.ingestion)
+        agent_model = AgentModel(config.agent)
+        from .video import NativeVideoAnswers, needs_video
+        native = NativeVideoAnswers(gateway, config.answers)
         agent = AgentService(
-            agent_config, agent_model, RagKnowledge(answers.rag), analyzer=answers.analyze
+            config.agent, agent_model, RagKnowledge(answers.rag), analyzer=answers.analyze,
+            media_answerer=native.answer, media_selector=needs_video,
         )
         return TeamAdapters(answers, ingestion, agent)
     except BaseException:

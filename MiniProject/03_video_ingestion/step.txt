@@ -31,8 +31,39 @@ D) Verification
 3. Record contacted providers and limitations in TEST_REPORT.md.
 4. Run production-limit overflow/full-pipe timeout/cancel/shutdown regressions; cleanup
    must drain or close pipes and reap children within its separate bounded budget.
-5. Use acceptance_check.py with --fixture-embeddings and a new empty state directory
+5. Use acceptance_check.py with --fixture-identity --fixture-embeddings and a new empty state directory
    to verify live Thai/English captions through 02/04, every stored timestamp and dedup.
 6. Record the 2026-10-20 follow-up results separately in FOLLOWUP_REPORT.md.
 
 Future: channel/playlist discovery, ready-video refresh, scheduling and optional ASR.
+
+E) Native member flow
+1. Use the native 02 PR18 / 04 PR20 integration candidate documented in MEMBER_CONTRACT.md.
+2. Enable 02 authentication and use its Google challenge/session exchange and CSRF cookie.
+3. POST URL-only imports; 02 creates a private import/attach job and library membership.
+4. The durable import claim passes ExecutionContext directly to 03 and 04.
+5. 03 checks execution during bounded caption fetching and returns TranscriptResult.
+6. 02 saves transcript/version; 04 fences publication using the same backend transaction.
+7. Poll/retry/cancel with the owner's session. Shared import cancellation returns 409;
+   use library detach to preserve other members' required work.
+8. DELETE detaches only this library while other references remain. Final GC waits for
+   active dependencies; 04 checks references/generation at its physical-delete boundary.
+9. Run test_native_members.py for authenticated API + SQLite/Chroma acceptance.
+10. Live-caption acceptance uses explicit fixture identity/vectors and reports that real
+    Google verification and semantic quality have not been evaluated.
+
+Durable member quotas/fair scheduling and production Docker acceptance remain open.
+
+F) Local frames/OCR preparation (internal API only)
+1. Agree the 02 evidence/upload/job contract before enabling any public media path.
+2. 02 authorizes and stages an immutable allowed local file; pass its owned context.
+3. Opt into MediaPreparation / IngestionService.prepare_media, never fake TranscriptResult.
+4. Snapshot/hash, ffprobe, sample capped frames and preserve decoded PTS plus seek targets.
+5. Keep original PNG/hash/occurrence times; reuse exact images/OCR and mark near duplicates.
+6. Run local tha+eng OCR; keep image and explicit status when text cannot be read.
+7. Commit checkpoints under an OS writer lock. Retry resumes completed frames; OCR model
+   changes or OCR retry do not force frame extraction or caption fetching again.
+8. Cancel/timeout kills process trees, cleans snapshots/partials and retains completed work.
+9. Return PreparedMedia to the future 02 contract; 05 vision must use 02's quota broker.
+10. Run unit/process tests and opt-in real engine tests on a self-created silent clip.
+11. 07 packages engines/models and validates downstream locks, Linux/Docker and storage GC.

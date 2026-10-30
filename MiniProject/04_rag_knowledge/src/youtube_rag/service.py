@@ -1,37 +1,89 @@
 import asyncio
-import base64
-import json
 import math
 from uuid import uuid4
 
 from youtube_backend.schemas import IndexReceipt, Source, TranscriptResult
 
+from . import cursors
+from .binding import StoreBinding
 from .chunking import Chunker
-from .embeddings import validate_vectors
+from .embeddings import prepare_inputs, validate_vectors
 from .errors import error
 from .models import ChunkPage, CoverageInventory, SearchHit, digest
 from .vectors import ChromaStore
 
 
+def same_timestamp(value, expected):
+    # Chroma's JSON round trip can turn 60.800000000000004 into 60.8. Permit
+    # sub-nanosecond representation noise only; identifiers and scope stay exact.
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and math.isclose(value, expected, rel_tol=0, abs_tol=1e-9)
+    )
+
+
 class RagService:
     def __init__(self, settings, manifest, embedder, vectors=None):
-        if embedder.settings.fingerprint != settings.fingerprint:
+        if embedder is not None and embedder.settings.fingerprint != settings.fingerprint:
             raise error("index_configuration_mismatch", "Embedder configuration does not match")
         self.settings = settings
         self.manifest = manifest
         self.embedder = embedder
         self.chunker = Chunker(settings)
+        self.binding = StoreBinding(manifest, settings.chroma_persist_dir)
         self.vectors = vectors or ChromaStore(settings.chroma_persist_dir, settings.collection_name)
 
     def timeout(self, execution):
         execution.check()
         return min(self.settings.rag_operation_timeout_seconds, execution.remaining_seconds)
 
-    async def _embed(self, texts, execution, *, purpose="document", titles=None):
+    async def _embed(self, texts, execution, *, purpose="document", titles=None, cache_guard=None):
         timeout = self.timeout(execution)
         try:
             async with asyncio.timeout(timeout):
-                vectors = await self.embedder.embed(texts, timeout, purpose=purpose, titles=titles)
+                if getattr(self.embedder, "requires_execution", False):
+                    from .embedding_cache import EmbeddingCache
+
+                    cache = EmbeddingCache(self.manifest.database, self.settings)
+                    prepared = prepare_inputs(texts, purpose=purpose, titles=titles)
+                    vectors = []
+
+                    def guarded_scope():
+                        scope = cache_guard() if cache_guard else None
+                        if scope:
+                            scope = {
+                                **scope,
+                                "model_policy": execution.embedding_policy(
+                                    self.settings.embedding_model,
+                                    self.embedder.credential_sha256,
+                                ),
+                            }
+                        return scope
+
+                    for i, text in enumerate(texts):
+                        scope = guarded_scope()
+                        vector = cache.get(scope, prepared[i], purpose) if scope else None
+                        if vector is None:
+                            vector = (
+                                await self.embedder.embed(
+                                    [text],
+                                    self.timeout(execution),
+                                    purpose=purpose,
+                                    titles=[titles[i]] if titles else None,
+                                    execution=execution,
+                                )
+                            )[0]
+                            if scope:
+                                if guarded_scope() != scope:
+                                    raise error("source_changed", "Embedding scope changed")
+                                cache.put(scope, prepared[i], purpose, vector)
+                        vectors.append(vector)
+                else:
+                    vectors = await self.embedder.embed(
+                        texts, timeout, purpose=purpose, titles=titles
+                    )
         except TimeoutError:
             raise error(
                 "embedding_timeout",
@@ -42,18 +94,23 @@ class RagService:
         execution.check()
         return validate_vectors(vectors, len(texts), self.settings.embedding_dimensions)
 
-    def _snapshot(self, sources, execution, *, require=True):
+    def _snapshot(self, sources, execution, *, require=True, operation="read"):
         sources = [
             Source.model_validate(s.model_dump() if hasattr(s, "model_dump") else s)
             for s in sources
         ]
         execution.authorize(sources)
+        permission = execution.permission_scope(sources, operation=operation)
         rows, missing = self.manifest.current(sources, self.settings.fingerprint, require=require)
+        for row in rows:
+            row["_permission"] = permission
         return sources, rows, missing
 
-    def _recheck(self, sources, rows, execution, *, require=True):
-        _, current, _ = self._snapshot(sources, execution, require=require)
-        if [r["run_id"] for r in current] != [r["run_id"] for r in rows]:
+    def _recheck(self, sources, rows, execution, *, require=True, operation="read"):
+        _, current, _ = self._snapshot(sources, execution, require=require, operation=operation)
+        if [(r["run_id"], r["_permission"]) for r in current] != [
+            (r["run_id"], r["_permission"]) for r in rows
+        ]:
             raise error("source_changed", "Index changed while reading; restart this operation")
 
     async def index(self, source, transcript, execution, *, allow_reindex=False):
@@ -67,6 +124,8 @@ class RagService:
         if actual_version != source.transcript_version:
             raise error("invalid_transcript", "Transcript content does not match its version")
         execution.authorize([source])
+        execution.authorize_index(source, allow_reindex=allow_reindex)
+        await self.binding.ensure(execution, create=True)
         try:
             current, _ = self.manifest.current([source], self.settings.fingerprint)
         except Exception as exc:
@@ -90,7 +149,10 @@ class RagService:
         for offset in range(0, len(records), batch_size):
             batch = records[offset : offset + batch_size]
             vectors = await self._embed(
-                [chunk.text for chunk in batch], execution, titles=[chunk.title for chunk in batch]
+                [chunk.text for chunk in batch],
+                execution,
+                titles=[chunk.title for chunk in batch],
+                cache_guard=lambda: execution.cache_scope([source]),
             )
             await self.vectors.call(
                 "upsert",
@@ -118,33 +180,54 @@ class RagService:
         expected_ids = {f"{run_id}:{chunk.chunk_id}" for chunk in records}
         if set(stored["ids"]) != expected_ids:
             raise error("incomplete_index", "Not all chunk vectors were persisted", status=502)
+        await self.binding.ensure(execution)
         # No await between the atomic backend lease/lifecycle fence and publication.
         self.manifest.publish(run_id, source, records, execution)
         await self.cleanup(execution, source=source)
         return IndexReceipt(source=source, chunk_count=len(records), complete=True)
 
     async def inventory(self, sources, execution):
-        sources, rows, _ = self._snapshot(sources, execution)
+        sources, rows, _ = self._snapshot(sources, execution, operation="inventory")
+        await self.binding.ensure(execution)
         count = 0
         for row in rows:
             stored = await self.vectors.call(
                 "get", self.timeout(execution), where={"run_id": row["run_id"]}, include=[]
             )
-            if len(stored["ids"]) != row["chunk_count"]:
+            records = self.manifest.page([row["run_id"]], 0, row["chunk_count"] + 1)
+            expected = {f"{row['run_id']}:{chunk.chunk_id}" for chunk in records}
+            if len(expected) != row["chunk_count"] or set(stored["ids"]) != expected:
                 raise error(
                     "incomplete_index", "Published vector inventory is incomplete", status=502
                 )
             count += len(stored["ids"])
-        self._recheck(sources, rows, execution)
+        self._recheck(sources, rows, execution, operation="inventory")
         return count
 
     async def evidence(self, sources, chunk_ids, execution):
         if len(chunk_ids) > 1000:
             raise error("invalid_limit", "At most 1000 evidence IDs per request", status=422)
         sources, rows, _ = self._snapshot(sources, execution)
+        await self.binding.ensure(execution)
         records = self.manifest.by_ids([row["run_id"] for row in rows], chunk_ids)
         self._recheck(sources, rows, execution)
         return [record.evidence() for record in records]
+
+    async def short_context(self, sources, execution, *, max_bytes=16000, max_chunks=80):
+        """Avoid a remote query embedding when the complete scoped clip fits locally.
+
+        Uses the same version/grant-bound reader and cursor checks as full analysis.
+        Returns None rather than silently selecting an arbitrary prefix of a long clip.
+        """
+        if not 1 <= max_bytes <= 24000 or not 1 <= max_chunks <= 100:
+            raise error("invalid_limit", "Short context budget is outside its bounds", status=422)
+        page = await self.read_video_chunks(sources, execution, limit=max_chunks)
+        execution.check()
+        if page.next_cursor or not page.inventory.complete:
+            return None
+        if sum(len(c.text.encode("utf-8")) + 512 for c in page.items) > max_bytes:
+            return None
+        return page.items
 
     async def search(self, question, sources, execution, *, top_k=None, min_score=None):
         limit = self.settings.retrieval_top_k if top_k is None else top_k
@@ -162,7 +245,15 @@ class RagService:
         ):
             raise error("invalid_limit", "min_score must be a finite cosine score", status=422)
         sources, rows, _ = self._snapshot(sources, execution)
-        query = (await self._embed([question], execution, purpose="query"))[0]
+        await self.binding.ensure(execution)
+        query = (
+            await self._embed(
+                [question],
+                execution,
+                purpose="query",
+                cache_guard=lambda: execution.cache_scope(sources),
+            )
+        )[0]
         run_ids = [r["run_id"] for r in rows]
         total = sum(r["chunk_count"] for r in rows)
         response = await self.vectors.call(
@@ -173,12 +264,54 @@ class RagService:
             where={"run_id": {"$in": run_ids}},
             include=["metadatas", "distances"],
         )
-        ids = [meta["chunk_id"] for meta in response["metadatas"][0]]
+        try:
+            candidates = list(
+                zip(
+                    response["ids"][0],
+                    response["metadatas"][0],
+                    response["distances"][0],
+                    strict=True,
+                )
+            )
+            if any(meta.get("run_id") not in run_ids for _, meta, _ in candidates):
+                raise ValueError
+            ids = [meta["chunk_id"] for _, meta, _ in candidates]
+        except (KeyError, TypeError, ValueError, IndexError, AttributeError):
+            raise error(
+                "incomplete_index",
+                "Vector candidates exceed the authorized index snapshot",
+                status=502,
+            ) from None
         records = {c.chunk_id: c for c in self.manifest.by_ids(run_ids, ids)}
+        owners = {row["run_id"]: row["source"] for row in rows}
         selected = []
-        for chunk_id, distance in zip(ids, response["distances"][0], strict=True):
-            chunk = records.get(chunk_id)
-            if chunk is None:
+        for vector_id, meta, distance in candidates:
+            chunk = records.get(meta["chunk_id"])
+            if (
+                chunk is None
+                or owners[meta["run_id"]]
+                != {
+                    "video_id": chunk.video_id,
+                    "generation": chunk.generation,
+                    "transcript_version": chunk.transcript_version,
+                }
+                or chunk.embedding_version != self.settings.fingerprint
+                or vector_id != f"{meta['run_id']}:{chunk.chunk_id}"
+                or any(
+                    meta.get(field) != getattr(chunk, field)
+                    for field in (
+                        "video_id",
+                        "generation",
+                        "transcript_version",
+                    )
+                )
+                or any(
+                    not same_timestamp(meta.get(field), getattr(chunk, field))
+                    for field in ("start_seconds", "end_seconds")
+                )
+                or not isinstance(distance, (int, float))
+                or not math.isfinite(distance)
+            ):
                 raise error(
                     "incomplete_index", "Vector refers to missing chunk metadata", status=502
                 )
@@ -205,27 +338,22 @@ class RagService:
         if type(limit) is not int or not 1 <= limit <= 200:
             raise error("invalid_limit", "Chunk page limit must be 1-200", status=422)
         sources, rows, missing = self._snapshot(sources, execution, require=False)
-        snapshot = digest([s.model_dump() for s in sources] + [r["run_id"] for r in rows])
+        await self.binding.ensure(execution)
+        snapshot = digest(
+            {
+                "sources": [s.model_dump() for s in sources],
+                "runs": [r["run_id"] for r in rows],
+                "permission": execution.permission_scope(sources),
+            }
+        )
         offset = 0
         if cursor is not None:
-            try:
-                if not isinstance(cursor, str) or len(cursor) > 1000:
-                    raise ValueError
-                decoded = json.loads(base64.urlsafe_b64decode(cursor.encode()))
-                offset = decoded["offset"]
-                if decoded["snapshot"] != snapshot or type(offset) is not int or offset < 0:
-                    raise ValueError
-            except (ValueError, KeyError, TypeError):
-                raise error(
-                    "invalid_cursor", "Cursor is invalid or its index has changed", status=422
-                ) from None
+            offset = cursors.decode(cursor, snapshot, self.manifest.cursor_key())
         total = sum(row["chunk_count"] for row in rows)
         items = self.manifest.page([r["run_id"] for r in rows], offset, limit)
         next_cursor = None
         if offset + len(items) < total:
-            next_cursor = base64.urlsafe_b64encode(
-                json.dumps({"snapshot": snapshot, "offset": offset + len(items)}).encode()
-            ).decode()
+            next_cursor = cursors.encode(snapshot, offset + len(items), self.manifest.cursor_key())
         self._recheck(sources, rows, execution, require=False)
         return ChunkPage(
             items=items,
@@ -242,32 +370,68 @@ class RagService:
         )
 
     async def _remove_run(self, row, execution):
+        await self.binding.ensure(execution)
+        self.manifest.check_removal(row, execution)
         store = self.vectors
         own = row["collection"] != self.settings.collection_name
         if own:
             store = ChromaStore(self.settings.chroma_persist_dir, row["collection"])
         try:
             await store.call("delete", self.timeout(execution), where={"run_id": row["run_id"]})
-            execution.check()
-            self.manifest.forget(row["run_id"])
+            remaining = await store.call(
+                "get", self.timeout(execution), where={"run_id": row["run_id"]}, include=[]
+            )
+            if remaining["ids"]:
+                raise error(
+                    "incomplete_cleanup",
+                    "Vectors remain; cleanup metadata retained",
+                    retryable=True,
+                )
+            await self.binding.ensure(execution)
+            self.manifest.forget(row["run_id"], execution)
         finally:
             if own:
                 await store.close()
 
     async def cleanup(self, execution, *, source=None, include_staging=False):
+        execution.authorize_cleanup(source=source, include_staging=include_staging)
+        await self.binding.ensure(execution)
+        await self.media.cleanup(execution, source=source, include_staging=include_staging)
         # include_staging is only for explicit maintenance with all workers stopped.
         for row in self.manifest.garbage(include_staging=include_staging):
             if source is not None and (
                 row["video_id"] != source.video_id or row["generation"] != source.generation
             ):
                 continue
-            await self._remove_run(row, execution)
+            try:
+                await self._remove_run(row, execution)
+            except Exception as exc:
+                if (
+                    source is None
+                    or row["state"] != "retired"
+                    or getattr(exc, "code", None) != "source_in_use"
+                ):
+                    raise
+                # A published replacement is valid; defer obsolete vectors until readers finish.
+
+    @property
+    def media(self):
+        if not hasattr(self, "_media"):
+            from .media import MediaRag
+
+            self._media = MediaRag(self)
+        return self._media
 
     async def delete(self, video_id, generation, execution):
         execution.check()
+        await self.binding.ensure(execution, create=not self.manifest.all_runs())
+        await self.media.delete(video_id, generation, execution)
         for row in self.manifest.begin_delete(video_id, generation, execution):
             await self._remove_run(row, execution)
 
     async def close(self):
+        if hasattr(self, "_media"):
+            await self._media.close()
         await self.vectors.close()
-        await self.embedder.close()
+        if self.embedder is not None:
+            await self.embedder.close()
