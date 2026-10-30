@@ -37,6 +37,8 @@ def test_time_question_selects_exact_requested_scope(question, start, end, fps):
 @pytest.mark.parametrize(
     "question",
     [
+        "เวลา01:20:",
+        "เวลา:01:20",
         "เวลา01:60",
         "เวลา1:2",
         "ช่วง01:00:00:10",

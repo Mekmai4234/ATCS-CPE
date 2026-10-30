@@ -18,7 +18,7 @@ class VideoPlan:
     @classmethod
     def from_question(cls, source, question):
         """Parse whole clock tokens, never a prefix of an hours timestamp."""
-        matches = list(re.finditer(r"(?<![\d:])\d+(?::\d+)+(?![\d:])", question))
+        matches = list(re.finditer(r"(?<![\d:])[\d:]*\d:[\d:]+(?![\d:])", question))
         if not matches:
             return cls(source)
         if len(matches) > 2:
@@ -30,6 +30,7 @@ class VideoPlan:
             parts = match.group().split(":")
             if (
                 len(parts) not in {2, 3}
+                or any(not part.isdecimal() for part in parts)
                 or len(parts[0]) > (2 if len(parts) == 3 else 3)
                 or len(parts[-1]) != 2
                 or (len(parts) == 3 and len(parts[-2]) != 2)
