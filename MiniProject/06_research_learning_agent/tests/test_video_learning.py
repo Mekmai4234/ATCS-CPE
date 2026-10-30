@@ -148,3 +148,98 @@ async def test_stored_video_does_not_enable_multiclip_native_learning(unit):
     sources = [unit.sources[0], unit.sources[0].model_copy(update={"video_id": "jNQXAC9IVRw"})]
     run = unit.service._run(sources, unit.ctx)
     assert await stored_video(unit.service, {"topic": "visual scene"}, run) is None
+
+
+def library_record(unit, start, end):
+    citation = Citation(
+        citation_id="stored",
+        chunk_id="stored",
+        video_id=unit.sources[0].video_id,
+        title="red card",
+        start_seconds=start,
+        end_seconds=end,
+        kind="video",
+        observation_cache_id="a" * 64,
+    )
+    return SimpleNamespace(
+        ranking_score=1.0, citation=citation.model_dump(), source=unit.sources[0]
+    )
+
+
+@pytest.mark.parametrize(
+    "topic,start,end",
+    [
+        ("red card 01:00", 55, 75),
+        ("red card 01:00-01:20", 60, 80),
+        ("red card 01:20:30", 4825, 4845),
+        ("red card", 0, None),
+    ],
+)
+async def test_stored_learning_uses_the_shared_native_time_window(unit, topic, start, end):
+    calls = []
+
+    async def search(*args, **kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(items=[library_record(unit, start + 1, start + 3)], notes=[])
+
+    unit.service.knowledge.rag = SimpleNamespace(
+        evidence_library=lambda: SimpleNamespace(search=search)
+    )
+    run = unit.service._run(unit.sources, unit.ctx)
+    result = await stored_video(unit.service, {"topic": topic}, run)
+    assert result and result.citations[0].start_seconds == start + 1
+    assert calls[0]["start_seconds"] == start and calls[0]["end_seconds"] == end
+
+
+@pytest.mark.parametrize("start,end", [(2, 4), (53, 57), (73, 77)])
+async def test_stored_learning_rejects_outside_and_overlapping_windows(unit, start, end):
+    async def search(*args, **kwargs):
+        # Even a catalogue that ignores bounds must not authorize out-of-window evidence.
+        return SimpleNamespace(items=[library_record(unit, start, end)], notes=[])
+
+    unit.service.knowledge.rag = SimpleNamespace(
+        evidence_library=lambda: SimpleNamespace(search=search)
+    )
+    run = unit.service._run(unit.sources, unit.ctx)
+    assert await stored_video(unit.service, {"topic": "red card 01:00"}, run) is None
+
+
+@pytest.mark.parametrize(
+    "topic", ["red card 02:00-01:00", "red card 01:60", "red card 01:20:", "red card -00:10"]
+)
+@pytest.mark.parametrize("has_catalogue", [False, True])
+async def test_invalid_learning_time_fails_before_lookup_or_native_fallback(
+    unit, topic, has_catalogue
+):
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("Invalid time must fail before lookup or inference")
+
+    if has_catalogue:
+        unit.service.knowledge.rag = SimpleNamespace(
+            evidence_library=lambda: SimpleNamespace(search=forbidden)
+        )
+    unit.service.media_answerer = forbidden
+    run = unit.service._run(unit.sources, unit.ctx)
+    with pytest.raises(AppError) as caught:
+        await video_artifact(unit.service, {"type": "quiz", "topic": topic}, run, QuizContent)
+    assert caught.value.status_code == 422
+
+
+async def test_native_learning_result_is_rechecked_against_requested_window(unit):
+    async def native(*args):
+        return AnswerResult(
+            status="answered",
+            answer="red card",
+            citations=[Citation.model_validate(library_record(unit, 2, 4).citation)],
+            coverage=Coverage(
+                expected_videos=1, processed_videos=1, complete=False, notes=["sampled"]
+            ),
+            provider_metadata=metadata(),
+        )
+
+    unit.service.media_answerer = native
+    run = unit.service._run(unit.sources, unit.ctx)
+    with pytest.raises(AppError, match="requested time window"):
+        await video_artifact(
+            unit.service, {"type": "quiz", "topic": "red card 01:00"}, run, QuizContent
+        )

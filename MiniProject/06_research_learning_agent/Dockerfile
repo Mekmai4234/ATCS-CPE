@@ -8,6 +8,7 @@ ENV UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app/06_research_learning_agent
 COPY 02_api_backend/pyproject.toml /app/02_api_backend/pyproject.toml
 COPY 02_api_backend/src /app/02_api_backend/src
+COPY 03_video_ingestion/src /app/03_video_ingestion/src
 COPY 04_rag_knowledge/pyproject.toml /app/04_rag_knowledge/pyproject.toml
 COPY 04_rag_knowledge/src /app/04_rag_knowledge/src
 COPY 06_research_learning_agent/pyproject.toml 06_research_learning_agent/uv.lock ./

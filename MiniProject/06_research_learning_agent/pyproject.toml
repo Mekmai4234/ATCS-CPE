@@ -27,6 +27,7 @@ packages = ["src/youtube_agent"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+pythonpath = ["../03_video_ingestion/src"]
 
 [tool.ruff]
 line-length = 100
