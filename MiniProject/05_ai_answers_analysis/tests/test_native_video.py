@@ -11,11 +11,12 @@ from youtube_answers.config import AnswerSettings
 from youtube_answers.video import NativeVideoAnswers
 
 
+@pytest.mark.parametrize("history", [[], [{"role": "user", "content": "ดู 01:20 คนนี้ใคร"}]])
 @pytest.mark.parametrize(
     "question,invalid_window", [("บนจอเขียนว่าอะไร", False), ("ในภาพช่วง00:10เห็นอะไร", True)]
 )
 async def test_native_video_has_scoped_input_timestamps_and_reuses_private_cache(
-    monkeypatch, question, invalid_window
+    monkeypatch, question, invalid_window, history
 ):
     import youtube_answers.video as module
 
@@ -85,16 +86,20 @@ async def test_native_video_has_scoped_input_timestamps_and_reuses_private_cache
             from youtube_backend.errors import AppError
 
             with pytest.raises(AppError, match="inspected time window"):
-                await service.answer(question, [source], context)
+                await service.answer(question, [source], context, history=history)
             assert Store.data is None
             return
-        first = await service.answer(question, [source], context)
-        second = await service.answer(question, [source], context)
+        first = await service.answer(question, [source], context, history=history)
+        second = await service.answer(question, [source], context, history=history)
         assert first.citations[0].kind == "video"
         assert first.citations[0].start_seconds == 1
         assert not first.coverage.complete
         assert second.provider_metadata.provider == "video-cache"
         assert len(sent) == 2
+        payload = json.loads(sent[0]["contents"][0]["parts"][0]["text"])
+        assert payload["window_seconds"] == [0, None]
+        assert payload["question"] == question
+        assert payload["untrusted_history_references"] == history
         part = sent[0]["contents"][0]["parts"][1]
         assert (
             part["fileData"].get("fileUri", part["fileData"].get("file_uri"))
