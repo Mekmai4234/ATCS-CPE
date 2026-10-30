@@ -70,7 +70,10 @@ def test_worker_readiness_expires(identity):
 
 
 async def test_idle_worker_publishes_heartbeat(identity):
-    assert await identity.worker.run_once() is False
+    from youtube_backend.worker import Worker
+
+    daemon = Worker(identity.repo, identity.worker.adapters, identity.settings)
+    assert await daemon.run_once() is False
     assert worker_status(identity.settings)["ready"]
 
 
