@@ -61,6 +61,11 @@ async def test_native_video_has_scoped_input_timestamps_and_reuses_private_cache
             pass
 
         def load(self, *args):
+            if ":" in question:
+                cache_scope = json.loads(args[-1])
+                assert cache_scope["time_plan_version"] == 2
+                if scope[1] is not None:
+                    assert cache_scope["window"][:2] == scope
             return "a" * 64, self.data
 
         def publish(self, source, model, question, data, reservation, input_hash):
