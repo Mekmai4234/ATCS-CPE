@@ -46,3 +46,14 @@ describe('checked evidence is distinct from a supported answer', () => {
     expect(html).not.toContain('ยังยืนยันคำตอบไม่ได้');
   });
 });
+
+it('labels native video observations separately from transcript citations', () => {
+  const native: TaskResult = {
+    ...result,
+    status: 'answered',
+    citations: result.citations!.map((c) => ({ ...c, kind: 'video' })),
+  };
+  const html = renderToStaticMarkup(createElement(ResultView, { result: native }));
+  expect(html).toContain('ภาพและเสียง · AI วิเคราะห์');
+  expect(html).not.toContain('>บทถอดเสียง<');
+});
