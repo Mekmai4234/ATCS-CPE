@@ -2,6 +2,7 @@ import json
 from types import SimpleNamespace
 
 import httpx
+import pytest
 from google import genai
 from google.genai import types
 from youtube_backend.schemas import Source
@@ -109,3 +110,21 @@ def test_video_abstention_discards_populated_claims_and_punctuation_only_message
     assert value.status == "insufficient_evidence"
     assert not value.statements and not value.observations
     assert "ยืนยัน" in value.message
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "not-json",
+        '{"status":"answered","observations":[],"statements":[{"text":"invented","citation_ids":["unknown"]}]}',
+    ],
+)
+def test_invalid_native_evidence_is_rejected_without_publishing_claims(text):
+    from youtube_backend.errors import AppError
+
+    from youtube_answers.video import parse_video_output
+
+    with pytest.raises(AppError) as caught:
+        parse_video_output(text)
+    assert caught.value.code == "invalid_model_output"
+    assert "invented" not in str(caught.value)

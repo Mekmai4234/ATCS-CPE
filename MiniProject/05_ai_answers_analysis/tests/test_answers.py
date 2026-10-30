@@ -388,17 +388,26 @@ async def test_analysis_cannot_ignore_one_available_video(env):
 
 async def test_insufficient_retrieval_expands_evidence_without_new_embedding(env):
     from conftest import metadata
+
     from youtube_answers.models import Generated
+
     original = env.model.generate
     calls = 0
+
     async def generate(data, timeout):
         nonlocal calls
         calls += 1
         if calls == 1:
-            return Generated(GeneratedAnswer(status="insufficient_evidence", message="Need more evidence"), metadata())
+            return Generated(
+                GeneratedAnswer(status="insufficient_evidence", message="Need more evidence"),
+                metadata(),
+            )
         return await original(data, timeout)
+
     # Duplicate the authorized fixture chunk with a distinct ID outside initial hits.
-    env.knowledge.chunks.append(env.knowledge.chunks[0].model_copy(update={"chunk_id": "extra-chunk"}))
+    env.knowledge.chunks.append(
+        env.knowledge.chunks[0].model_copy(update={"chunk_id": "extra-chunk"})
+    )
     env.model.generate = generate
     result = await env.service.answer(env.request, env.sources, [], env.ctx)
     assert result.status == "answered"
