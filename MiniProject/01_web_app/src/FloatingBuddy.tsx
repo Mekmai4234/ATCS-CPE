@@ -73,6 +73,7 @@ function launcherViewport(): Viewport {
 export default function FloatingBuddy(props: Props) {
   const { open, onOpen } = props;
   const [view, setView] = useState(viewport);
+  const [positionOpen, setPositionOpen] = useState(false);
   const [point, setPoint] = useState(() => readPosition(storage(), launcherViewport()));
   const current = useRef(point);
   const preferred = useRef(point);
@@ -319,6 +320,47 @@ export default function FloatingBuddy(props: Props) {
       >
         <InteractiveBuddy headOnly active={false} decorative state={state} />
       </button>
+      {!open && (
+        <div
+          className="buddy-position-controls"
+          style={{
+            position: 'fixed',
+            left: Math.max(8, Math.min(point.x, view.width - 208)),
+            top: point.y < 112 ? point.y + 80 : point.y - 96,
+            zIndex: 1,
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setPositionOpen(false);
+              launcher.current?.focus();
+            }
+          }}
+        >
+          <button
+            className="secondary"
+            aria-label="ตำแหน่งและการแสดงแชต"
+            aria-expanded={positionOpen}
+            aria-controls="buddy-position-options"
+            onClick={() => setPositionOpen((value) => !value)}
+          >
+            ตำแหน่งแชต
+          </button>
+          {positionOpen && (
+            <div id="buddy-position-options">
+              <button
+                className="secondary"
+                onClick={() => {
+                  apply(cornerPoint('bottom-right', launcherViewport()), true);
+                  setPositionOpen(false);
+                  launcher.current?.focus();
+                }}
+              >
+                คืนตำแหน่ง
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       <span id="buddy-position-help" className="visually-hidden">
         กด Enter เพื่อเปิดหรือย่อแชต ใช้ปุ่มลูกศรเพื่อย้ายตำแหน่ง และ Home เพื่อกลับมุมขวาล่าง
       </span>
