@@ -34,6 +34,7 @@ Run Python module suites in separate processes; their fixture modules share name
 | Check | Result |
 | --- | ---: |
 | 01 unit tests | 115 passed |
+| 01 isolated checkout identity smoke | 8 passed |
 | 01 browser suite | 103 passed initially; the one stale timeout-text assertion was corrected and its case passed on rerun: 104 distinct passing cases, 9 skipped |
 | 02 full suite | 144 passed |
 | 03 full suite | 143 passed, 2 skipped (local media tooling checks) |
@@ -41,7 +42,7 @@ Run Python module suites in separate processes; their fixture modules share name
 | 05 full suite + subsequent added native regressions | 207 full-suite passes, plus 3 new passing native cases: 210 distinct cases |
 | 06 full suite | 128 passed; the updated decoder/native-learning SDK tests also passed (21 targeted cases) |
 
-Total: **1,003 distinct passing automated cases**, excluding repeated runs. TypeScript/Vite build, Prettier, scoped Ruff and diff checks are also required before delivery.
+Total: **1,011 distinct passing automated cases**, excluding repeated runs. TypeScript/Vite build, Prettier, scoped Ruff and diff checks also passed before delivery.
 
 Tests specifically cover forged quota proofs, another owner's observation references, altered timestamps, fabricated citation IDs, invalid provider JSON, abstentions populated with unsupported statements, out-of-window native observations, cache reuse without a second inference, scoped small-context reads without embeddings and terminal polling behavior. These are contract/correctness checks; fixture successes do not certify the semantic quality of every live model answer.
 
