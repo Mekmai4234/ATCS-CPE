@@ -25,8 +25,6 @@ export function serviceMessage(code: string | null | undefined, status?: number)
     return userMessages.unavailable;
   if (code === 'context_budget_exceeded')
     return 'เนื้อหาที่เลือกเกินขีดจำกัด กรุณาเลือกคลิปน้อยลงหรือระบุหัวข้อ';
-  if (code === 'generation_output_truncated')
-    return 'AI สร้างคำตอบไม่ครบ กรุณาลองใหม่หรือเลือกสรุปสั้นลง';
   if (['generation_timeout', 'task_timeout', 'agent_budget_exhausted'].includes(code || ''))
     return 'งานนี้ใช้เวลานานเกินกำหนด กรุณาลองใหม่หรือเลือกคลิปน้อยลง';
   if (code === 'invalid_model_output')
