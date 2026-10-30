@@ -15,7 +15,13 @@ class VideoLearningEvidence:
 
     def model_dump(self):
         return dict(
-            self.observation, kind="video_observation", observation_kind=self.observation["kind"]
+            evidence_id=self.observation["evidence_id"],
+            kind="video_observation",
+            observation_kind=self.observation["kind"],
+            text=self.observation["text"],
+            video_id=self.observation["video_id"],
+            start_seconds=self.observation["start_seconds"],
+            end_seconds=self.observation["end_seconds"],
         )
 
 
@@ -68,10 +74,13 @@ async def video_artifact(service, request, run, schema):
     for key, count in native.provider_metadata.usage.items():
         metadata.usage[key] = metadata.usage.get(key, 0) + count
     metadata.latency_ms += native.provider_metadata.latency_ms
+    coverage = native.coverage.model_copy(deep=True)
+    if len(evidence) < len(records):
+        coverage.notes.append("ใช้หลักฐานฉบับเต็มบางรายการเพื่อให้อยู่ในขีดจำกัดข้อมูล")
     return ArtifactResult(
         type=request["type"],
         content=content,
         citations=[allowed[cid].model_copy(update={"citation_id": cid}) for cid in sorted(ids)],
-        coverage=native.coverage,
+        coverage=coverage,
         provider_metadata=metadata,
     )
