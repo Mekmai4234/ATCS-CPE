@@ -189,6 +189,10 @@ class AnswerService:
         # Escalate only an unsupported answer, without paying for another embedding.
         # Enumerate bounded original evidence; never count unread chunks as processed.
         if output.status == "insufficient_evidence" and expected:
+            if callable(getattr(getattr(run.context, "repository", None), "stage", None)):
+                run.context.repository.stage(
+                    run.context.job_id, run.context.lease_token, "expanding_evidence"
+                )
             cursor, seen, expanded = None, set(), list(nodes)
             included = {cid for node in expanded for cid in node["citation_ids"]}
             for _ in range(4):
