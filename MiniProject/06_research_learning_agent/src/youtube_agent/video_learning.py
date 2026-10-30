@@ -3,22 +3,19 @@
 from dataclasses import dataclass
 
 from youtube_backend.schemas import ArtifactResult
+from youtube_backend.video_evidence import VideoEvidenceStore
 
+from .gemini import byte_size
 from .models import error
 
 
 @dataclass
 class VideoLearningEvidence:
-    citation: object
+    observation: dict
 
     def model_dump(self):
         return dict(
-            evidence_id=self.citation.chunk_id,
-            kind="video_observation",
-            text=self.citation.title,
-            video_id=self.citation.video_id,
-            start_seconds=self.citation.start_seconds,
-            end_seconds=self.citation.end_seconds,
+            self.observation, kind="video_observation", observation_kind=self.observation["kind"]
         )
 
 
@@ -36,7 +33,20 @@ async def video_artifact(service, request, run, schema):
             "Video evidence is insufficient for this learning topic",
             status=409,
         )
-    evidence = [VideoLearningEvidence(c) for c in native.citations]
+    records = VideoEvidenceStore(run.context).resolve(native.citations)
+    evidence = []
+    for record in records:
+        candidate = [*evidence, VideoLearningEvidence(record)]
+        if (
+            byte_size({"request": request, "evidence": [e.model_dump() for e in candidate]})
+            <= service.settings.max_context_tokens // 2
+        ):
+            evidence = candidate
+    if not evidence:
+        raise error(
+            "context_budget_exceeded", "Full video observations exceed learning input budget"
+        )
+    supplied = {e.observation["evidence_id"] for e in evidence}
     generated = await service._bounded(
         run,
         lambda timeout: service.model.generate(
@@ -49,7 +59,7 @@ async def video_artifact(service, request, run, schema):
         content, {"quiz": "questions", "flashcards": "cards", "study_plan": "days"}[request["type"]]
     )
     ids = {cid for item in items for cid in item.citations}
-    allowed = {c.chunk_id: c for c in native.citations}
+    allowed = {c.chunk_id: c for c in native.citations if c.chunk_id in supplied}
     if not ids.issubset(allowed) or not ids:
         raise error("invalid_citation", "Video artifact cites unknown observations")
     if request["type"] == "study_plan" and len(items) != request["days"]:
