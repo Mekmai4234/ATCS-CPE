@@ -6,12 +6,13 @@ from youtube_backend.errors import AppError
 from youtube_backend.schemas import AnswerResult, Citation, Coverage, QuizContent
 
 from youtube_agent.models import Generated
-from youtube_agent.video_learning import video_artifact
+from youtube_agent.video_learning import stored_video, video_artifact
 
 
 @pytest.mark.parametrize("unknown", [False, True])
+@pytest.mark.parametrize("stored", [False, True])
 async def test_video_learning_preserves_real_observation_ids_and_partial_coverage(
-    unit, unknown, monkeypatch
+    unit, unknown, stored, monkeypatch
 ):
     full_text = "Visible card. " * 20 + "This is a replay, not another opening."
 
@@ -81,6 +82,30 @@ async def test_video_learning_preserves_real_observation_ids_and_partial_coverag
         )
 
     unit.service.media_answerer = native
+    if stored:
+
+        async def search(topic, sources, context, **kwargs):
+            assert kwargs["kinds"] == ["video"]
+            answer = await native()
+            return SimpleNamespace(
+                items=[
+                    SimpleNamespace(
+                        ranking_score=1.0,
+                        citation=answer.citations[0].model_dump(),
+                        source=sources[0],
+                    )
+                ],
+                notes=["Sampled video observations"],
+            )
+
+        unit.service.knowledge.rag = SimpleNamespace(
+            evidence_library=lambda: SimpleNamespace(search=search),
+        )
+
+        async def forbidden(*args):
+            raise AssertionError("Stored observations must avoid another video inference")
+
+        unit.service.media_answerer = forbidden
     unit.service.model = SimpleNamespace(generate=generate)
     run = unit.service._run(unit.sources, unit.ctx)
     request = dict(type="quiz", topic="What is on screen?")
@@ -92,3 +117,34 @@ async def test_video_learning_preserves_real_observation_ids_and_partial_coverag
         assert result.citations[0].kind == "video"
         assert result.citations[0].citation_id == "real-observation"
         assert not result.coverage.complete
+
+
+@pytest.mark.parametrize("kind,field", [("quiz", "question"), ("flashcards", "front")])
+def test_rejects_duplicate_questions_or_cards_after_normalization(kind, field):
+    from youtube_agent.quality import validate_learning_items
+
+    with pytest.raises(AppError, match="repeats"):
+        validate_learning_items(
+            kind,
+            [
+                SimpleNamespace(**{field: "What is RAG?"}),
+                SimpleNamespace(**{field: "what IS rag !"}),
+            ],
+        )
+    validate_learning_items(
+        kind,
+        [
+            SimpleNamespace(**{field: "What is RAG?"}),
+            SimpleNamespace(**{field: "How do embeddings work?"}),
+        ],
+    )
+    # Thai tone marks distinguish words; normalization must not erase them.
+    validate_learning_items(
+        kind, [SimpleNamespace(**{field: "ถามป้า"}), SimpleNamespace(**{field: "ถามปา"})]
+    )
+
+
+async def test_stored_video_does_not_enable_multiclip_native_learning(unit):
+    sources = [unit.sources[0], unit.sources[0].model_copy(update={"video_id": "jNQXAC9IVRw"})]
+    run = unit.service._run(sources, unit.ctx)
+    assert await stored_video(unit.service, {"topic": "visual scene"}, run) is None
