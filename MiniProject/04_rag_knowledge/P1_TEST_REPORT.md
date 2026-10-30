@@ -1,5 +1,18 @@
 # Module 04 P1 verification — 30 October 2026
 
+## Review follow-up
+
+Merged `origin/develop` (`9f569ea`, already up to date) on the module branch before
+editing. Addressed #33's model mismatch: native catalogue reads now use the same
+effective model as the native writer, `vision_model or llm_model`, while retaining
+owner/source/generation/version/prompt/expiry fences. Regressions cover the default,
+a separate vision model and a subsequent model change invalidating reuse.
+
+Latest Windows catalogue suite: **12 passed**. Latest Linux Docker full suite:
+**171 passed, 1 existing live embedding test skipped**. Full Ruff lint/format and
+whitespace checks pass. The coordinated 07 test additionally checks native learning
+reuse with a separate effective vision model. No 01/03/05 source was edited.
+
 Work ran on `feature/04_rag_knowledge`, updated to develop `9f569ea` before editing.
 This PR changes only 04 and uses the existing 02 immutable stores/contracts; no new
 dependencies, schema migration or paid/provider requests are needed for catalogue reads.

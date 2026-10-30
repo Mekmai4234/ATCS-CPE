@@ -14,7 +14,7 @@ from youtube_backend.video_evidence import VERSION
 __all__ = ["accounts"]
 
 
-def seed(env, source, *, owner="a", expires=None):
+def seed(env, source, *, owner="a", expires=None, model=None):
     # Explicit storage fixture, not a real inference or a billing attestation.
     observation = dict(
         id="v1",
@@ -35,7 +35,7 @@ def seed(env, source, *, owner="a", expires=None):
                 generation=source.generation,
                 evidence_version=source.transcript_version,
                 prompt_version=VERSION,
-                model=env.settings.llm_model,
+                model=model or env.settings.llm_model,
                 input_hash="a" * 64,
                 expires_at=expires or time.time() + 3600,
                 data=dict(source=source.model_dump(), observations=[observation]),
@@ -62,6 +62,23 @@ async def test_new_questions_reuse_full_observations_without_embeddings(accounts
         assert record.citation["kind"] == "video"
         assert record.provenance["model"] == env.settings.llm_model
     assert not (await library.search("cooking rice", task.sources, task.ctx, kinds=["video"])).items
+
+
+@pytest.mark.parametrize("vision_model", ["", "approved-vision-model"])
+async def test_catalogue_uses_effective_vision_model_and_rejects_old_model(accounts, vision_model):
+    env = accounts
+    env.settings.vision_model = vision_model
+    effective = vision_model or env.settings.llm_model
+    seed(env, env.source_a, model=effective)
+    task = query(env, "a", VIDEO_A)
+    result = await env.rag.evidence_library().search(
+        "red card", task.sources, task.ctx, kinds=["video"]
+    )
+    assert len(result.items) == 1 and result.items[0].provenance["model"] == effective
+    env.settings.vision_model = "another-vision-model"
+    assert not (
+        await env.rag.evidence_library().search("red card", task.sources, task.ctx, kinds=["video"])
+    ).items
 
 
 async def test_cross_owner_expiry_and_source_revocation(accounts):
