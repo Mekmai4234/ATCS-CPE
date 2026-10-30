@@ -16,6 +16,7 @@ from .auth import AuthService, GoogleLogin, actor_id, public_user
 from .config import Settings
 from .database import SCHEMA_REVISION, Database
 from .errors import AppError
+from .quota_status import QuotaStatus
 from .repository import Repository
 from .runtime import ManagedAdapters
 from .schemas import (
@@ -404,6 +405,24 @@ def create_app(settings=None, database=None, adapters=None):
         from .workspace import worker_status
 
         return worker_status(settings)
+
+    @app.get("/api/quota", response_model=QuotaStatus, response_model_exclude_none=True)
+    def member_quota():
+        from .quota_status import quota_status
+
+        return quota_status(repository)
+
+    @app.get("/api/admin/quota", response_model=QuotaStatus, response_model_exclude_none=True)
+    def project_quota():
+        from .quota_status import quota_status
+
+        return quota_status(repository, admin=True)
+
+    @app.post("/api/jobs/{job_id}/resume", response_model=Accepted, status_code=202)
+    def resume_job(job_id: str):
+        from .job_resume import resume
+
+        return accepted(resume(repository, job_id))
 
     @app.post("/api/auth/google")
     def google_login(body: GoogleLogin, request: Request, response: Response):
