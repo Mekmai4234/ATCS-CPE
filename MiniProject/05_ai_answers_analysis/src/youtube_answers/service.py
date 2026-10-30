@@ -148,13 +148,26 @@ class AnswerService:
         expected = await self._bounded(
             run, lambda _: self.knowledge.inventory(run.sources, run.context)
         )
-        hits = await self._bounded(
-            run,
-            lambda _: self.knowledge.search(
-                query, run.sources, run.context, top_k=self.settings.retrieval_top_k
-            ),
-        )
-        nodes = [self._record(run, hit.chunk.evidence()) for hit in hits]
+        short = None
+        if expected and expected <= 80 and callable(getattr(self.knowledge, "short_context", None)):
+            short = await self._bounded(
+                run, lambda _: self.knowledge.short_context(run.sources, run.context)
+            )
+        if short:
+            nodes = [self._record(run, chunk.evidence()) for chunk in short]
+            if input_size(payload("answer", request, nodes, history)) > self.settings.max_context_tokens:
+                short = None
+        if not short:
+            hits = await self._bounded(
+                run,
+                lambda _: self.knowledge.search(
+                    query, run.sources, run.context, top_k=self.settings.retrieval_top_k
+                ),
+            )
+            nodes = [self._record(run, hit.chunk.evidence()) for hit in hits]
+        else:
+            hits = short
+            run.notes.append("ใช้บทถอดเสียงครบในงบข้อมูลโดยไม่เรียกค้นเวกเตอร์ซ้ำ")
         data = payload("answer", request, nodes, history)
         while nodes and input_size(data) > self.settings.max_context_tokens:
             nodes.pop()
@@ -476,8 +489,6 @@ class AnswerService:
         )
         if full and not complete and not run.notes:
             run.notes.append("Selected evidence could not be processed completely.")
-        if run.notes:
-            text += "\n\nข้อจำกัด / Limitations: " + " ".join(dict.fromkeys(run.notes))
         usage = {}
         for meta in run.metadata:
             for key, value in meta.usage.items():
