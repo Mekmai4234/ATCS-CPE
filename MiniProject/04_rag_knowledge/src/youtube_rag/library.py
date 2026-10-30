@@ -282,7 +282,8 @@ class EvidenceLibrary:
                             table.c.generation == source.generation,
                             table.c.evidence_version == source.transcript_version,
                             table.c.prompt_version == VERSION,
-                            table.c.model == context.settings.llm_model,
+                            table.c.model
+                            == (context.settings.vision_model or context.settings.llm_model),
                             table.c.expires_at > time.time(),
                         )
                         .order_by(table.c.expires_at.desc(), table.c.cache_id)

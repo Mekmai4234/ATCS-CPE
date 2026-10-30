@@ -28,7 +28,7 @@ snapshot and asset citation; they cannot be passed as transcript-v1 citations.
 Every call requires a real authenticated backend execution. Current job/lease, account,
 selected sources, library grant and source generation/version are checked before and
 after collection. Native observations are private to their owner, current configured
-model, supported prompt version and one-hour reuse lifetime. Expiry only removes reuse
+effective vision model (`vision_model or llm_model`), supported prompt version and one-hour reuse lifetime. Expiry only removes reuse
 eligibility; immutable referenced observations remain in 02 for historical citation
 verification. OCR/visual data uses only the current revision pointer for that generation.
 Revocation, cancellation and changed versions fail closed; no browser-supplied owner is
