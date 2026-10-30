@@ -1,5 +1,6 @@
 """Learning artifacts from explicitly labelled native-video observations, never fake speech."""
 
+import re
 from dataclasses import dataclass
 
 from youtube_backend.schemas import (
@@ -32,7 +33,8 @@ class VideoLearningEvidence:
 
 
 async def video_artifact(service, request, run, schema):
-    native = await stored_video(service, request, run)
+    plan = learning_plan(run.sources[0], request["topic"])
+    native = await stored_video(service, request, run, plan=plan)
     if native is None:
         native = await service._bounded(
             run,
@@ -47,6 +49,8 @@ async def video_artifact(service, request, run, schema):
             "Video evidence is insufficient for this learning topic",
             status=409,
         )
+    if any(not within_plan(c, plan) for c in native.citations):
+        raise error("invalid_citation", "Video learning evidence exceeds the requested time window")
     records = VideoEvidenceStore(run.context).resolve(native.citations)
     evidence = []
     for record in records:
@@ -98,7 +102,25 @@ async def video_artifact(service, request, run, schema):
     )
 
 
-async def stored_video(service, request, run):
+def learning_plan(source, topic):
+    try:
+        from youtube_ingestion.video_plan import VideoPlan
+    except ImportError:
+        raise error(
+            "integration_not_installed",
+            "Native learning requires the shared video planner",
+            status=503,
+        ) from None
+    return VideoPlan.from_question(source, topic)
+
+
+def within_plan(citation, plan):
+    return citation.start_seconds >= plan.start_seconds and citation.end_seconds <= (
+        plan.end_seconds if plan.end_seconds is not None else 7200
+    )
+
+
+async def stored_video(service, request, run, *, plan=None):
     """Use 04's private observation catalogue before spending a vision call.
 
     Older 04 installations keep the native path. Relevance is a candidate filter,
@@ -106,21 +128,32 @@ async def stored_video(service, request, run):
     """
     if len(run.sources) != 1:
         return None  # Preserve the existing single-video native contract until P3.
+    plan = plan or learning_plan(run.sources[0], request["topic"])
     rag = getattr(service.knowledge, "rag", None)
     factory = getattr(rag, "evidence_library", None)
     if not callable(factory):
         return None
+    # Clock tokens constrain the lookup window; they are not lexical topic terms.
+    lookup_topic = re.sub(r"(?<![\d:])[\d:]*\d:[\d:]+(?![\d:])", " ", request["topic"]).strip()
+    if not any(char.isalnum() for char in lookup_topic):
+        return None
     result = await service._bounded(
         run,
         lambda _: factory().search(
-            request["topic"],
+            lookup_topic,
             run.sources,
             run.context,
             kinds=["video"],
             limit=16,
+            start_seconds=plan.start_seconds,
+            end_seconds=plan.end_seconds,
         ),
     )
-    candidates = [r for r in result.items if r.ranking_score >= 0.5]
+    candidates = [
+        r
+        for r in result.items
+        if r.ranking_score >= 0.5 and within_plan(Citation.model_validate(r.citation), plan)
+    ]
     if not candidates:
         return None
     return AnswerResult(

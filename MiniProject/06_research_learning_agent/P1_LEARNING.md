@@ -1,5 +1,13 @@
 # P1 evidence reuse and learning quality
 
+Explicit times are parsed using the existing shared `VideoPlan` before lookup or
+fallback. Stored and newly returned native citations must stay wholly inside that
+same window; overlap alone is insufficient. Invalid ranges fail before inference.
+The full-team native integration supplies the ingestion planner; test-only source
+paths and the Docker test allowlist use that same implementation without modifying 03
+or adding a production dependency. Valid clock tokens constrain time rather than
+lexical relevance; generation still receives the original topic.
+
 Visual learning first checks the new 04 evidence library for private, current,
 relevant native observations. Lexical overlap of at least 0.5 selects candidates;
 it is not proof of semantic support. No hit falls back to the existing bounded native
