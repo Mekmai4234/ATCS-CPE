@@ -60,12 +60,13 @@ class Run:
 
 
 class AgentService:
-    def __init__(self, settings, model, knowledge, *, analyzer=None, media_answerer=None):
+    def __init__(self, settings, model, knowledge, *, analyzer=None, media_answerer=None, media_selector=None):
         self.settings = settings
         self.model = model
         self.knowledge = knowledge
         self.analyzer = analyzer
         self.media_answerer = media_answerer
+        self.media_selector = media_selector
 
     def _run(self, sources, context):
         context.check()
@@ -369,7 +370,7 @@ class AgentService:
             return await member.artifact(request, sources, context)
         run = self._run(sources, context)
         request = self._request(ArtifactRequest, request, run)
-        if self.media_answerer:
+        if self.media_answerer and (self.media_selector is None or self.media_selector(request["topic"])):
             from .video_learning import video_artifact
 
             native = await video_artifact(self, request, run, CONTENTS[request["type"]])
