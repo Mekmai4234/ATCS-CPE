@@ -411,7 +411,7 @@ export async function pollJob(
   id: string,
   onUpdate: (job: Job) => void | Promise<void>,
   signal: AbortSignal,
-  options = { intervalMs: 1500, maxMs: 600000 },
+  options = { intervalMs: 750, maxMs: 600000 },
 ): Promise<Job> {
   const started = Date.now();
   let failures = 0;
