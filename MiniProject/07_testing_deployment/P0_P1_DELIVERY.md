@@ -1,5 +1,30 @@
 # P0/P1 delivery and remaining acceptance — 30 October 2026
 
+## Review follow-up
+
+Merged `origin/develop` (`9f569ea`, already up to date) on the module branch before
+editing. Addressed #35 by replacing the obsolete position-menu controls with the
+supported keyboard Home reset. The test drags the launcher away, asserts movement,
+resets to its actual bottom-right bounds above mobile navigation, checks containment,
+and opens with Enter again while localStorage throws. Desktop and mobile cases retain
+focus/open/drag/resize/composition coverage; nothing is skipped to hide the old failure.
+Latest Floating Buddy browser suite: **5 passed**; scoped Prettier check passes.
+
+Expanded the actual 02/04/06 handoff from one case to eight: default reuse, explicit
+point/range reuse, out-of-window and straddling stored evidence requiring fresh in-window
+observations, invalid/reversed times preventing publication, and an independently
+configured vision model. Successful results preserve exact intervals through history,
+cold backup/restore and revocation. The suite passes on the 07 branch's legacy native
+fallback and on the coordinated corrected branches. Latest Windows handoff: **8 passed**;
+latest combined Docker full 07 suite: **83 passed**, including strict Free Tier cases.
+
+All owned-module Ruff/format checks pass. The shared base still has a confirmed Ruff
+format failure in module 05's `youtube_answers/team.py`, and standalone CI needs the
+owned 02/04/07 changes integrated into develop as well. That out-of-scope 05 file was
+read for diagnosis but not edited. New CI runs are recorded on the updated PRs; local
+and Docker results do not claim that the shared CI or P0 human/live gates are accepted.
+This follow-up makes no provider requests and does not change quota policy or ledger.
+
 User-selected scope: modules **02, 04, 06, 07**, P0/P1 only. Each branch was updated
 to develop `9f569ea` before editing. PRs target develop separately; no 01/03/05,
 root configuration, GitHub workflow or external TODO file was edited. P2/P3 remains
