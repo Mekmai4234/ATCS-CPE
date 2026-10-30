@@ -170,7 +170,35 @@ class AnswerService:
             output = GeneratedAnswer(
                 status="insufficient_evidence", message="ไม่พบหลักฐานที่เพียงพอในวิดีโอที่เลือก"
             )
-        run.notes.append("Question answering uses ranked retrieval, not whole-video analysis.")
+        # Escalate only an unsupported answer, without paying for another embedding.
+        # Enumerate bounded original evidence; never count unread chunks as processed.
+        if output.status == "insufficient_evidence" and expected and nodes:
+            cursor, seen, expanded = None, set(), list(nodes)
+            included = {cid for node in expanded for cid in node["citation_ids"]}
+            for _ in range(4):
+                page = await self._bounded(
+                    run, lambda _, cursor=cursor: self.knowledge.read(
+                        run.sources, run.context, limit=self.settings.answer_read_page_size, cursor=cursor
+                    )
+                )
+                for chunk in page.items:
+                    record = chunk.evidence()
+                    if record.chunk_id in included:
+                        continue
+                    node = self._record(run, record)
+                    candidate = payload("answer", request, [*expanded, node], history)
+                    if input_size(candidate) <= self.settings.max_context_tokens:
+                        expanded.append(node)
+                        included.add(record.chunk_id)
+                cursor = page.next_cursor
+                if cursor is None or cursor in seen:
+                    break
+                seen.add(cursor)
+            if included - run.processed:
+                output = await self._generate(run, payload("answer", request, expanded, history))
+                run.processed.update(included)
+                run.notes.append("ค้นหลักฐานเพิ่มเติมจากบทถอดเสียงเมื่อการค้นครั้งแรกไม่เพียงพอ")
+        run.notes.append("แชตค้นหลักฐานตามคำถาม อาจไม่ได้อ่านครบทุกช่วงของคลิป")
         return await self._finish(run, output, expected, full=False)
 
     def _groups(self, task, request, nodes):
