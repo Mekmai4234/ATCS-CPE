@@ -278,6 +278,9 @@ class GeminiModel:
             "untrusted_evidence": [e.model_dump() for e in evidence],
             "instructions": f"Return the artifact. Use {citation_key} as each citation ID. "
             "Every item needs supporting citations. Never invent missing facts. "
+            "Preserve qualifications, uncertainty, negation and replay warnings in the evidence. "
+            "Adapt difficulty to the requested level without adding facts. Avoid questions "
+            "with the same meaning; return fewer items when evidence supports fewer facts. "
             "For study plans return exactly the requested number of days. "
             "For quizzes return at most 5 questions; for flashcards at most 8 cards. "
             "Keep each answer and explanation short; cite only relevant evidence IDs.",
