@@ -22,14 +22,15 @@ logger = logging.getLogger(__name__)
 
 
 class Worker:
-    def __init__(self, repository, adapters, settings):
+    def __init__(self, repository, adapters, settings, *, report_liveness=True):
         self.repo = repository
         self.adapters = adapters
         self.settings = settings
         self.last_pulse = 0.0
+        self.report_liveness = report_liveness
 
     def pulse(self):
-        if time.monotonic() - self.last_pulse < 5:
+        if not self.report_liveness or time.monotonic() - self.last_pulse < 5:
             return
         from .workspace import beat
 
