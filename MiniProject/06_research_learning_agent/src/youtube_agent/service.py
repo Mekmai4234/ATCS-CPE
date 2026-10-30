@@ -60,11 +60,12 @@ class Run:
 
 
 class AgentService:
-    def __init__(self, settings, model, knowledge, *, analyzer=None):
+    def __init__(self, settings, model, knowledge, *, analyzer=None, media_answerer=None):
         self.settings = settings
         self.model = model
         self.knowledge = knowledge
         self.analyzer = analyzer
+        self.media_answerer = media_answerer
 
     def _run(self, sources, context):
         context.check()
@@ -137,7 +138,16 @@ class AgentService:
         citations = list(result.citations)
         for artifact in getattr(result, "artifacts", []):
             citations.extend(artifact.citations)
-        ids = sorted({c.chunk_id for c in citations})
+        for citation in citations:
+            if citation.kind == "video":
+                from youtube_backend.video_evidence import verify_video_citation
+
+                with run.context.repository.db.read() as connection:
+                    job = run.context.repository._owned(
+                        connection, run.context.job_id, run.context.lease_token
+                    )
+                    verify_video_citation(run.context.repository, connection, job, citation)
+        ids = sorted({c.chunk_id for c in citations if c.kind == "transcript"})
         for offset in range(0, len(ids), 1000):
             batch = ids[offset : offset + 1000]
             current = await self._bounded(
@@ -359,6 +369,12 @@ class AgentService:
             return await member.artifact(request, sources, context)
         run = self._run(sources, context)
         request = self._request(ArtifactRequest, request, run)
+        if self.media_answerer:
+            from .video_learning import video_artifact
+
+            native = await video_artifact(self, request, run, CONTENTS[request["type"]])
+            if native is not None:
+                return await self._deliver(run, native)
         try:
             self._event(run, 0, "create_learning_artifact", "running", "Collecting scoped evidence")
             await self._inventory(run)
