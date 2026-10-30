@@ -1,0 +1,732 @@
+{
+  "schema": 1,
+  "status": "draft_requires_human_review",
+  "semantic_quality_verified": false,
+  "notes": [
+    "36 proposed questions tied to real public video IDs; availability and gold answers require human review.",
+    "English clips are planned additions, not imports or verified live sources.",
+    "Do not invent reviewed answers or timestamps. Include captions/audio mismatch and replay checks during review."
+  ],
+  "cases": [
+    {
+      "id": "vb-01",
+      "video_ids": [
+        "C0DXctGPWxw"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
+      "clip_type": "music_video",
+      "language": "th",
+      "category": "speech",
+      "question": "ในช่วงที่ตรวจ ผู้พูดอธิบายเรื่องใดบ้าง? อ้างช่วงเวลาและแยกคำพูดจากภาพ",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-02",
+      "video_ids": [
+        "C0DXctGPWxw"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
+      "clip_type": "music_video",
+      "language": "th",
+      "category": "screen_text",
+      "question": "ข้อความบนจอที่อ่านได้ชัดในช่วงที่ตรวจคืออะไร? ถ้าอ่านไม่ชัดให้ระบุข้อจำกัด",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-03",
+      "video_ids": [
+        "C0DXctGPWxw"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
+      "clip_type": "music_video",
+      "language": "th",
+      "category": "visual",
+      "question": "ในช่วง 00:00–00:10 มีสิ่งใดมองเห็นได้โดยตรง โดยไม่เดาชื่อหรือเจตนาบุคคล?",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-04",
+      "video_ids": [
+        "C0DXctGPWxw"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
+      "clip_type": "music_video",
+      "language": "th",
+      "category": "sequence",
+      "question": "จากช่วงที่ตรวจ เหตุการณ์ที่เห็นเกิดก่อนและหลังกันอย่างไร? แยกภาพย้อนถ้ามี",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-05",
+      "video_ids": [
+        "C0DXctGPWxw"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
+      "clip_type": "music_video",
+      "language": "th",
+      "category": "count",
+      "question": "ระบุจำนวนที่ผู้พูดหรือจอบอกไว้อย่างชัดเจน พร้อมเวลา ถ้าไม่มีอย่าเดายอดรวมจากภาพสุ่ม",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-06",
+      "video_ids": [
+        "C0DXctGPWxw"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
+      "clip_type": "music_video",
+      "language": "th",
+      "category": "insufficient",
+      "question": "จากหลักฐานที่ตรวจ ยืนยันได้หรือไม่ว่าจำนวนเหตุการณ์ตลอดทั้งคลิปครบถ้วน? อธิบายช่องว่าง",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-07",
+      "video_ids": [
+        "B-zaXo-skGo"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
+      "clip_type": "music_video",
+      "language": "th",
+      "category": "speech",
+      "question": "ในช่วงที่ตรวจ ผู้พูดอธิบายเรื่องใดบ้าง? อ้างช่วงเวลาและแยกคำพูดจากภาพ",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-08",
+      "video_ids": [
+        "B-zaXo-skGo"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
+      "clip_type": "music_video",
+      "language": "th",
+      "category": "screen_text",
+      "question": "ข้อความบนจอที่อ่านได้ชัดในช่วงที่ตรวจคืออะไร? ถ้าอ่านไม่ชัดให้ระบุข้อจำกัด",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-09",
+      "video_ids": [
+        "B-zaXo-skGo"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
+      "clip_type": "music_video",
+      "language": "th",
+      "category": "visual",
+      "question": "ในช่วง 00:00–00:10 มีสิ่งใดมองเห็นได้โดยตรง โดยไม่เดาชื่อหรือเจตนาบุคคล?",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-10",
+      "video_ids": [
+        "B-zaXo-skGo"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
+      "clip_type": "music_video",
+      "language": "th",
+      "category": "sequence",
+      "question": "จากช่วงที่ตรวจ เหตุการณ์ที่เห็นเกิดก่อนและหลังกันอย่างไร? แยกภาพย้อนถ้ามี",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-11",
+      "video_ids": [
+        "B-zaXo-skGo"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
+      "clip_type": "music_video",
+      "language": "th",
+      "category": "count",
+      "question": "ระบุจำนวนที่ผู้พูดหรือจอบอกไว้อย่างชัดเจน พร้อมเวลา ถ้าไม่มีอย่าเดายอดรวมจากภาพสุ่ม",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-12",
+      "video_ids": [
+        "B-zaXo-skGo"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
+      "clip_type": "music_video",
+      "language": "th",
+      "category": "insufficient",
+      "question": "จากหลักฐานที่ตรวจ ยืนยันได้หรือไม่ว่าจำนวนเหตุการณ์ตลอดทั้งคลิปครบถ้วน? อธิบายช่องว่าง",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-13",
+      "video_ids": [
+        "NZImGB4O-X4"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=NZImGB4O-X4",
+      "clip_type": "general",
+      "language": "th",
+      "category": "speech",
+      "question": "ในช่วงที่ตรวจ ผู้พูดอธิบายเรื่องใดบ้าง? อ้างช่วงเวลาและแยกคำพูดจากภาพ",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-14",
+      "video_ids": [
+        "NZImGB4O-X4"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=NZImGB4O-X4",
+      "clip_type": "general",
+      "language": "th",
+      "category": "screen_text",
+      "question": "ข้อความบนจอที่อ่านได้ชัดในช่วงที่ตรวจคืออะไร? ถ้าอ่านไม่ชัดให้ระบุข้อจำกัด",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-15",
+      "video_ids": [
+        "NZImGB4O-X4"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=NZImGB4O-X4",
+      "clip_type": "general",
+      "language": "th",
+      "category": "visual",
+      "question": "ในช่วง 00:00–00:10 มีสิ่งใดมองเห็นได้โดยตรง โดยไม่เดาชื่อหรือเจตนาบุคคล?",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-16",
+      "video_ids": [
+        "NZImGB4O-X4"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=NZImGB4O-X4",
+      "clip_type": "general",
+      "language": "th",
+      "category": "sequence",
+      "question": "จากช่วงที่ตรวจ เหตุการณ์ที่เห็นเกิดก่อนและหลังกันอย่างไร? แยกภาพย้อนถ้ามี",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-17",
+      "video_ids": [
+        "NZImGB4O-X4"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=NZImGB4O-X4",
+      "clip_type": "general",
+      "language": "th",
+      "category": "count",
+      "question": "ระบุจำนวนที่ผู้พูดหรือจอบอกไว้อย่างชัดเจน พร้อมเวลา ถ้าไม่มีอย่าเดายอดรวมจากภาพสุ่ม",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-18",
+      "video_ids": [
+        "NZImGB4O-X4"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=NZImGB4O-X4",
+      "clip_type": "general",
+      "language": "th",
+      "category": "insufficient",
+      "question": "จากหลักฐานที่ตรวจ ยืนยันได้หรือไม่ว่าจำนวนเหตุการณ์ตลอดทั้งคลิปครบถ้วน? อธิบายช่องว่าง",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-19",
+      "video_ids": [
+        "cWVse_LuFO0"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
+      "clip_type": "tutorial",
+      "language": "th",
+      "category": "speech",
+      "question": "ในช่วงที่ตรวจ ผู้พูดอธิบายเรื่องใดบ้าง? อ้างช่วงเวลาและแยกคำพูดจากภาพ",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-20",
+      "video_ids": [
+        "cWVse_LuFO0"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
+      "clip_type": "tutorial",
+      "language": "th",
+      "category": "screen_text",
+      "question": "ข้อความบนจอที่อ่านได้ชัดในช่วงที่ตรวจคืออะไร? ถ้าอ่านไม่ชัดให้ระบุข้อจำกัด",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-21",
+      "video_ids": [
+        "cWVse_LuFO0"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
+      "clip_type": "tutorial",
+      "language": "th",
+      "category": "visual",
+      "question": "ในช่วง 00:00–00:10 มีสิ่งใดมองเห็นได้โดยตรง โดยไม่เดาชื่อหรือเจตนาบุคคล?",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-22",
+      "video_ids": [
+        "cWVse_LuFO0"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
+      "clip_type": "tutorial",
+      "language": "th",
+      "category": "sequence",
+      "question": "จากช่วงที่ตรวจ เหตุการณ์ที่เห็นเกิดก่อนและหลังกันอย่างไร? แยกภาพย้อนถ้ามี",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-23",
+      "video_ids": [
+        "cWVse_LuFO0"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
+      "clip_type": "tutorial",
+      "language": "th",
+      "category": "count",
+      "question": "ระบุจำนวนที่ผู้พูดหรือจอบอกไว้อย่างชัดเจน พร้อมเวลา ถ้าไม่มีอย่าเดายอดรวมจากภาพสุ่ม",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-24",
+      "video_ids": [
+        "cWVse_LuFO0"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
+      "clip_type": "tutorial",
+      "language": "th",
+      "category": "insufficient",
+      "question": "จากหลักฐานที่ตรวจ ยืนยันได้หรือไม่ว่าจำนวนเหตุการณ์ตลอดทั้งคลิปครบถ้วน? อธิบายช่องว่าง",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-25",
+      "video_ids": [
+        "aircAruvnKk"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=aircAruvnKk",
+      "clip_type": "tutorial",
+      "language": "en",
+      "category": "speech",
+      "question": "What does the speaker explicitly explain in a reviewed interval? Cite speech separately from visual evidence.",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-26",
+      "video_ids": [
+        "aircAruvnKk"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=aircAruvnKk",
+      "clip_type": "tutorial",
+      "language": "en",
+      "category": "screen_text",
+      "question": "Which on-screen words can be read clearly in the reviewed interval? Abstain if they are unclear.",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-27",
+      "video_ids": [
+        "aircAruvnKk"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=aircAruvnKk",
+      "clip_type": "tutorial",
+      "language": "en",
+      "category": "visual",
+      "question": "What is directly visible in 00:00–00:10? Do not infer identities or intentions.",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-28",
+      "video_ids": [
+        "aircAruvnKk"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=aircAruvnKk",
+      "clip_type": "tutorial",
+      "language": "en",
+      "category": "sequence",
+      "question": "What is the observed order of events in the reviewed interval? Flag any replay rather than counting it again.",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-29",
+      "video_ids": [
+        "aircAruvnKk"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=aircAruvnKk",
+      "clip_type": "tutorial",
+      "language": "en",
+      "category": "count",
+      "question": "Is a numerical total explicitly spoken or displayed? Cite it, or abstain instead of inferring a whole-video total from samples.",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-30",
+      "video_ids": [
+        "aircAruvnKk"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=aircAruvnKk",
+      "clip_type": "tutorial",
+      "language": "en",
+      "category": "insufficient",
+      "question": "Can the inspected evidence establish an exhaustive event total for the entire clip? Explain any unobserved intervals.",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-31",
+      "video_ids": [
+        "jNQXAC9IVRw"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "clip_type": "general",
+      "language": "en",
+      "category": "speech",
+      "question": "What does the speaker explicitly explain in a reviewed interval? Cite speech separately from visual evidence.",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-32",
+      "video_ids": [
+        "jNQXAC9IVRw"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "clip_type": "general",
+      "language": "en",
+      "category": "screen_text",
+      "question": "Which on-screen words can be read clearly in the reviewed interval? Abstain if they are unclear.",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-33",
+      "video_ids": [
+        "jNQXAC9IVRw"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "clip_type": "general",
+      "language": "en",
+      "category": "visual",
+      "question": "What is directly visible in 00:00–00:10? Do not infer identities or intentions.",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-34",
+      "video_ids": [
+        "jNQXAC9IVRw"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "clip_type": "general",
+      "language": "en",
+      "category": "sequence",
+      "question": "What is the observed order of events in the reviewed interval? Flag any replay rather than counting it again.",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-35",
+      "video_ids": [
+        "jNQXAC9IVRw"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "clip_type": "general",
+      "language": "en",
+      "category": "count",
+      "question": "Is a numerical total explicitly spoken or displayed? Cite it, or abstain instead of inferring a whole-video total from samples.",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    },
+    {
+      "id": "vb-36",
+      "video_ids": [
+        "jNQXAC9IVRw"
+      ],
+      "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "clip_type": "general",
+      "language": "en",
+      "category": "insufficient",
+      "question": "Can the inspected evidence establish an exhaustive event total for the entire clip? Explain any unobserved intervals.",
+      "expected_answer": null,
+      "source_version": null,
+      "references": [],
+      "review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "case_sha256": null
+      }
+    }
+  ]
+}
