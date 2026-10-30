@@ -43,6 +43,8 @@ export interface ImportItem {
   error_code: string | null;
 }
 export interface Citation {
+  kind?: 'transcript' | 'video';
+  observation_cache_id?: string | null;
   presentation?: CitationPresentation;
   citation_id: string;
   chunk_id: string;

@@ -51,7 +51,7 @@ function EvidenceBody({ api, video }: { api: Api; video: Video }) {
           wholeVideoReviewed: false,
         }}
       />
-      <p>ภาพและ OCR เป็นหลักฐานเสริม การถามแชตยังใช้บทถอดเสียงของคลิป</p>
+      <p>ภาพและ OCR ที่บันทึกไว้ · คำถามเกี่ยวกับภาพจะวิเคราะห์คลิปเพิ่มเมื่อพร้อมใช้งาน</p>
       {data.evidence.map((item) => (
         <FrameEvidence
           key={`${item.frame_id}-${item.kind}`}
