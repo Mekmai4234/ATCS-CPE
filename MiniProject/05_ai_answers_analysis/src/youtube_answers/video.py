@@ -1,15 +1,16 @@
 """Native YouTube audio/video evidence with private, source-versioned reuse."""
 
 import asyncio
+import json
 import re
 import time
-
-import httpx
 from typing import Literal
 from uuid import uuid4
 
+import httpx
 from google.genai import errors, types
-from pydantic import Field, model_validator
+from pydantic import Field, ValidationError, model_validator
+from youtube_backend.errors import AppError
 from youtube_backend.provider_errors import provider_error
 from youtube_backend.quota import ProviderReply, QuotaBroker
 from youtube_backend.repository import digest
@@ -55,7 +56,7 @@ class Observation(Schema):
 
     @model_validator(mode="after")
     def ordered(self):
-        if self.end_seconds < self.start_seconds:
+        if self.end_seconds < self.start_seconds or not any(c.isalnum() for c in self.text):
             raise ValueError("Observation time is reversed")
         return self
 
@@ -223,7 +224,7 @@ class NativeVideoAnswers:
                 "FinishReason.STOP",
             }:
                 return None
-            output = VideoOutput.model_validate_json(value.text)
+            output = parse_video_output(value.text)
             returned = value.model_version
             usage = {
                 k: v
@@ -301,3 +302,25 @@ class NativeVideoAnswers:
                 latency_ms=(time.monotonic() - started) * 1000,
             ),
         )
+
+
+def parse_video_output(text):
+    """Discard unsupported statements; never repair a factual answer or its citations."""
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict) and data.get("status") == "insufficient_evidence":
+            # Providers sometimes populate every schema field even for abstentions.
+            # No observation/claim from an abstention may become learning evidence.
+            data["statements"] = []
+            data["observations"] = []
+            if not isinstance(data.get("message"), str) or not any(
+                c.isalnum() for c in data["message"]
+            ):
+                data["message"] = (
+                    "ยังยืนยันคำตอบจากภาพและเสียงของคลิปนี้ไม่ได้ กรุณาระบุช่วงเวลาหรือถามให้เจาะจงขึ้น"
+                )
+        return VideoOutput.model_validate(data)
+    except (ValueError, TypeError, ValidationError):
+        raise AppError(
+            "invalid_model_output", "Native video returned invalid evidence JSON", 502
+        ) from None

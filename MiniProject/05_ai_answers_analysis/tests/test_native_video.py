@@ -91,3 +91,21 @@ async def test_native_video_has_scoped_input_timestamps_and_reuses_private_cache
         await client.aio.aclose()
         client.close()
         await http.aclose()
+
+
+def test_video_abstention_discards_populated_claims_and_punctuation_only_message():
+    from youtube_answers.video import parse_video_output
+
+    value = parse_video_output(
+        json.dumps(
+            {
+                "status": "insufficient_evidence",
+                "message": "!!!!!",
+                "statements": [{"text": "!!!!!", "citation_ids": ["obs_0"]}],
+                "observations": [],
+            }
+        )
+    )
+    assert value.status == "insufficient_evidence"
+    assert not value.statements and not value.observations
+    assert "ยืนยัน" in value.message
