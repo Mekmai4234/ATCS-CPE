@@ -62,6 +62,8 @@ export const statusLabels: Record<string, string> = {
   paused: 'พักงานไว้',
   fetching_transcript: 'กำลังดึงบทถอดเสียง',
   indexing: 'กำลังสร้างฐานความรู้',
+  reviewing_video: 'กำลังตรวจภาพและเสียงของคลิป',
+  expanding_evidence: 'กำลังค้นหลักฐานเพิ่มเติม',
   ready: 'พร้อมใช้งาน',
   no_transcript: 'ไม่มีบทถอดเสียง',
   completed: 'เสร็จแล้ว',
