@@ -218,7 +218,7 @@ class GeminiModel:
                 description=DESCRIPTIONS.get(
                     name, "Use only authorized stored evidence and frame IDs."
                 ),
-                parameters_json_schema=schema.model_json_schema(),
+                parameters_json_schema=provider_schema(schema),
             )
             for name, schema in registry.items()
         ]
