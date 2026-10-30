@@ -160,13 +160,16 @@ class AnswerAdapters(RagAdapters):
                 {"question": video_question, "untrusted_history_references": history[-4:]}
             )
         video_note = None
+        native_insufficient = None
         if use_video and isinstance(self.answers.model, GeminiModel):
             try:
                 native = await NativeVideoAnswers(self.answers.model, self.answers.settings).answer(
                     video_question, sources, context
                 )
-                if native is not None:
+                if native is not None and native.status == "answered":
                     return native
+                native_insufficient = native
+                video_note = "ภาพและเสียงยังยืนยันคำตอบไม่ได้ จึงตรวจบทถอดเสียงเพิ่มเติม"
             except AppError as exc:
                 if exc.code not in {
                     "free_tier_unverified",
@@ -201,6 +204,8 @@ class AnswerAdapters(RagAdapters):
                         "quota_pending",
                     }:
                         raise
+        if result.status == "insufficient_evidence" and native_insufficient is not None:
+            return native_insufficient
         if video_note:
             result.coverage.notes.append(video_note)
         return result
