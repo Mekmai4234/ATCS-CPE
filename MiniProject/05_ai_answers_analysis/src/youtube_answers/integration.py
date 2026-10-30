@@ -89,10 +89,34 @@ class AnswerAdapters(RagAdapters):
         self.answers = AnswerService(config, gateway, RagKnowledge(self.rag))
 
     async def answer(self, request, sources, history, context):
+        from .video import NativeVideoAnswers, needs_video
+        from youtube_backend.errors import AppError
+
+        use_video = needs_video(request["question"])
+        video_note = None
+        if use_video and isinstance(self.answers.model, GeminiModel):
+            try:
+                native = await NativeVideoAnswers(self.answers.model, self.answers.settings).answer(
+                    request["question"], sources, context
+                )
+                if native is not None:
+                    return native
+            except AppError as exc:
+                if exc.code not in {
+                    "free_tier_unverified",
+                    "free_model_unverified",
+                    "quota_pending",
+                }:
+                    raise
+                video_note = "คลิปนี้ยังตอบจากบทถอดเสียง: สิทธิ์วิเคราะห์ภาพและเสียงยังไม่พร้อม"
         if isinstance(getattr(self.answers.model, "broker", None), ExecutionBroker):
             with self.answers.model.broker.bind(context):
-                return await self.answers.answer(request, sources, history, context)
-        return await self.answers.answer(request, sources, history, context)
+                result = await self.answers.answer(request, sources, history, context)
+        else:
+            result = await self.answers.answer(request, sources, history, context)
+        if video_note:
+            result.coverage.notes.append(video_note)
+        return result
 
     async def analyze(self, request, sources, context):
         if isinstance(getattr(self.answers.model, "broker", None), ExecutionBroker):

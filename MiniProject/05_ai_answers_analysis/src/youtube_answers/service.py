@@ -177,9 +177,13 @@ class AnswerService:
             included = {cid for node in expanded for cid in node["citation_ids"]}
             for _ in range(4):
                 page = await self._bounded(
-                    run, lambda _, cursor=cursor: self.knowledge.read(
-                        run.sources, run.context, limit=self.settings.answer_read_page_size, cursor=cursor
-                    )
+                    run,
+                    lambda _, cursor=cursor: self.knowledge.read(
+                        run.sources,
+                        run.context,
+                        limit=self.settings.answer_read_page_size,
+                        cursor=cursor,
+                    ),
                 )
                 for chunk in page.items:
                     record = chunk.evidence()
