@@ -230,6 +230,15 @@ class NativeVideoAnswers:
             }:
                 return None
             output = parse_video_output(value.text)
+            if any(
+                o.start_seconds < plan.start_seconds or o.end_seconds > (plan.end_seconds or 7200)
+                for o in output.observations
+            ):
+                raise AppError(
+                    "invalid_model_output",
+                    "Video observation exceeds the inspected time window",
+                    502,
+                )
             returned = value.model_version
             usage = {
                 k: v

@@ -11,7 +11,12 @@ from youtube_answers.config import AnswerSettings
 from youtube_answers.video import NativeVideoAnswers
 
 
-async def test_native_video_has_scoped_input_timestamps_and_reuses_private_cache(monkeypatch):
+@pytest.mark.parametrize(
+    "question,invalid_window", [("บนจอเขียนว่าอะไร", False), ("ในภาพช่วง00:10เห็นอะไร", True)]
+)
+async def test_native_video_has_scoped_input_timestamps_and_reuses_private_cache(
+    monkeypatch, question, invalid_window
+):
     import youtube_answers.video as module
 
     sent = []
@@ -76,8 +81,15 @@ async def test_native_video_has_scoped_input_timestamps_and_reuses_private_cache
     service = NativeVideoAnswers(SimpleNamespace(client=client), AnswerSettings(_env_file=None))
     source = Source(video_id="dQw4w9WgXcQ", generation=1, transcript_version="v1")
     try:
-        first = await service.answer("บนจอเขียนว่าอะไร", [source], context)
-        second = await service.answer("บนจอเขียนว่าอะไร", [source], context)
+        if invalid_window:
+            from youtube_backend.errors import AppError
+
+            with pytest.raises(AppError, match="inspected time window"):
+                await service.answer(question, [source], context)
+            assert Store.data is None
+            return
+        first = await service.answer(question, [source], context)
+        second = await service.answer(question, [source], context)
         assert first.citations[0].kind == "video"
         assert first.citations[0].start_seconds == 1
         assert not first.coverage.complete
