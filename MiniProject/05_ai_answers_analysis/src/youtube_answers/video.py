@@ -3,6 +3,8 @@
 import asyncio
 import re
 import time
+
+import httpx
 from typing import Literal
 from uuid import uuid4
 
@@ -37,7 +39,7 @@ def needs_video(question):
     return bool(
         re.search(
             r"กี่(?:ใบ|ครั้ง|ซอง|ตัว|คน|อัน)|นับ|เปิดกาชา|บนจอ|ในภาพ|สีอะไร|แต่งตัว|เห็นอะไร"
-            r"|การ์ด|จำนวน|how many|on.screen|what.*wear",
+            r"|การ์ด|ได้ยิน|พูดว่าอะไร|เสียงในคลิป|how many|on.screen|what.*wear|what.*hear",
             question,
             re.I,
         )
@@ -93,6 +95,12 @@ class NativeVideoAnswers:
         if len(sources) != 1:
             return None
         started = time.monotonic()
+        from .transcript import wants_performer_attribution
+
+        if wants_performer_attribution(question) or re.search(
+            r"ใบหน้า|หน้าคน|คนนี้.*ใคร|ใคร.*ภาพ", question
+        ):
+            return None
         source = sources[0]
         model = self.settings.vision_model or self.settings.llm_model
         broker = QuotaBroker(context.repository)
@@ -149,6 +157,7 @@ class NativeVideoAnswers:
                     source.model_dump(),
                     POLICY,
                     config.model_dump(mode="json", exclude_none=True),
+                    [c.model_dump(mode="json", exclude_none=True) for c in contents],
                 ]
             )
 
@@ -158,6 +167,10 @@ class NativeVideoAnswers:
                         value = await callback()
                     except errors.APIError as exc:
                         raise provider_error(exc.code) from None
+                    except (httpx.TimeoutException, TimeoutError):
+                        raise provider_error(504) from None
+                    except httpx.TransportError:
+                        raise provider_error(503) from None
                     meta = getattr(value, "usage_metadata", None)
                     return ProviderReply(
                         value,
@@ -182,7 +195,13 @@ class NativeVideoAnswers:
                 count = await call(
                     "countTokens",
                     lambda: self.gateway.client.aio.models.count_tokens(
-                        model=model, contents=contents
+                        model=model,
+                        contents=contents,
+                        config=types.CountTokensConfig(
+                            http_options=types.HttpOptions(
+                                retry_options=types.HttpRetryOptions(attempts=1)
+                            )
+                        ),
                     ),
                     96000,
                 )
