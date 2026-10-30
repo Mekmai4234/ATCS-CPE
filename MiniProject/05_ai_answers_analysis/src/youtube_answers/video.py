@@ -25,7 +25,9 @@ Never identify people from appearance or voice. Do not invent offscreen events o
 Return at most 16 short observations with absolute video timestamps and unique IDs.
 Each statement must cite observation IDs. If uncertain return insufficient_evidence.
 For counting, enumerate distinct time-linked events and exclude replays/repeated views. Do not infer
-a whole-clip total from sparse frames or from only part of the video. Explain sampling uncertainty.
+a whole-clip total from sparse frames or from only part of the video. An exact opening/event
+total requires an explicit spoken or on-screen total; otherwise report insufficient_evidence.
+Explain sampling uncertainty and retain the observed event timeline.
 No observation proves continuous coverage. Never claim to have inspected the entire video.
 Return JSON only. Do not copy long lyrics or transcripts; summarize heard speech instead.
 """
@@ -46,8 +48,8 @@ class Observation(Schema):
     id: str = Field(min_length=1, max_length=30)
     kind: Literal["spoken", "on_screen", "visual", "event"]
     text: str = Field(min_length=1, max_length=2000)
-    start_seconds: float = Field(ge=0, le=600)
-    end_seconds: float = Field(gt=0, le=600)
+    start_seconds: float = Field(ge=0, le=7200)
+    end_seconds: float = Field(gt=0, le=7200)
 
     @model_validator(mode="after")
     def ordered(self):
@@ -107,6 +109,11 @@ class NativeVideoAnswers:
                 cached = None
         if not cached:
             plan = VideoPlan(source)
+            time_match = re.search(r"(?<!\d)(\d{1,2}):(\d{2})(?!\d)", question)
+            if time_match:
+                target = int(time_match[1]) * 60 + int(time_match[2])
+                if target < 7180 and int(time_match[2]) < 60:
+                    plan = plan.focus(max(0, target - 5), target + 15)
             contents = [
                 types.Content(
                     role="user",
@@ -115,7 +122,7 @@ class NativeVideoAnswers:
                             text=json_text(
                                 {
                                     "question": question,
-                                    "window_seconds": [0, 600],
+                                    "window_seconds": [plan.start_seconds, plan.end_seconds],
                                     "version": VERSION,
                                 }
                             )
@@ -217,6 +224,18 @@ class NativeVideoAnswers:
                 response.reservation_id,
                 input_hash,
             )
+        if (
+            re.search(r"เปิดกาชา|เปิด.*กี่(?:ครั้ง|ซอง)|นับ.*(?:ครั้ง|ซอง)", question)
+            and output.status == "answered"
+            and not any(o.kind in {"spoken", "on_screen"} for o in output.observations)
+        ):
+            output = output.model_copy(
+                update={
+                    "status": "insufficient_evidence",
+                    "statements": [],
+                    "message": "พบภาพเหตุการณ์บางช่วง แต่ยังยืนยันจำนวนการเปิดทั้งหมดไม่ได้จากภาพสุ่ม",
+                }
+            )
         citations, labels = [], {}
         by_id = {o.id: o for o in output.observations}
         for statement in output.statements:
@@ -230,7 +249,7 @@ class NativeVideoAnswers:
                         citation_id=labels[cid],
                         chunk_id=digest(item.model_dump()),
                         video_id=source.video_id,
-                        title="หลักฐานภาพและเสียงจากคลิป",
+                        title=item.text[:160],
                         start_seconds=item.start_seconds,
                         end_seconds=item.end_seconds,
                         kind="video",
@@ -253,9 +272,7 @@ class NativeVideoAnswers:
                 expected_videos=1,
                 processed_videos=1,
                 complete=False,
-                notes=[
-                    "วิเคราะห์ภาพและเสียงแบบสุ่มภายใน 10 นาทีแรก เหตุการณ์สั้นหรือภาพย้อนอาจทำให้นับคลาดเคลื่อน"
-                ],
+                notes=["วิเคราะห์ภาพตัวอย่างและเสียงของคลิป เหตุการณ์สั้นหรือภาพย้อนอาจทำให้นับคลาดเคลื่อน"],
             ),
             provider_metadata=ProviderMetadata(
                 provider="video-cache" if cached else "gemini-video",
