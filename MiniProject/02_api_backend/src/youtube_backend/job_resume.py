@@ -1,7 +1,5 @@
 """Explicit, idempotent restart of failed generation work with its frozen sources."""
 
-import time
-
 import sqlalchemy as sa
 
 from . import database as db
@@ -65,7 +63,7 @@ def resume(repo, job_id):
                     role="user",
                     content=old["payload"]["request"]["question"],
                     scope=old["payload"]["sources"],
-                    created_at=time.time(),
+                    created_at=repo._message_timestamp(c, old["conversation_id"]),
                 )
             )
         return job

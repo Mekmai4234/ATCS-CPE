@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 import random
 import time
 from datetime import UTC, datetime
@@ -41,6 +42,20 @@ class Repository(Ownership):
     def __init__(self, database, settings):
         self.db = database
         self.settings = settings
+
+    def _message_timestamp(self, connection, conversation_id):
+        """Preserve insertion order when the host clock returns equal timestamps.
+
+        Call only inside the serialized writer transaction that inserts the message.
+        UUID ordering cannot represent causality between a user turn and its answer.
+        """
+        previous = connection.scalar(
+            sa.select(sa.func.max(db.messages.c.created_at)).where(
+                db.messages.c.conversation_id == conversation_id
+            )
+        )
+        now = time.time()
+        return now if previous is None else max(now, math.nextafter(previous, math.inf))
 
     def _check_mode(self, connection):
         modes = (
@@ -341,7 +356,7 @@ class Repository(Ownership):
                         role="user",
                         content=request["question"],
                         scope=sources,
-                        created_at=time.time(),
+                        created_at=self._message_timestamp(connection, conversation_id),
                     )
                 )
             return job
@@ -868,7 +883,7 @@ class Repository(Ownership):
                         role="assistant",
                         content=result["answer"],
                         scope=job["payload"]["sources"],
-                        created_at=time.time(),
+                        created_at=self._message_timestamp(connection, job["conversation_id"]),
                     )
                 )
                 for citation in result["citations"]:
