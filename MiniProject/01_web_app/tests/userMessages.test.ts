@@ -66,3 +66,14 @@ it.each([
   expect(serviceMessage(code, 422)).toBeTruthy();
   expect(jobWarning({ state: 'failed', error_code: code } as Job)).toBe(serviceMessage(code, 422));
 });
+
+it('distinguishes internal quota, provider throttling, worker and connection failures', () => {
+  const messages = [
+    'quota_wait',
+    'provider_rate_limited',
+    'worker_unavailable',
+    'network_error',
+  ].map((code) => serviceMessage(code, 503));
+  expect(new Set(messages).size).toBe(4);
+  expect(messages.every(Boolean)).toBe(true);
+});
