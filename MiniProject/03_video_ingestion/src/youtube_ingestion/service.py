@@ -8,6 +8,7 @@ from youtube_backend.urls import VIDEO_ID, normalize_url
 
 from .captions import SubprocessCaptions, remote_error
 from .config import IngestionSettings
+from .coverage import caption_coverage
 from .errors import failure
 from .metadata import YouTubeMetadata
 from .models import Metadata
@@ -67,6 +68,14 @@ class IngestionService:
                 track = await task
                 context.check()
                 result = normalize(video_id, track, metadata)
+                coverage = caption_coverage(result.segments)
+                if coverage["uncovered_intervals"]:
+                    logger.info(
+                        "caption_uncovered_intervals video_id=%s count=%s "
+                        "completeness_verified=false",
+                        video_id,
+                        len(coverage["uncovered_intervals"]),
+                    )
                 context.check()
                 return result
         except TimeoutError:
