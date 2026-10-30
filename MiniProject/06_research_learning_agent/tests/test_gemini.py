@@ -150,6 +150,8 @@ async def test_structured_artifact_uses_schema_and_known_chunk_ids(make_model):
     result = await model.generate({"type": "quiz"}, [evidence()], QuizContent, 5)
     assert result.content.questions[0].citations == ["chunk-1"]
     assert requests[-1]["generationConfig"]["responseMimeType"] == "application/json"
+    assert "maxItems" not in json.dumps(requests[-1]["generationConfig"]["responseJsonSchema"])
+    assert QuizContent.model_json_schema()["properties"]["questions"]["maxItems"] == 100
 
 
 @pytest.mark.parametrize(

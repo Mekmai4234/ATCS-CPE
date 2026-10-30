@@ -32,6 +32,19 @@ def json_text(value):
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
+def provider_schema(schema):
+    # Keep cardinality enforcement in Pydantic; large decoder array bounds can
+    # make otherwise valid quiz/flashcard schemas fail provider admission.
+    def compact(value):
+        if isinstance(value, dict):
+            return {key: compact(item) for key, item in value.items() if key != "maxItems"}
+        if isinstance(value, list):
+            return [compact(item) for item in value]
+        return value
+
+    return compact(schema.model_json_schema())
+
+
 def byte_size(value):
     """Conservative local input guard, explicitly NOT a model token count."""
     return len(json_text(value).encode("utf-8"))
@@ -266,14 +279,14 @@ class GeminiModel:
             "instructions": f"Return the artifact. Use {citation_key} as each citation ID. "
             "Every item needs supporting citations. Never invent missing facts. "
             "For study plans return exactly the requested number of days. "
-            "For quizzes return 5 questions; for flashcards return 8 cards. "
+            "For quizzes return at most 5 questions; for flashcards at most 8 cards. "
             "Keep each answer and explanation short; cite only relevant evidence IDs.",
         }
         response, metadata = await self._call(
             [types.Content(role="user", parts=[types.Part(text=json_text(payload))])],
             self._config(
                 response_mime_type="application/json",
-                response_json_schema=schema.model_json_schema(),
+                response_json_schema=provider_schema(schema),
             ),
             timeout,
             context,
