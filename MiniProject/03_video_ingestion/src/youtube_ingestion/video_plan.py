@@ -1,5 +1,6 @@
 """Bounded public YouTube inputs; never accept arbitrary URLs from model output."""
 
+import re
 from dataclasses import dataclass
 
 from youtube_backend.schemas import Source
@@ -14,7 +15,12 @@ class VideoPlan:
     fps: float = 0.25
 
     def __post_init__(self):
-        if not 0 <= self.start_seconds < (self.end_seconds or 7200) <= 7200 or not 0 < self.fps <= 3:
+        if not re.fullmatch(r"[A-Za-z0-9_-]{11}", self.source.video_id):
+            raise ValueError("A canonical YouTube video ID is required")
+        if (
+            not 0 <= self.start_seconds < (self.end_seconds or 7200) <= 7200
+            or not 0 < self.fps <= 3
+        ):
             raise ValueError("Video windows must stay within the bounded inspection range")
 
     @property
@@ -28,7 +34,8 @@ class VideoPlan:
             file_data=types.FileData(file_uri=self.uri, mime_type="video/mp4"),
             video_metadata=types.VideoMetadata(
                 start_offset=f"{self.start_seconds}s",
-                end_offset=f"{self.end_seconds}s" if self.end_seconds else None, fps=self.fps,
+                end_offset=f"{self.end_seconds}s" if self.end_seconds else None,
+                fps=self.fps,
             ),
         )
 
