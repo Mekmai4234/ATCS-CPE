@@ -193,3 +193,5 @@ def test_clock_questions_route_to_video_even_without_visual_keywords():
 
     assert needs_video("ช่วง01:20:30พูดถึงอะไร")
     assert needs_video("ช่วง01:00ถึง04:00พูดถึงอะไร")
+    assert needs_video("เวลา01:20:")
+    assert needs_video("เวลา:01:20")
