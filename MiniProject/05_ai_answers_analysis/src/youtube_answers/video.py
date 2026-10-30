@@ -43,7 +43,7 @@ def needs_video(question):
             question,
             re.I,
         )
-        or re.search(r"(?<![\d:])\d+(?::\d+)+(?![\d:])", question)
+        or re.search(r"(?<![\d:])[\d:]*\d:[\d:]+(?![\d:])", question)
     )
 
 
