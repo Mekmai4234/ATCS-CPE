@@ -10,7 +10,30 @@ from youtube_agent.video_learning import video_artifact
 
 
 @pytest.mark.parametrize("unknown", [False, True])
-async def test_video_learning_preserves_real_observation_ids_and_partial_coverage(unit, unknown):
+async def test_video_learning_preserves_real_observation_ids_and_partial_coverage(
+    unit, unknown, monkeypatch
+):
+    full_text = "Visible card. " * 20 + "This is a replay, not another opening."
+
+    class Store:
+        def __init__(self, context):
+            pass
+
+        def resolve(self, citations):
+            return [
+                dict(
+                    evidence_id=c.chunk_id,
+                    kind="visual",
+                    text=full_text,
+                    video_id=c.video_id,
+                    start_seconds=c.start_seconds,
+                    end_seconds=c.end_seconds,
+                )
+                for c in citations
+            ]
+
+    monkeypatch.setattr("youtube_agent.video_learning.VideoEvidenceStore", Store)
+
     async def native(*args):
         return AnswerResult(
             status="answered",
@@ -36,6 +59,9 @@ async def test_video_learning_preserves_real_observation_ids_and_partial_coverag
     async def generate(request, evidence, schema, timeout, **kwargs):
         assert kwargs["citation_key"] == "evidence_id"
         assert evidence[0].model_dump()["kind"] == "video_observation"
+        assert evidence[0].model_dump()["text"] == full_text
+        assert "replay" in evidence[0].model_dump()["text"]
+        assert evidence[0].model_dump()["observation_kind"] == "visual"
         return Generated(
             schema.model_validate(
                 {
