@@ -23,6 +23,7 @@ async def test_video_learning_preserves_real_observation_ids_and_partial_coverag
             return [
                 dict(
                     evidence_id=c.chunk_id,
+                    id="display-only-id",
                     kind="visual",
                     text=full_text,
                     video_id=c.video_id,
@@ -62,6 +63,7 @@ async def test_video_learning_preserves_real_observation_ids_and_partial_coverag
         assert evidence[0].model_dump()["text"] == full_text
         assert "replay" in evidence[0].model_dump()["text"]
         assert evidence[0].model_dump()["observation_kind"] == "visual"
+        assert "id" not in evidence[0].model_dump()
         return Generated(
             schema.model_validate(
                 {
