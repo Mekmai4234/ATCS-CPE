@@ -1,6 +1,7 @@
 import asyncio
 from types import SimpleNamespace
 
+import pytest
 import sqlalchemy as sa
 from test_free_tier import budget
 from test_identity import identity
@@ -118,3 +119,31 @@ def test_successful_inline_chat_does_not_claim_daemon_readiness(identity):
     )
     assert response.status_code == 200, response.text
     assert client.get("/ready").status_code == 503
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "invalid_video_time",
+        "invalid_video_time_range",
+        "video_time_out_of_bounds",
+        "ambiguous_video_time",
+    ],
+)
+def test_time_validation_is_a_client_error(identity, monkeypatch, code):
+    from test_identity import VIDEO, login, ready
+
+    from youtube_backend.errors import AppError
+
+    client, _ = login(identity, "time-check")
+    ready(identity, client)
+
+    async def invalid(*args):
+        raise AppError(code, "Invalid time input", 422)
+
+    monkeypatch.setattr(identity.app.state.adapters.adapter, "answer", invalid)
+    response = client.post(
+        "/api/chat", json={"question": "ดูช่วง01:20", "scope": {"video_ids": [VIDEO]}}
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == code
