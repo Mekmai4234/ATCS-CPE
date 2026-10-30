@@ -117,6 +117,8 @@ class NativeVideoAnswers:
             if returned not in grant.returned_models:
                 cached = None
         if not cached:
+            if callable(getattr(context.repository, "stage", None)):
+                context.repository.stage(context.job_id, context.lease_token, "reviewing_video")
             plan = VideoPlan(source)
             time_match = re.search(r"(?<!\d)(\d{1,2}):(\d{2})(?!\d)", question)
             if time_match:
