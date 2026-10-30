@@ -56,3 +56,13 @@ describe('public service error messages', () => {
     expect(serviceMessage(caught!.code, caught!.status)).toBe(userMessages.aiUnavailable);
   });
 });
+
+it.each([
+  'invalid_video_time',
+  'invalid_video_time_range',
+  'video_time_out_of_bounds',
+  'ambiguous_video_time',
+])('explains video time validation %s', (code) => {
+  expect(serviceMessage(code, 422)).toBeTruthy();
+  expect(jobWarning({ state: 'failed', error_code: code } as Job)).toBe(serviceMessage(code, 422));
+});

@@ -23,6 +23,10 @@ export function serviceMessage(code: string | null | undefined, status?: number)
     status === 503
   )
     return userMessages.unavailable;
+  if (code === 'invalid_video_time') return 'เวลาไม่ถูกต้อง ใช้รูปแบบ 01:20 หรือ 01:20:30';
+  if (code === 'invalid_video_time_range') return 'เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น';
+  if (code === 'video_time_out_of_bounds') return 'รองรับเวลาวิดีโอไม่เกิน 02:00:00';
+  if (code === 'ambiguous_video_time') return 'ระบุเวลาเดียวหรือช่วงต่อเนื่อง เช่น 01:00 ถึง 04:00';
   if (code === 'context_budget_exceeded')
     return 'เนื้อหาที่เลือกเกินขีดจำกัด กรุณาเลือกคลิปน้อยลงหรือระบุหัวข้อ';
   if (['generation_timeout', 'task_timeout', 'agent_budget_exhausted'].includes(code || ''))
