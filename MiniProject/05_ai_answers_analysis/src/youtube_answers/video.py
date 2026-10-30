@@ -16,7 +16,6 @@ from youtube_backend.quota import ProviderReply, QuotaBroker
 from youtube_backend.repository import digest
 from youtube_backend.schemas import AnswerResult, Citation, Coverage, ProviderMetadata, Schema
 from youtube_backend.video_evidence import VERSION, VideoEvidenceStore
-from youtube_ingestion.video_plan import VideoPlan
 
 from .gemini import provider_response_schema
 from .prompts import json_text
@@ -117,6 +116,10 @@ class NativeVideoAnswers:
             if returned not in grant.returned_models:
                 cached = None
         if not cached:
+            try:
+                from youtube_ingestion.video_plan import VideoPlan
+            except ImportError:
+                return None
             if callable(getattr(context.repository, "stage", None)):
                 context.repository.stage(context.job_id, context.lease_token, "reviewing_video")
             plan = VideoPlan(source)
