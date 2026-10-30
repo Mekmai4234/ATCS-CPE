@@ -955,12 +955,14 @@ export default function App({
               <button
                 key={id}
                 className={
-                  tab === id || (id === 'history' && tab === 'chat')
+                  tab === id || (id === 'history' && tab === 'chat' && viewingHistory)
                     ? 'nav-item active'
                     : 'nav-item'
                 }
                 aria-current={
-                  tab === id || (id === 'history' && tab === 'chat') ? 'page' : undefined
+                  tab === id || (id === 'history' && tab === 'chat' && viewingHistory)
+                    ? 'page'
+                    : undefined
                 }
                 onClick={() => navigateTab(id)}
               >
@@ -1812,8 +1814,14 @@ export default function App({
           {workspaceMenu.map(([id, label, icon]) => (
             <button
               key={id}
-              className={tab === id || (id === 'history' && tab === 'chat') ? 'active' : ''}
-              aria-current={tab === id || (id === 'history' && tab === 'chat') ? 'page' : undefined}
+              className={
+                tab === id || (id === 'history' && tab === 'chat' && viewingHistory) ? 'active' : ''
+              }
+              aria-current={
+                tab === id || (id === 'history' && tab === 'chat' && viewingHistory)
+                  ? 'page'
+                  : undefined
+              }
               onClick={() => navigateTab(id)}
             >
               <UiIcon name={icon} />

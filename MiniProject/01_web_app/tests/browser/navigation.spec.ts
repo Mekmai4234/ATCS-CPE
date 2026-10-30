@@ -114,3 +114,18 @@ test('keyboard navigation and browser history preserve the chat draft and form a
   await page.goForward();
   await expect(page).toHaveURL(/\/learning$/);
 });
+
+test('a new Buddy chat does not select chat history in navigation', async ({ page }) => {
+  await openMemberHome(page);
+  await page.goto('http://127.0.0.1:3003/chat');
+  await expect(page.getByRole('heading', { name: /คุยกัน/ })).toBeVisible();
+  for (const [nav, width] of [
+    ['เมนูหลัก', 1280],
+    ['เมนูมือถือ', 375],
+  ] as const) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(
+      page.getByRole('navigation', { name: nav }).getByRole('button', { name: 'ประวัติแชท' }),
+    ).not.toHaveAttribute('aria-current', 'page');
+  }
+});
