@@ -1,0 +1,28 @@
+{
+  "label": "Module 06 synthetic Thai/English acceptance",
+  "provenance": "synthetic",
+  "videos": [
+    {
+      "video_id": "dQw4w9WgXcQ", "title": "[FIXTURE] Retrieval lesson", "language": "en",
+      "source": "fixture", "segments": [
+        {"segment_id": "retrieval", "text": "Retrieval augmented generation retrieves relevant evidence before generating an answer.", "start_seconds": 0, "duration_seconds": 15},
+        {"segment_id": "citations", "text": "A source citation lets learners verify the answer against the original transcript.", "start_seconds": 15, "duration_seconds": 15}
+      ]
+    },
+    {
+      "video_id": "jNQXAC9IVRw", "title": "[FIXTURE] หลักฐานและการอ้างอิง", "language": "th",
+      "source": "fixture", "segments": [
+        {"segment_id": "evidence", "text": "คำตอบต้องมีหลักฐานจากคลิปที่ผู้เรียนเลือก และแจ้งเมื่อข้อมูลไม่เพียงพอ", "start_seconds": 3, "duration_seconds": 15},
+        {"segment_id": "coverage", "text": "การสรุปทั้งคลิปต้องอ่านเนื้อหาให้ครบและบอกส่วนที่ยังขาด", "start_seconds": 18, "duration_seconds": 15}
+      ]
+    }
+  ],
+  "cases": [
+    {"id": "research-th", "operation": "research", "request": {"goal": "ช่วยจัดลำดับเรียนรู้เรื่องหลักฐานสำหรับผู้เริ่มต้น", "scope": {"video_ids": ["jNQXAC9IVRw"]}, "days": 3}, "review": ["Thai response addresses the goal", "Each claim is supported by the selected transcript", "Source timestamps are usable"]},
+    {"id": "research-en-multi", "operation": "research", "request": {"goal": "Explain retrieval and source verification from both lessons", "scope": {"video_ids": ["dQw4w9WgXcQ", "jNQXAC9IVRw"]}, "days": 3}, "review": ["Covers both selected videos without inventing facts", "States missing coverage honestly"]},
+    {"id": "quiz-th", "operation": "artifact", "request": {"type": "quiz", "topic": "หลักฐานในคำตอบ", "scope": {"video_ids": ["jNQXAC9IVRw"]}}, "review": ["Questions test the requested topic", "Answers and explanations match source passages"]},
+    {"id": "flashcards-en", "operation": "artifact", "request": {"type": "flashcards", "topic": "Retrieval and citations", "scope": {"video_ids": ["dQw4w9WgXcQ"]}}, "review": ["Cards are concise", "Answers introduce no unsupported facts"]},
+    {"id": "study-plan", "operation": "artifact", "request": {"type": "study_plan", "topic": "RAG basics", "days": 7, "scope": {"video_ids": ["dQw4w9WgXcQ", "jNQXAC9IVRw"]}}, "review": ["Exactly seven days", "Topic order is useful for beginners", "Every day has supporting citations"]},
+    {"id": "step-limit", "operation": "research", "max_steps": 1, "expected_states": ["partial"], "request": {"goal": "Read the lessons within a one-step budget", "scope": {"video_ids": ["dQw4w9WgXcQ", "jNQXAC9IVRw"]}}, "review": ["Does not claim research is complete", "Keeps retrieved and processed evidence distinct"]}
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "base": "69f534730669f59051a453d9833a0be88695f263",
+  "modules": {
+    "01_web_app": "2b43754e1313da9afbb72bbfc4d14193fe26e083",
+    "02_api_backend": "b047e809f983ffb2e4f3f9d3e3f074b8976cd6da",
+    "03_video_ingestion": "c3c7c598ae2f6692d360c8cd5d8d6aacc1e6fc04",
+    "04_rag_knowledge": "1c1c536de3d2a316cc239b8f21b186cd8169aff8",
+    "05_ai_answers_analysis": "144d2b14848bec0085f2ff9d0cee6453e9ba1391",
+    "06_research_learning_agent": "fafece3e5a24229628c8616a463a042af96b974d"
+  },
+  "purpose": "Unmerged integration candidate; not a develop or live Google acceptance claim"
+}

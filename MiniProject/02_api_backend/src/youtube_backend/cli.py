@@ -5,7 +5,7 @@ import signal
 from contextlib import suppress
 
 from .config import Settings
-from .database import Database
+from .database import SCHEMA_REVISION, Database
 from .migration import upgrade_database
 from .repository import Repository
 from .runtime import ManagedAdapters
@@ -24,7 +24,7 @@ def migrate():
     database = Database(Settings().database_url)
     try:
         upgrade_database(database)
-        print("Database upgraded to head (0001).")
+        print(f"Database upgraded to head ({SCHEMA_REVISION}).")
     finally:
         database.close()
 
@@ -89,7 +89,7 @@ def integration_init():
         upgrade_database(database)
         Repository(database, settings).check_mode()
         initialize(database)
-        print("Backend schema 0001 and RAG manifest v1 initialized.")
+        print(f"Backend schema {SCHEMA_REVISION} and RAG manifest v1 initialized.")
     finally:
         database.close()
 

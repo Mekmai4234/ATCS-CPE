@@ -1,0 +1,14 @@
+# Local QA tools only; not a production worker or a Gemini-enabled image.
+FROM python:3.11-slim-bookworm@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg=7:5.1.9-0+deb12u1 \
+    tesseract-ocr=5.3.0-2 \
+    tesseract-ocr-eng=1:4.1.0-2 tesseract-ocr-tha=1:4.1.0-2 \
+    fonts-noto-core=20201225-1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 qa && useradd --uid 10001 --gid qa --no-create-home qa
+ENV OMP_THREAD_LIMIT=1 OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1
+COPY 07_testing_deployment/scripts/media_probe.py /qa/media_probe.py
+USER 10001:10001
+WORKDIR /tmp
+CMD ["python", "/qa/media_probe.py", "--output", "/evidence/local-media"]

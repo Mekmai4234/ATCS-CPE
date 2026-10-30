@@ -1,12 +1,23 @@
 # Module 02: API / Backend
 
+Free-only outbound policy, shared quota broker and media evidence v2 are documented
+in [FREE_TIER_MEDIA.md](FREE_TIER_MEDIA.md). Schema head is 0003. The default denies
+unverified Gemini and undeclared legacy provider calls; consumer broker/enrich wiring
+is a release dependency. Local operations can be declared independently of Gemini.
+
+Authentication is now required by default. See [AUTH.md](AUTH.md) for Google login,
+CSRF, ownership/admin APIs, explicit legacy migration and frontend/deployment handoff.
+The historical single-user demo commands below require the explicit development/test
+opt-out `AUTH_ENABLED=false`; they are not the authenticated deployment procedure.
+
 Runnable single-user backend for YouTube Knowledge. It implements HTTP contracts,
 SQLite persistence/migrations, import coordination, a separate durable worker,
 chat history, analysis/research jobs, learning artifacts, cancellation and deletion.
 
-Modules 04/06 are connected through the optional **02-owned integration environment**
-described in [integration/README.md](integration/README.md). Modules 03/05 remain
-unavailable. The lightweight default `unavailable` mode reports missing adapters
+For the full 03–06 system, use the **02-owned full launcher** and configuration/pair
+checks in [full/README.md](full/README.md). It delegates to the existing 05 team factory.
+The older [integration environment](integration/README.md) connects only 04/06;
+03/05 are unavailable in that smaller environment. The default `unavailable` mode reports missing adapters
 explicitly. `fixture` mode is a deterministic integration sandbox:
 it does not fetch YouTube, create embeddings, use ChromaDB, call Gemini, or run an
 autonomous agent. Every fixture answer/title is labelled and HTTP responses carry

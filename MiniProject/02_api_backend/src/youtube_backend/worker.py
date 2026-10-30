@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+import traceback
 from contextlib import suppress
 
 from pydantic import ValidationError
@@ -21,13 +22,27 @@ logger = logging.getLogger(__name__)
 
 
 class Worker:
-    def __init__(self, repository, adapters, settings):
+    def __init__(self, repository, adapters, settings, *, report_liveness=True):
         self.repo = repository
         self.adapters = adapters
         self.settings = settings
+        self.last_pulse = 0.0
+        self.report_liveness = report_liveness
+
+    def pulse(self):
+        if not self.report_liveness or time.monotonic() - self.last_pulse < 5:
+            return
+        from .workspace import beat
+
+        try:
+            beat(self.settings)
+            self.last_pulse = time.monotonic()
+        except OSError:
+            logger.warning("worker_heartbeat_write_failed")
 
     async def _heartbeat(self, context):
         while True:
+            self.pulse()
             await asyncio.sleep(self.settings.job_lease_seconds / 3)
             context.check()
             self.repo.heartbeat(context.job_id, context.lease_token)
@@ -35,6 +50,17 @@ class Worker:
     async def _process(self, job, context):
         context.check()
         kind, job_id, token = job["kind"], job["job_id"], job["lease_token"]
+        if kind == "attach":
+            self.repo.finish(job_id, token, {"video_id": job["video_id"]})
+            return
+        if kind == "enrich":
+            from .media import MediaStore
+
+            self.repo.stage(job_id, token, "enriching")
+            result = await self.adapters.enrich(job["video_id"], context)
+            published = MediaStore(self.repo).publish(context, result)
+            self.repo.finish(job_id, token, published)
+            return
         if kind == "import":
             self.repo.stage(job_id, token, "fetching_transcript")
             transcript = TranscriptResult.model_validate(
@@ -62,6 +88,9 @@ class Worker:
             self.repo.stage(job_id, token, "deleting")
             await self.adapters.delete(job["video_id"], job["generation"], context)
             context.check()
+            from .media import MediaStore
+
+            MediaStore(self.repo).gc(context)
             self.repo.finish(job_id, token, {"video_id": job["video_id"], "deleted": True})
             return
         payload = job["payload"]
@@ -105,6 +134,7 @@ class Worker:
         self.repo.finish(job_id, token, result.model_dump(mode="json"), state=state)
 
     async def run_once(self, job_id=None):
+        self.pulse()
         started = time.monotonic()
         job = self.repo.claim(job_id)
         if not job:
@@ -146,8 +176,15 @@ class Worker:
             )
         except AppError as error:
             self._fail_if_owned(job, error)
-        except Exception:
+        except Exception as error:
             # Deliberately omit exception strings; adapters may embed credentials in them.
+            frames = traceback.extract_tb(error.__traceback__)
+            logger.error(
+                "dependency_failed job_id=%s error_type=%s frames=%s",
+                job["job_id"],
+                type(error).__name__,
+                " > ".join(f"{frame.name}:{frame.lineno}" for frame in frames),
+            )
             self._fail_if_owned(
                 job, AppError("dependency_error", "Dependency failed unexpectedly", 502)
             )
@@ -159,7 +196,7 @@ class Worker:
                 if task is not None:
                     with suppress(asyncio.CancelledError, Exception):
                         await task
-        final = self.repo.get_job(job["job_id"])
+        final = self.repo.get_job(job["job_id"], internal=True)
         logger.info(
             "job_finished job_id=%s request_id=%s kind=%s state=%s stage=%s latency_ms=%.1f",
             job["job_id"],

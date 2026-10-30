@@ -20,12 +20,12 @@ async def test_answer_scoped_citations_metadata_and_ranked_coverage(env):
     assert result.provider_metadata.provider == "fixture"
 
 
-async def test_no_hits_does_not_call_model(env):
+async def test_no_ranked_hits_reads_authorized_transcript_before_giving_up(env):
     env.knowledge.hits = []
     result = await env.service.answer(env.request, env.sources, [], env.ctx)
-    assert result.status == "insufficient_evidence" and not result.citations
-    assert result.coverage.processed_chunks == 0
-    assert result.provider_metadata.provider == "none" and not env.model.payloads
+    assert result.status == "answered" and result.citations
+    assert result.coverage.processed_chunks == len(env.knowledge.chunks)
+    assert len(env.model.payloads) == 1
 
 
 async def test_model_can_report_insufficient_evidence(env):
@@ -384,3 +384,33 @@ async def test_analysis_cannot_ignore_one_available_video(env):
             env.ctx,
         )
     assert caught.value.code == "invalid_citation"
+
+
+async def test_insufficient_retrieval_expands_evidence_without_new_embedding(env):
+    from conftest import metadata
+
+    from youtube_answers.models import Generated
+
+    original = env.model.generate
+    calls = 0
+
+    async def generate(data, timeout):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return Generated(
+                GeneratedAnswer(status="insufficient_evidence", message="Need more evidence"),
+                metadata(),
+            )
+        return await original(data, timeout)
+
+    # Duplicate the authorized fixture chunk with a distinct ID outside initial hits.
+    env.knowledge.chunks.append(
+        env.knowledge.chunks[0].model_copy(update={"chunk_id": "extra-chunk"})
+    )
+    env.model.generate = generate
+    result = await env.service.answer(env.request, env.sources, [], env.ctx)
+    assert result.status == "answered"
+    assert calls == 2
+    assert len(env.knowledge.queries) == 1
+    assert any(c.chunk_id == "extra-chunk" for c in result.citations)
