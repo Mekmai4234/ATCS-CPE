@@ -74,7 +74,7 @@ def test_regenerated_cache_keeps_original_citations_and_full_observations(budget
         verify_video_citation(env.repo, c, job, citations[0])
 
 
-def test_inline_api_worker_can_report_a_background_worker_ready(tmp_path):
+def test_inline_api_worker_cannot_report_background_worker_ready(tmp_path):
     settings = Settings(
         _env_file=None, database_url=f"sqlite:///{(tmp_path / 'audit.db').as_posix()}"
     )
@@ -86,3 +86,16 @@ def test_inline_api_worker_can_report_a_background_worker_ready(tmp_path):
     daemon = Worker(SimpleNamespace(claim=lambda _: None), None, settings)
     asyncio.run(daemon.run_once("absent-job"))
     assert worker_status(settings)["ready"] is True
+
+
+def test_successful_inline_chat_does_not_claim_daemon_readiness(identity):
+    from test_identity import VIDEO, login, ready
+
+    client, _ = login(identity, "inline-check")
+    ready(identity, client)
+    assert client.get("/ready").status_code == 503
+    response = client.post(
+        "/api/chat", json={"question": "What is RAG?", "scope": {"video_ids": [VIDEO]}}
+    )
+    assert response.status_code == 200, response.text
+    assert client.get("/ready").status_code == 503
