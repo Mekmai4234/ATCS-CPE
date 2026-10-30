@@ -137,7 +137,7 @@ for (const state of ['completed', 'partial', 'failed', 'cancelled']) {
         page.getByText('ได้ผลบางส่วน — งานนี้ยังไม่สำเร็จครบถ้วน', { exact: true }),
       ).toBeVisible();
     if (state === 'failed')
-      await expect(page.getByRole('alert').filter({ hasText: 'ทำรายการไม่สำเร็จ' })).toBeVisible();
+      await expect(page.getByRole('alert').filter({ hasText: 'งานนี้ใช้เวลานานเกินกำหนด' })).toBeVisible();
     if (state === 'cancelled')
       await expect(page.getByRole('alert').filter({ hasText: 'งานถูกยกเลิกแล้ว' })).toBeVisible();
     await page.waitForTimeout(1700);
