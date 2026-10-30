@@ -1,5 +1,8 @@
 """05-owned composition of 02/04 boundaries, without changing other modules."""
 
+import time
+from collections import OrderedDict
+
 import sqlalchemy as sa
 from youtube_backend import database as db
 from youtube_backend.schemas import Segment
@@ -20,6 +23,9 @@ class RagKnowledge:
 
     async def inventory(self, sources, context):
         return await self.rag.inventory(sources, BackendExecution(context))
+
+    async def short_context(self, sources, context):
+        return await self.rag.short_context(sources, BackendExecution(context))
 
     async def search(self, query, sources, context, **kwargs):
         return await self.rag.search(query, sources, BackendExecution(context), **kwargs)
@@ -87,10 +93,57 @@ class AnswerAdapters(RagAdapters):
             settings=settings, repository=repository, rag_settings=rag_settings, embedder=embedder
         )
         self.answers = AnswerService(config, gateway, RagKnowledge(self.rag))
+        self.answer_reuse = OrderedDict()
 
     async def answer(self, request, sources, history, context):
-        from .video import NativeVideoAnswers, needs_video
+        from youtube_backend.repository import digest
+
+        key = None
+        broker = getattr(self.answers.model, "broker", None)
+        if isinstance(broker, ExecutionBroker) and context.settings.auth_enabled:
+            context.check()
+            context.authorize_sources(sources)
+            with context.repository.db.read() as connection:
+                job = context.repository._owned(connection, context.job_id, context.lease_token)
+                context.repository._check_sources(
+                    connection, [s.model_dump() for s in sources], owner=job["owner_id"]
+                )
+            with broker.bind(context):
+                grant = self.answers.model.grant(self.answers.settings.llm_model, "chat")
+            key = digest(
+                [
+                    job["owner_id"],
+                    [s.model_dump() for s in sources],
+                    {k: v for k, v in request.items() if k != "conversation_id"},
+                    history,
+                    grant.returned_models,
+                    self.answers.settings.llm_model,
+                ]
+            )
+            cached = self.answer_reuse.get(key)
+            if cached and cached[0] > time.monotonic():
+                if any(c.kind == "video" for c in cached[1].citations):
+                    from youtube_backend.quota import QuotaBroker
+                    QuotaBroker(context.repository).access(
+                        cached[1].provider_metadata.requested_model, "generateContent", "vision"
+                    )
+                result = cached[1].model_copy(deep=True)
+                result.provider_metadata.provider = "answer-cache"
+                result.provider_metadata.usage = {}
+                result.provider_metadata.latency_ms = 0
+                return result
+        result = await self._answer_uncached(request, sources, history, context)
+        if key and result.status == "answered" and len(result.model_dump_json().encode()) < 100000:
+            self.answer_reuse[key] = (time.monotonic() + 300, result.model_copy(deep=True))
+            self.answer_reuse.move_to_end(key)
+            while len(self.answer_reuse) > 64:
+                self.answer_reuse.popitem(last=False)
+        return result
+
+    async def _answer_uncached(self, request, sources, history, context):
         from youtube_backend.errors import AppError
+
+        from .video import NativeVideoAnswers, needs_video
 
         use_video = needs_video(request["question"])
         video_note = None
