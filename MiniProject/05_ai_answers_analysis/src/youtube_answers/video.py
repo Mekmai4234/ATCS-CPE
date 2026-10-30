@@ -89,7 +89,7 @@ class NativeVideoAnswers:
     def __init__(self, gateway, settings):
         self.gateway, self.settings = gateway, settings
 
-    async def answer(self, question, sources, context):
+    async def answer(self, question, sources, context, *, history=()):
         # Keep multi-video synthesis on the transcript path until bounded native
         # cross-video evidence has an explicit budget. No scope is silently dropped.
         if len(sources) != 1:
@@ -108,7 +108,14 @@ class NativeVideoAnswers:
         if not grant.image_capable:
             return None
         store = VideoEvidenceStore(context)
-        key, cached = store.load(source, model, question)
+        cache_question = (
+            json_text(
+                {"current_question": question, "untrusted_history_references": list(history)[-4:]}
+            )
+            if history
+            else question
+        )
+        key, cached = store.load(source, model, cache_question)
         usage = {}
         if cached:
             output = VideoOutput.model_validate(cached["output"])
@@ -136,6 +143,7 @@ class NativeVideoAnswers:
                             text=json_text(
                                 {
                                     "question": question,
+                                    "untrusted_history_references": list(history)[-4:],
                                     "window_seconds": [plan.start_seconds, plan.end_seconds],
                                     "version": VERSION,
                                 }
@@ -159,7 +167,7 @@ class NativeVideoAnswers:
             input_hash = digest(
                 [
                     VERSION,
-                    question,
+                    cache_question,
                     source.model_dump(),
                     POLICY,
                     config.model_dump(mode="json", exclude_none=True),
@@ -251,7 +259,7 @@ class NativeVideoAnswers:
             key = store.publish(
                 source,
                 model,
-                question,
+                cache_question,
                 dict(
                     output=output.model_dump(), observations=observations, returned_model=returned
                 ),
