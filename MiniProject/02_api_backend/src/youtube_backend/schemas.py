@@ -123,6 +123,8 @@ class Citation(Schema):
     start_seconds: float = Field(ge=0)
     end_seconds: float = Field(gt=0)
     url: str = ""
+    kind: Literal["transcript", "video"] = "transcript"
+    observation_cache_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
 
 
 class Coverage(Schema):

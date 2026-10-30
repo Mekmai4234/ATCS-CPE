@@ -809,6 +809,13 @@ class Repository(Ownership):
             kind = job["kind"]
             if kind not in {"import", "delete", "attach", "enrich"}:
                 self._check_sources(connection, job["payload"]["sources"], owner=job["owner_id"])
+            if kind in {"chat", "analysis", "artifact", "research"} and result:
+                from .schemas import Citation
+                from .video_evidence import verify_video_citation
+                for value in result.get("citations", []):
+                    citation = Citation.model_validate(value)
+                    if citation.kind == "video":
+                        verify_video_citation(self, connection, job, citation)
             if kind == "attach":
                 video = row(connection, db.videos, db.videos.c.video_id == job["video_id"])
                 if video["status"] != "ready":
