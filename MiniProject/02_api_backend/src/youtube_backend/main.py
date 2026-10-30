@@ -278,6 +278,14 @@ def create_app(settings=None, database=None, adapters=None):
             if code in {"quota_wait", "provider_rate_limited"}
             else 504
             if code == "task_timeout"
+            else 422
+            if code
+            in {
+                "invalid_video_time",
+                "invalid_video_time_range",
+                "video_time_out_of_bounds",
+                "ambiguous_video_time",
+            }
             else (409 if code in {"cancelled", "source_changed"} else 502)
         )
         return error_response(
