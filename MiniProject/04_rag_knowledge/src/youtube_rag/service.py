@@ -213,6 +213,22 @@ class RagService:
         self._recheck(sources, rows, execution)
         return [record.evidence() for record in records]
 
+    async def short_context(self, sources, execution, *, max_bytes=16000, max_chunks=80):
+        """Avoid a remote query embedding when the complete scoped clip fits locally.
+
+        Uses the same version/grant-bound reader and cursor checks as full analysis.
+        Returns None rather than silently selecting an arbitrary prefix of a long clip.
+        """
+        if not 1 <= max_bytes <= 24000 or not 1 <= max_chunks <= 100:
+            raise error("invalid_limit", "Short context budget is outside its bounds", status=422)
+        page = await self.read_video_chunks(sources, execution, limit=max_chunks)
+        execution.check()
+        if page.next_cursor or not page.inventory.complete:
+            return None
+        if sum(len(c.text.encode("utf-8")) + 512 for c in page.items) > max_bytes:
+            return None
+        return page.items
+
     async def search(self, question, sources, execution, *, top_k=None, min_score=None):
         limit = self.settings.retrieval_top_k if top_k is None else top_k
         if type(limit) is not int or not 1 <= limit <= 100:
