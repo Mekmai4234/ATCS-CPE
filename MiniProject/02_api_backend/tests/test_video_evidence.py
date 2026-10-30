@@ -49,6 +49,8 @@ def test_native_observation_requires_real_reconciled_proof_and_exact_citation(bu
     with env.repo.db.read() as c:
         job = env.repo._owned(c, env.context.job_id, env.context.lease_token)
         verify_video_citation(env.repo, c, job, citation)
+        with pytest.raises(AppError, match="private source scope"):
+            verify_video_citation(env.repo, c, {**job, "owner_id": "another-owner"}, citation)
         with pytest.raises(AppError, match="match stored"):
             verify_video_citation(
                 env.repo, c, job, citation.model_copy(update={"start_seconds": 3})
