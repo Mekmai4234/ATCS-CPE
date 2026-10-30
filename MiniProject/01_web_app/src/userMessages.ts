@@ -23,6 +23,14 @@ export function serviceMessage(code: string | null | undefined, status?: number)
     status === 503
   )
     return userMessages.unavailable;
+  if (code === 'context_budget_exceeded')
+    return 'เนื้อหาที่เลือกเกินขีดจำกัด กรุณาเลือกคลิปน้อยลงหรือระบุหัวข้อ';
+  if (code === 'generation_output_truncated')
+    return 'AI สร้างคำตอบไม่ครบ กรุณาลองใหม่หรือเลือกสรุปสั้นลง';
+  if (['generation_timeout', 'task_timeout', 'agent_budget_exhausted'].includes(code || ''))
+    return 'งานนี้ใช้เวลานานเกินกำหนด กรุณาลองใหม่หรือเลือกคลิปน้อยลง';
+  if (code === 'invalid_model_output')
+    return 'AI ส่งผลลัพธ์ไม่สมบูรณ์ กรุณาลองสร้างใหม่';
   if (code === 'incomplete_index') return userMessages.indexUnavailable;
   if (code === 'network_error') return userMessages.connection;
   if (status && status >= 500) return userMessages.unavailable;
