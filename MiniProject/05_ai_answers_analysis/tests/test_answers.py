@@ -20,12 +20,12 @@ async def test_answer_scoped_citations_metadata_and_ranked_coverage(env):
     assert result.provider_metadata.provider == "fixture"
 
 
-async def test_no_hits_does_not_call_model(env):
+async def test_no_ranked_hits_reads_authorized_transcript_before_giving_up(env):
     env.knowledge.hits = []
     result = await env.service.answer(env.request, env.sources, [], env.ctx)
-    assert result.status == "insufficient_evidence" and not result.citations
-    assert result.coverage.processed_chunks == 0
-    assert result.provider_metadata.provider == "none" and not env.model.payloads
+    assert result.status == "answered" and result.citations
+    assert result.coverage.processed_chunks == len(env.knowledge.chunks)
+    assert len(env.model.payloads) == 1
 
 
 async def test_model_can_report_insufficient_evidence(env):

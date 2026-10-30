@@ -155,7 +155,10 @@ class AnswerService:
             )
         if short:
             nodes = [self._record(run, chunk.evidence()) for chunk in short]
-            if input_size(payload("answer", request, nodes, history)) > self.settings.max_context_tokens:
+            if (
+                input_size(payload("answer", request, nodes, history))
+                > self.settings.max_context_tokens
+            ):
                 short = None
         if not short:
             hits = await self._bounded(
@@ -185,7 +188,7 @@ class AnswerService:
             )
         # Escalate only an unsupported answer, without paying for another embedding.
         # Enumerate bounded original evidence; never count unread chunks as processed.
-        if output.status == "insufficient_evidence" and expected and nodes:
+        if output.status == "insufficient_evidence" and expected:
             cursor, seen, expanded = None, set(), list(nodes)
             included = {cid for node in expanded for cid in node["citation_ids"]}
             for _ in range(4):
@@ -489,6 +492,8 @@ class AnswerService:
         )
         if full and not complete and not run.notes:
             run.notes.append("Selected evidence could not be processed completely.")
+        if full and run.notes:
+            text += "\n\nข้อจำกัด / Limitations: " + " ".join(dict.fromkeys(run.notes))
         usage = {}
         for meta in run.metadata:
             for key, value in meta.usage.items():

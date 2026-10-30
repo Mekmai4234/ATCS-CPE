@@ -124,6 +124,7 @@ class AnswerAdapters(RagAdapters):
             if cached and cached[0] > time.monotonic():
                 if any(c.kind == "video" for c in cached[1].citations):
                     from youtube_backend.quota import QuotaBroker
+
                     QuotaBroker(context.repository).access(
                         cached[1].provider_metadata.requested_model, "generateContent", "vision"
                     )
@@ -133,7 +134,12 @@ class AnswerAdapters(RagAdapters):
                 result.provider_metadata.latency_ms = 0
                 return result
         result = await self._answer_uncached(request, sources, history, context)
-        if key and result.status == "answered" and len(result.model_dump_json().encode()) < 100000:
+        if (
+            key
+            and result.status == "answered"
+            and not any(c.kind == "video" for c in result.citations)
+            and len(result.model_dump_json().encode()) < 100000
+        ):
             self.answer_reuse[key] = (time.monotonic() + 300, result.model_copy(deep=True))
             self.answer_reuse.move_to_end(key)
             while len(self.answer_reuse) > 64:
@@ -146,11 +152,18 @@ class AnswerAdapters(RagAdapters):
         from .video import NativeVideoAnswers, needs_video
 
         use_video = needs_video(request["question"])
+        video_question = request["question"]
+        if history:
+            from .prompts import json_text
+
+            video_question = json_text(
+                {"question": video_question, "untrusted_history_references": history[-4:]}
+            )
         video_note = None
         if use_video and isinstance(self.answers.model, GeminiModel):
             try:
                 native = await NativeVideoAnswers(self.answers.model, self.answers.settings).answer(
-                    request["question"], sources, context
+                    video_question, sources, context
                 )
                 if native is not None:
                     return native
@@ -167,6 +180,27 @@ class AnswerAdapters(RagAdapters):
                 result = await self.answers.answer(request, sources, history, context)
         else:
             result = await self.answers.answer(request, sources, history, context)
+        if (
+            result.status == "insufficient_evidence"
+            and not use_video
+            and isinstance(self.answers.model, GeminiModel)
+        ):
+            from .transcript import wants_performer_attribution
+
+            if not wants_performer_attribution(request["question"]):
+                try:
+                    native = await NativeVideoAnswers(
+                        self.answers.model, self.answers.settings
+                    ).answer(video_question, sources, context)
+                    if native is not None:
+                        return native
+                except AppError as exc:
+                    if exc.code not in {
+                        "free_tier_unverified",
+                        "free_model_unverified",
+                        "quota_pending",
+                    }:
+                        raise
         if video_note:
             result.coverage.notes.append(video_note)
         return result
