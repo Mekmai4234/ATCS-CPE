@@ -33,7 +33,11 @@ export function Citations({
             <span className="source-number">{i + 1}</span>
             <div>
               <strong>{citation.title}</strong>
-              <small>{evidenceLabels[citation.presentation?.kind || 'transcript']}</small>
+              <small>
+                {citation.kind === 'video'
+                  ? 'ภาพและเสียง · AI วิเคราะห์'
+                  : evidenceLabels[citation.presentation?.kind || 'transcript']}
+              </small>
               <span>
                 {visual && validFrame(frame)
                   ? timestamp(frame.timeSeconds)
