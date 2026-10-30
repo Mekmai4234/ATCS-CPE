@@ -152,19 +152,12 @@ class AnswerAdapters(RagAdapters):
         from .video import NativeVideoAnswers, needs_video
 
         use_video = needs_video(request["question"])
-        video_question = request["question"]
-        if history:
-            from .prompts import json_text
-
-            video_question = json_text(
-                {"question": video_question, "untrusted_history_references": history[-4:]}
-            )
         video_note = None
         native_insufficient = None
         if use_video and isinstance(self.answers.model, GeminiModel):
             try:
                 native = await NativeVideoAnswers(self.answers.model, self.answers.settings).answer(
-                    video_question, sources, context
+                    request["question"], sources, context, history=history
                 )
                 if native is not None and native.status == "answered":
                     return native
@@ -194,7 +187,7 @@ class AnswerAdapters(RagAdapters):
                 try:
                     native = await NativeVideoAnswers(
                         self.answers.model, self.answers.settings
-                    ).answer(video_question, sources, context)
+                    ).answer(request["question"], sources, context, history=history)
                     if native is not None:
                         return native
                 except AppError as exc:
