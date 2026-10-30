@@ -1,5 +1,23 @@
 # Module 02 P1 verification — 30 October 2026
 
+## Review follow-up
+
+Before editing, switched to `feature/02_api_backend` and merged `origin/develop`
+(`9f569ea`, already up to date). Review #32 reported no additional quota/resume
+regression; its shared CI failures were formatter/Buddy checks in other module bases.
+
+Reverification exposed a Windows clock-resolution history failure: equal message
+timestamps fell back to random UUID ordering, sometimes putting an assistant answer
+before its user message. All three message insertion paths (new turn, assistant result,
+explicit resume) now assign strictly increasing conversation timestamps within the
+existing serialized SQLite writer transaction. A frozen-clock test verifies two full
+turns, their citations and unique timestamps; no sleeps or weakened assertions.
+
+Latest Windows and Linux Docker full suites: **158 passed** each; focused
+history/deletion/quota checks: **8 passed**. Full owned-module
+Ruff lint/format and whitespace checks pass. Shared CI still needs the 04/07 fixes and
+the owner of 05 to format `youtube_answers/team.py`; no 01/03/05 files were edited.
+
 Scope: module 02 only, on `feature/02_api_backend`, updated to develop `9f569ea`
 before editing. No 01/03/05 source, model policy, credentials or quota counters changed.
 
