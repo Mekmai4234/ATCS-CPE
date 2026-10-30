@@ -77,8 +77,8 @@ class Settings(BaseSettings):
     agent_timeout_seconds: float = Field(default=120, gt=0)
     agent_max_steps: int = Field(default=8, ge=1, le=100)
     max_context_tokens: int = Field(default=24000, gt=0)
-    answer_max_output_tokens: int = Field(default=1200, gt=0)
-    agent_max_output_tokens: int = Field(default=2400, gt=0)
+    answer_max_output_tokens: int = Field(default=8192, ge=128, le=32000)
+    agent_max_output_tokens: int = Field(default=8192, ge=128, le=32000)
     agent_finalize_reserve_seconds: float = Field(default=10, gt=0, le=120)
     agent_read_page_size: int = Field(default=30, ge=1, le=200)
     embedding_provider: str = "gemini"
