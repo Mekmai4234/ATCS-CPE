@@ -43,6 +43,7 @@ def needs_video(question):
             question,
             re.I,
         )
+        or re.search(r"(?<![\d:])\d+(?::\d+)+(?![\d:])", question)
     )
 
 
@@ -102,6 +103,11 @@ class NativeVideoAnswers:
         ):
             return None
         source = sources[0]
+        try:
+            from youtube_ingestion.video_plan import VideoPlan
+        except ImportError:
+            return None
+        plan = VideoPlan.from_question(source, question)
         model = self.settings.vision_model or self.settings.llm_model
         broker = QuotaBroker(context.repository)
         _, grant = broker.access(model, "generateContent", "vision")
@@ -115,6 +121,14 @@ class NativeVideoAnswers:
             if history
             else question
         )
+        if plan.end_seconds is not None:
+            cache_question = json_text(
+                {
+                    "time_plan_version": 2,
+                    "context": cache_question,
+                    "window": [plan.start_seconds, plan.end_seconds, plan.fps],
+                }
+            )
         key, cached = store.load(source, model, cache_question)
         usage = {}
         if cached:
@@ -123,18 +137,8 @@ class NativeVideoAnswers:
             if returned not in grant.returned_models:
                 cached = None
         if not cached:
-            try:
-                from youtube_ingestion.video_plan import VideoPlan
-            except ImportError:
-                return None
             if callable(getattr(context.repository, "stage", None)):
                 context.repository.stage(context.job_id, context.lease_token, "reviewing_video")
-            plan = VideoPlan(source)
-            time_match = re.search(r"(?<!\d)(\d{1,2}):(\d{2})(?!\d)", question)
-            if time_match:
-                target = int(time_match[1]) * 60 + int(time_match[2])
-                if target < 7180 and int(time_match[2]) < 60:
-                    plan = plan.focus(max(0, target - 5), target + 15)
             contents = [
                 types.Content(
                     role="user",
