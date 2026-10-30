@@ -1,8 +1,11 @@
 import asyncio
 from types import SimpleNamespace
 
+import sqlalchemy as sa
 from test_free_tier import budget
 from test_identity import identity
+
+from youtube_backend import database as db
 
 __all__ = ["budget", "identity"]
 from youtube_backend.config import Settings
@@ -60,6 +63,21 @@ def test_regenerated_cache_keeps_original_citations_and_full_observations(budget
                 observation_cache_id=key,
             )
         )
+        if i == 0:
+            # Preserve citations from the pre-revision cache format as well.
+            table = db.v2["cache"]
+            legacy_key = store.key(
+                env.user["user_id"], source, env.settings.llm_model, "same question"
+            )
+            with env.repo.db.write() as c:
+                record = dict(
+                    c.execute(sa.select(table).where(table.c.cache_id == key)).mappings().one()
+                )
+                record["cache_id"] = legacy_key
+                c.execute(table.insert().values(**record))
+                c.execute(table.delete().where(table.c.cache_id == digest(["lookup", legacy_key])))
+            legacy_citation = citations[0].model_copy(update={"observation_cache_id": legacy_key})
+            assert store.load(source, env.settings.llm_model, "same question")[0] == legacy_key
         with env.repo.db.read() as c:
             job = env.repo._owned(c, env.context.job_id, env.context.lease_token)
             verify_video_citation(env.repo, c, job, citations[-1])
@@ -72,6 +90,7 @@ def test_regenerated_cache_keeps_original_citations_and_full_observations(budget
     with env.repo.db.read() as c:
         job = env.repo._owned(c, env.context.job_id, env.context.lease_token)
         verify_video_citation(env.repo, c, job, citations[0])
+        verify_video_citation(env.repo, c, job, legacy_citation)
 
 
 def test_inline_api_worker_cannot_report_background_worker_ready(tmp_path):
