@@ -30,6 +30,7 @@ class VideoPlan:
             parts = match.group().split(":")
             if (
                 len(parts) not in {2, 3}
+                or len(parts[0]) > (2 if len(parts) == 3 else 3)
                 or len(parts[-1]) != 2
                 or (len(parts) == 3 and len(parts[-2]) != 2)
                 or int(parts[-1]) >= 60
