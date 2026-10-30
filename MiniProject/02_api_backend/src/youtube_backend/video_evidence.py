@@ -41,6 +41,18 @@ class VideoEvidenceStore:
             job = self.guard(c, source)
             key = self.key(job["owner_id"], source, model, question)
             table = db.v2["cache"]
+            pointer = row(
+                c,
+                table,
+                sa.and_(
+                    table.c.cache_id == digest(["lookup", key]), table.c.expires_at > time.time()
+                ),
+            )
+            if pointer:
+                revision_id = pointer["data"]["revision_id"]
+                record = row(c, table, table.c.cache_id == revision_id)
+                if record and record["owner_id"] == job["owner_id"]:
+                    return revision_id, record["data"]
             record = row(
                 c, table, sa.and_(table.c.cache_id == key, table.c.expires_at > time.time())
             )
@@ -74,26 +86,50 @@ class VideoEvidenceStore:
             key = self.key(job["owner_id"], source, model, question)
             table = db.v2["cache"]
             value = dict(data, source=source.model_dump(), reservation_id=reservation_id)
+            revision_id = digest([key, reservation_id, value])
+            fields = dict(
+                owner_id=job["owner_id"],
+                video_id=source.video_id,
+                generation=source.generation,
+                evidence_version=source.transcript_version,
+                model=model,
+                input_hash=input_hash,
+                expires_at=time.time() + 3600,
+            )
+            c.execute(
+                insert(table)
+                .values(cache_id=revision_id, prompt_version=VERSION, data=value, **fields)
+                .on_conflict_do_nothing()
+            )
+            pointer_data = {"revision_id": revision_id}
             c.execute(
                 insert(table)
                 .values(
-                    cache_id=key,
-                    owner_id=job["owner_id"],
-                    video_id=source.video_id,
-                    generation=source.generation,
-                    evidence_version=source.transcript_version,
-                    prompt_version=VERSION,
-                    model=model,
-                    input_hash=input_hash,
-                    data=value,
-                    expires_at=time.time() + 3600,
+                    cache_id=digest(["lookup", key]),
+                    prompt_version=VERSION + "-lookup",
+                    data=pointer_data,
+                    **fields,
                 )
                 .on_conflict_do_update(
                     index_elements=[table.c.cache_id],
-                    set_={"data": value, "expires_at": time.time() + 3600},
+                    set_={"data": pointer_data, "expires_at": fields["expires_at"]},
                 )
             )
-            return key
+            return revision_id
+
+    def resolve(self, citations):
+        """Return full authorized observations; display titles are never evidence."""
+        self.context.check()
+        with self.repo.db.read() as c:
+            job = self.repo._owned(c, self.context.job_id, self.context.lease_token)
+            return [
+                dict(
+                    verify_video_citation(self.repo, c, job, citation),
+                    evidence_id=citation.chunk_id,
+                    video_id=citation.video_id,
+                )
+                for citation in citations
+            ]
 
 
 def verify_video_citation(repo, c, job, citation):
@@ -120,3 +156,4 @@ def verify_video_citation(repo, c, job, citation):
         or citation.end_seconds != match["end_seconds"]
     ):
         raise AppError("invalid_citation", "Video citation does not match stored observations", 502)
+    return dict(match)

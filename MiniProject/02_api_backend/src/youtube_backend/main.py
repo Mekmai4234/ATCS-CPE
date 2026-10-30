@@ -50,7 +50,7 @@ def create_app(settings=None, database=None, adapters=None):
     database = database or Database(settings.database_url)
     repository = Repository(database, settings)
     runtime = ManagedAdapters(settings, repository, adapters)
-    worker = Worker(repository, runtime, settings)
+    worker = Worker(repository, runtime, settings, report_liveness=False)
     auth = AuthService(database, settings)
 
     @asynccontextmanager
