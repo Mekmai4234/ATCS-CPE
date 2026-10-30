@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import json
+import re
 import time
 from uuid import uuid4
 
@@ -148,6 +149,8 @@ class GeminiModel:
             if len(response.candidates or []) != 1:
                 raise error("invalid_model_output", "Gemini returned no single usable candidate")
             candidate = response.candidates[0]
+            if str(candidate.finish_reason) in {"MAX_TOKENS", "FinishReason.MAX_TOKENS"}:
+                raise error("generation_output_truncated", "Artifact output budget exhausted")
             if str(candidate.finish_reason) not in {"STOP", "FinishReason.STOP"}:
                 raise error("invalid_model_output", "Gemini output was blocked or truncated")
             usage = response.usage_metadata
@@ -183,6 +186,8 @@ class GeminiModel:
             raise provider_error(exc.code) from None
 
     def _config(self, **kwargs):
+        if re.match(r"^(?:models/)?gemini-3(?:\.\d+)?-flash(?:-|$)", self.settings.llm_model):
+            kwargs["thinking_config"] = types.ThinkingConfig(thinking_level="LOW")
         return types.GenerateContentConfig(
             system_instruction=POLICY,
             max_output_tokens=self.settings.agent_max_output_tokens,
@@ -260,7 +265,9 @@ class GeminiModel:
             "untrusted_evidence": [e.model_dump() for e in evidence],
             "instructions": f"Return the artifact. Use {citation_key} as each citation ID. "
             "Every item needs supporting citations. Never invent missing facts. "
-            "For study plans return exactly the requested number of days.",
+            "For study plans return exactly the requested number of days. "
+            "For quizzes return 5 questions; for flashcards return 8 cards. "
+            "Keep each answer and explanation short; cite only relevant evidence IDs.",
         }
         response, metadata = await self._call(
             [types.Content(role="user", parts=[types.Part(text=json_text(payload))])],

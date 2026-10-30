@@ -262,9 +262,41 @@ class AgentService:
                 run, [e.evidence() if hasattr(e, "evidence") else e for e in page.items]
             )
             records.update({e.chunk_id: e for e in batch})
-            self._input_fits(
-                {"request": request, "evidence": [e.model_dump() for e in records.values()]}
-            )
+            try:
+                self._input_fits(
+                    {"request": request, "evidence": [e.model_dump() for e in records.values()]}
+                )
+            except AppError as exc:
+                if exc.code != "context_budget_exceeded":
+                    raise
+                # Large libraries use ranked evidence per source, not a silent prefix.
+                # Coverage remains partial: only successful model inputs are credited.
+                records = {}
+                for source in run.sources:
+                    hits = await self._bounded(
+                        run,
+                        lambda _, source=source: self.knowledge.search(
+                            request.get("topic") or "main concepts key points",
+                            [source],
+                            run.context,
+                            top_k=8,
+                        ),
+                    )
+                    for hit in hits:
+                        record = self._records(run, [hit.chunk.evidence()])[0]
+                        candidate = {**records, record.chunk_id: record}
+                        if (
+                            byte_size(
+                                {
+                                    "request": request,
+                                    "evidence": [e.model_dump() for e in candidate.values()],
+                                }
+                            )
+                            <= self.settings.max_context_tokens // 2
+                        ):
+                            records = candidate
+                self._remember(run, list(records.values()))
+                break
             self._remember(run, batch)
             cursor = page.next_cursor
             if cursor is None:

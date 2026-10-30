@@ -312,3 +312,22 @@ async def test_nonprogressing_pagination_fails(unit):
             {"type": "quiz", "scope": {"video_ids": [VIDEO_A]}}, unit.sources, unit.ctx
         )
     assert caught.value.code == "invalid_cursor"
+
+
+async def test_large_artifact_uses_ranked_subset_with_partial_coverage(unit):
+    from conftest import evidence
+
+    unit.config.max_context_tokens = 24000
+    unit.knowledge.records = [
+        evidence(cid=f"chunk-{i}", text="RAG evidence. " * 100) for i in range(20)
+    ]
+    result = await unit.service.artifact(
+        {"type": "quiz", "topic": "RAG", "scope": {"video_ids": [VIDEO_A]}},
+        unit.sources,
+        unit.ctx,
+    )
+    assert result.citations
+    assert not result.coverage.complete
+    assert result.coverage.processed_chunks == 1
+    assert result.coverage.expected_chunks == 20
+    assert any(call[0] == "search" for call in unit.knowledge.calls)

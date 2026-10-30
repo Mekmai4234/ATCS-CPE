@@ -104,6 +104,8 @@ async def test_native_calls_signatures_ids_and_policy_survive_roundtrip(make_mod
     assert requests[0][0].endswith(":countTokens")
     first_body = requests[1][1]
     assert "ONLY the authorized" in json.dumps(first_body["systemInstruction"])
+    assert first_body["generationConfig"]["thinkingConfig"] == {"thinking_level": "LOW"}
+    assert first_body["generationConfig"]["maxOutputTokens"] == 8192
     assert len(first_body["tools"][0]["functionDeclarations"]) == 5
     assert first_body["toolConfig"]["functionCallingConfig"]["mode"] == "ANY"
     last = requests[-1][1]
@@ -203,7 +205,7 @@ async def test_bad_token_count_prevents_generation(make_model, count):
         requests.append(request)
         return httpx.Response(200, json={"totalTokens": count})
 
-    model = make_model(handler)
+    model = make_model(handler, max_context_tokens=24000)
     with pytest.raises(AppError):
         await model.decide([{"role": "user", "data": {}}], 5)
     assert len(requests) == 1 and requests[0].url.path.endswith(":countTokens")
@@ -227,7 +229,7 @@ async def test_invalid_function_output_is_rejected(make_model, parts, finish):
         )
         return httpx.Response(200, json=data)
 
-    model = make_model(handler)
+    model = make_model(handler, max_context_tokens=24000)
     with pytest.raises(AppError):
         await model.decide([{"role": "user", "data": {}}], 5)
 
