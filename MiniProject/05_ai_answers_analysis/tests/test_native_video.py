@@ -167,8 +167,9 @@ def test_invalid_native_evidence_is_rejected_without_publishing_claims(text):
     "question", ["ช่วง01:60", "ช่วง01:20:99", "ช่วง04:00ถึง01:00", "ช่วง02:00:01", "เทียบ00:10กับ04:00"]
 )
 async def test_bad_times_are_rejected_before_cache_or_provider_access(monkeypatch, question):
-    import youtube_answers.video as module
     from youtube_backend.errors import AppError
+
+    import youtube_answers.video as module
 
     def forbidden(*args, **kwargs):
         raise AssertionError("invalid time must not access cached evidence or provider")
