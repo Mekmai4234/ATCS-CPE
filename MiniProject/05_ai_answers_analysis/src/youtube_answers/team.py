@@ -112,8 +112,11 @@ async def create_adapters(*, settings, repository):
     try:
         ingestion = IngestionService(config.ingestion)
         agent_model = AgentModel(config.agent)
+        from .video import NativeVideoAnswers, needs_video
+        native = NativeVideoAnswers(gateway, config.answers)
         agent = AgentService(
-            config.agent, agent_model, RagKnowledge(answers.rag), analyzer=answers.analyze
+            config.agent, agent_model, RagKnowledge(answers.rag), analyzer=answers.analyze,
+            media_answerer=native.answer, media_selector=needs_video,
         )
         return TeamAdapters(answers, ingestion, agent)
     except BaseException:
