@@ -37,7 +37,7 @@ def needs_video(question):
     return bool(
         re.search(
             r"กี่(?:ใบ|ครั้ง|ซอง|ตัว|คน|อัน)|นับ|เปิดกาชา|บนจอ|ในภาพ|สีอะไร|แต่งตัว|เห็นอะไร"
-            r"|how many|on.screen|what.*wear",
+            r"|การ์ด|จำนวน|how many|on.screen|what.*wear",
             question,
             re.I,
         )
