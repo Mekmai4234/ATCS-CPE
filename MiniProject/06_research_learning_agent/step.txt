@@ -10,8 +10,10 @@ A) Multi-step Research (implemented)
 7. Persist a concise action/outcome event through context.event; return the observation.
 8. Let the next decision depend on that observation; credit evidence actually submitted.
 9. Stop duplicate actions and enforce limits. On finish, validate known citation IDs and coverage.
-10. Return ResearchResult completed only with complete coverage, otherwise partial.
-11. 02 revalidates current sources/citations/inventory and durably stores the result/artifacts.
+10. Re-read exported citations and inventory; reject changed/missing sources before delivery.
+11. Return completed only with complete coverage, otherwise partial, and emit a terminal
+    run_controller event using the current step after validation.
+12. 02 revalidates current sources/citations/inventory and durably stores the result/artifacts.
 
 B) Direct Learning Artifacts (implemented)
 1. 02 invokes artifact(request, sources, execution_context); no decision loop is required.
@@ -31,4 +33,30 @@ C) Failures and Delivery
 - SDK transport/provider errors are redacted; no raw messages, credentials or private reasoning.
 - No automatic research replay/checkpoint resume is implemented.
 
-Installation, commands and limits: README.md. Executed validation: TEST_REPORT.md.
+Installation, evaluation commands and limits: README.md. Current validation: DEPENDENCY_REVIEW_REPORT.md.
+Core tests remain installable without module 05; the two real-05 checks use the separately
+locked acceptance/ environment. Both sets run with --locked, including Docker.
+
+Member execution integration
+- Use the account-aware 02 execution context and authorized 04 source contract before multi-user deployment.
+- The 05 team factory may keep constructing AgentService directly: research/artifact auto-wrap authenticated contexts.
+- The additive agent06_permits table is initialized on first member execution in the backend database.
+- For custom quotas, inject a trusted repository.agent_authority using the documented permit interface.
+- Run core and acceptance Docker targets; run acceptance/backend_contract explicitly against the member backend snapshot.
+- Do not expose legacy unauthenticated APIs as member-safe endpoints. 02 must enforce session/owner checks and atomic publication.
+- See MEMBER_AUTHORIZATION.md for test commands and MEMBER_TEST_REPORT.md for results.
+
+Auth candidate verification (2026-10-22)
+- Assemble the 02/04/05 dependency revisions recorded in AUTH_REVIEW_REPORT.md before running the refreshed core/acceptance locks.
+- Run uv lock --check --offline and uv sync --locked for core and acceptance on that same candidate.
+- Run core, combined acceptance and optional backend_contract tests; Docker Compose now provides tests, acceptance and contracts services.
+- Run python -m youtube_agent.evaluation in a NEW state directory; its default report must label isolated-member-fixture and preserve durable owners.
+- Use --legacy-test only for explicitly isolated offline regression; never combine it with --live or change production auth to make a test pass.
+
+Free Tier candidate checks (2026-10-25)
+- Assemble the exact 02/04/05 heads in FREE_TIER_REPORT.md with this module; do not edit other module source to make a check pass.
+- Run locked core, acceptance and contracts environments and Docker targets on that same candidate.
+- SDK wire tests use explicit mocked admission; backend_contract/test_free_agent.py separately tests the real shared broker and project credential binding.
+- On Windows keep UV_PROJECT_ENVIRONMENT short (for example module 06/runtime/c and runtime/a); nested candidate environments can exceed dependency import path limits.
+- Enable internal research_media only with an authorized bridge; current 04 reads require enrichment scope and cannot silently grant the agent planning role.
+- Do not call a live model until the operator verifies its Free Tier policy; no live billing/quota check was performed here.

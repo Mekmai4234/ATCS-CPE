@@ -2,8 +2,8 @@
 
 ระบบผู้ช่วยค้นคว้าและเรียนรู้จากวิดีโอ YouTube ด้วย RAG, LLM และ Agentic AI
 
-> สถานะปัจจุบัน: หมวด 02 มี API, ฐานข้อมูล, worker และชุดทดสอบที่รันได้แล้ว
-> หมวด 01 และ 03–06 ยังเป็นเอกสารออกแบบ การสาธิต Backend ใช้ fixture ที่ติดป้ายชัดเจน ยังไม่ได้เชื่อม YouTube, ChromaDB หรือ Gemini จริง
+> สถานะปัจจุบัน: หมวด 01 มีหน้าเว็บและชุดทดสอบแล้ว หมวด 02 มี API, ฐานข้อมูล และ worker ที่รันได้
+> การทดสอบเชื่อมต่อเว็บใช้ fixture ที่ติดป้ายชัดเจน ยังไม่ยืนยันคุณภาพการทำงานกับ YouTube และ Gemini จริง
 
 ## เป้าหมาย
 
@@ -42,8 +42,9 @@
 4. ทำตาม [คู่มือทำงานร่วมกัน](CONTRIBUTING.md) เพื่อสร้าง branch และส่ง Pull Request
 5. เมื่อต้องตั้งค่าจริง ให้คัดลอก `.env.example` เป็น `.env` และเติมเฉพาะเครื่องของตนเอง
 
+การติดตั้งและรันหน้าเว็บดู [คู่มือส่วน 01](01_web_app/README.md) ซึ่งมี manifest, pnpm-lock.yaml และคำสั่งทดสอบแล้ว
 การติดตั้งและรันหมวด 02 ดู [คู่มือ Backend](02_api_backend/README.md) และ [ข้อตกลง API](docs/backend_api_contract.md)
-มี manifest, uv.lock, migration, คำสั่งทดสอบ และ Docker Compose สำหรับ Backend แล้ว ส่วนเว็บและโมดูล AI ยังไม่มีคำสั่งรันจริง
+หมวด 02 มี manifest, uv.lock, migration, คำสั่งทดสอบ และ Docker Compose สำหรับ Backend แล้ว
 
 ## Branch
 

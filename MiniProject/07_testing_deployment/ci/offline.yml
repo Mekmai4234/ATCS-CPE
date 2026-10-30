@@ -1,0 +1,35 @@
+# HISTORICAL TEMPLATE: superseded by the authorized repository-root workflow.
+# Do not install this older copy; it does not contain frontend/auth checks.
+name: MiniProject offline verification
+on:
+  push:
+    paths: ['MiniProject/**', '.github/workflows/miniproject-offline.yml']
+  pull_request:
+    paths: ['MiniProject/**', '.github/workflows/miniproject-offline.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: MiniProject
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.9'
+          python-version: '3.11'
+      - run: uv sync --project 07_testing_deployment --locked
+      - run: uv run --project 07_testing_deployment --locked python 07_testing_deployment/scripts/check.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-${{ matrix.os }}
+          path: MiniProject/07_testing_deployment/runtime/
+          retention-days: 7

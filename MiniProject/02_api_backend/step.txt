@@ -2,6 +2,13 @@
 
 Setup and entrypoints
 ---------------------
+Authenticated setup: read AUTH.md first. Initialize a fresh revision-0002 database,
+or stop processes and use the explicit paired-backup migration for existing 0001.
+Configure Google client ID, HTTPS cookie policy and exact origins. The web obtains
+a one-time nonce/CSRF challenge, submits verified Google credentials, and includes
+the session cookie plus CSRF header on every data mutation. Bootstrap an intended
+registered administrator explicitly; approve legacy ownership separately.
+
 See README.md for PowerShell install/start/demo/test commands. From MiniProject:
 uv sync --project 02_api_backend --locked
 uv run --project 02_api_backend --locked yk-db upgrade head
@@ -60,3 +67,41 @@ D) Deletion, Cancellation and Recovery
 5. On lease expiry, recover retryable unfinished jobs within their existing attempt/deadline
    budgets. Old execution tokens cannot publish application results.
 6. Explicit eligible manual retry creates a new bounded job; repeated clicks reuse active work.
+
+Full-system startup workflow (implemented in 02)
+-----------------------------------------------
+1. Install the full locked environment and select one server-side env file.
+2. Inspect redacted resolved config; initialize a fresh SQLite/Chroma pair.
+3. Verify the binding and start API/worker through yk-full with the same config.
+4. Confirm all capabilities in health; import URLs and poll jobs until ready.
+5. Submit scoped chat/analysis requests and inspect persisted citations/history.
+6. Stop API/workers before explicit guarded maintenance; never adopt old demo data.
+See full/README.md for exact commands, limitations and module-07 handoff.
+
+Free-only Gemini and media v2 workflow
+--------------------------------------
+1. Read FREE_TIER_MEDIA.md. Existing 0001/0002 stores need a stopped, backed-up
+   yk-full migrate; fresh stores initialize at 0003. Preserve SQLite/Chroma/media together.
+2. Configure one policy path and concurrency limits for all API/worker processes.
+   Inspect the real project's tier/model quotas in AI Studio; do not infer them from a flag.
+3. Install the operator policy with yk-full quota-policy --workers-stopped. Do not
+   clear usage accounting. Outbound methods require per-request broker integration.
+4. Connect 03's enrich adapter using MediaEnrichment bytes/provenance; keep local
+   OCR independent of vision. Queue via the authenticated v2 enrichment route.
+5. Poll private jobs, distinguish paused/provider/local-estimate waits, and serve
+   frames only through the authorized asset API. Explicit retry creates a new bounded
+   enrichment job and honors known provider Retry-After without extending the old deadline.
+6. Run tests/test_free_tier.py, tests/test_media_v2.py, the full locked suites and
+   scripts/docker_full_smoke.py. Real Google/media/billing acceptance remains separate.
+
+Floating and Full-page Chat Integration
+--------------------------------------
+1. Follow FLOATING_CHAT_CONTRACT.md and its schema-checked JSON examples. Both UI
+   surfaces share one session, conversation and pending turn key; select ready videos.
+2. Run: uv run --project 02_api_backend --locked pytest
+   02_api_backend/tests/test_chat_contract.py -q -W error (join onto one command line).
+3. Run the full locked backend/integration/full suites and scripts/docker_full_smoke.py.
+4. Verify the actual frontend adapter with auth enabled, including readable cross-origin
+   401/403 responses, and label synthetic Google/provider transports in the report.
+5. Before live acceptance, configure real Google origins/Client ID and HTTPS cookies;
+   do not interpret fixture browser tests as real Google or live AI verification.

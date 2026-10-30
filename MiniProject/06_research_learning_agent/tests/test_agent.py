@@ -230,6 +230,7 @@ async def test_timeouts_and_task_cancellation(unit):
 
 async def test_unconnected_comparison_is_explicit_observation(unit):
     unit.sources.append(Source(video_id=VIDEO_B, generation=1, transcript_version="v1"))
+    unit.request["scope"]["video_ids"].append(VIDEO_B)
     unit.model.actions = [
         ("compare_videos", {"video_ids": [VIDEO_A, VIDEO_B]}),
         ("finish_research", {"content": "No comparison", "citation_ids": []}),
@@ -247,6 +248,7 @@ def test_bad_budget_configuration():
 @pytest.mark.parametrize("bad_citation", [False, True])
 async def test_comparison_adapter_validates_exact_intervals(unit, bad_citation):
     unit.sources.append(Source(video_id=VIDEO_B, generation=1, transcript_version="v1"))
+    unit.request["scope"]["video_ids"].append(VIDEO_B)
     unit.knowledge.records.append(evidence(video=VIDEO_B, cid="chunk-b"))
 
     async def analyzer(request, sources, context):
@@ -310,3 +312,22 @@ async def test_nonprogressing_pagination_fails(unit):
             {"type": "quiz", "scope": {"video_ids": [VIDEO_A]}}, unit.sources, unit.ctx
         )
     assert caught.value.code == "invalid_cursor"
+
+
+async def test_large_artifact_uses_ranked_subset_with_partial_coverage(unit):
+    from conftest import evidence
+
+    unit.config.max_context_tokens = 24000
+    unit.knowledge.records = [
+        evidence(cid=f"chunk-{i}", text="RAG evidence. " * 100) for i in range(20)
+    ]
+    result = await unit.service.artifact(
+        {"type": "quiz", "topic": "RAG", "scope": {"video_ids": [VIDEO_A]}},
+        unit.sources,
+        unit.ctx,
+    )
+    assert result.citations
+    assert not result.coverage.complete
+    assert result.coverage.processed_chunks == 1
+    assert result.coverage.expected_chunks == 20
+    assert any(call[0] == "search" for call in unit.knowledge.calls)

@@ -16,6 +16,14 @@ VIDEO_A = "dQw4w9WgXcQ"
 VIDEO_B = "jNQXAC9IVRw"
 
 
+@pytest.fixture(autouse=True)
+def legacy_single_user_tests(request, monkeypatch):
+    # Existing coordinator tests explicitly retain their single-user test environment.
+    # New identity tests enable authentication on their Settings instance.
+    if not request.module.__name__.endswith("test_identity"):
+        monkeypatch.setenv("AUTH_ENABLED", "false")
+
+
 @pytest.fixture
 def env(tmp_path):
     settings = Settings(
@@ -24,7 +32,9 @@ def env(tmp_path):
         adapter_mode="fixture",
         database_url=f"sqlite:///{(tmp_path / 'app.db').as_posix()}",
         job_retry_base_seconds=0,
-        job_lease_seconds=1,
+        # General integration work must not lose ownership under CI/browser load.
+        # Lease expiry and heartbeat cases override the clock/lease explicitly.
+        job_lease_seconds=30,
     )
     database = Database(settings.database_url)
     upgrade_database(database)

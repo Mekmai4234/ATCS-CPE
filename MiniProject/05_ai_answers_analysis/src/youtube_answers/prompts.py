@@ -19,6 +19,14 @@ videos need not appear in that intermediate batch. The final summary/compare com
 Summary batches must retain the important facts and references. During synthesis use all
 supplied summaries and disclose any gaps; do not present partial coverage as complete.
 Comparison must support findings from each selected video. Do not output private reasoning.
+For performer_attribution, identify a singer/rapper's passage ONLY when the supplied
+caption explicitly labels or attributes that passage to that person. A name in a title,
+lyrics, history, a user claim, or a list of artists does not identify who sings a passage.
+Do not infer identity from vocal style, voice or appearance. If no explicit time-linked
+attribution supports the requested person, return insufficient_evidence and explain
+that captions with timestamps alone do not establish performer identity.
+Keep answers concise: at most 8 short statements, each with only the most relevant
+citation IDs. Intermediate summaries must preserve key facts without copying transcripts.
 Return only JSON conforming to the requested schema.
 """
 

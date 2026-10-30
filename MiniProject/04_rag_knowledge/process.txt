@@ -21,6 +21,29 @@ Important details
 - Publication uses the existing 02 transaction-level lease guard and lifecycle checks.
 - Reindex is explicit when provider/model/dimensions/format/counting/chunk schema changes.
 - No distributed transaction with Chroma is claimed; offline GC removes abandoned staging.
+- SQLite and the Chroma marker share a persistent pair identity; every operation checks it.
+- Existing v1 databases add rag04_store_binding via init, then explicitly verify legacy IDs
+  with bind-store while stopped. Wrong stores fail before manifest changes.
+- Maintenance selects runtime factory profiles or explicit ordered env files. Config
+  diagnostics expose resolved paths/model identity, never keys. GC needs no provider key.
+- GC verifies vectors are gone before forgetting run metadata; failures remain retryable.
+- Authenticated reads require a durable leased owner, frozen permitted sources and current
+  user_videos memberships. Prompt/request user_id and role fields confer no authority.
+- Snapshot grants/account revisions before reads and recheck before releasing evidence.
+- Validate Chroma candidates against exact SQLite run/source/version identities.
+- HMAC cursors bind account/job/grants/sources/runs; rag04_security persists the private key.
+- Shared import inventory is a worker publication check for remaining subscribers, not
+  permission for a detached creator to read text. No account evidence cache is introduced.
+- Physical GC checks refs/jobs under the writer fence and relies on 02's deleting
+  tombstone during asynchronous vector deletion. Ordinary AI jobs cannot run maintenance.
+- The permission upgrade is additive and preserves embedding fingerprints and vectors.
+- Consumer metadata includes backend google-auth/requests without package upgrades.
+- Integration checks export full backend metadata/source and this module's locked files,
+  install them with uv sync --locked, then build/test that same Docker candidate.
+- No PYTHONPATH-only source override establishes lock validity. Independent consumer
+  suites, browser login and whole-system release acceptance remain separate gates.
+- Use native 02 jobs/memberships plus 03 IngestionService in the selected full factory;
+  the alternative member_ingestion_backend proposal is not activated by module 04.
 
 Interfaces
 ----------
@@ -38,3 +61,17 @@ Fixture tests do not establish semantic quality; live results use a small synthe
 Transcript/title text is untrusted evidence and cannot authorize tools or change instructions.
 Live ingestion, generation, research, multi-user ownership and production deployment remain
 separate work. See TEST_REPORT.md for actual local/Docker/live checks.
+
+TIMESTAMP ROUND-TRIP COMPARISON (24 October 2026)
+Chroma metadata serialization can round decimal timestamps by a floating-point ULP. Compare only start/end seconds with absolute tolerance 1e-9 and zero relative tolerance.
+Keep video IDs, source versions, generations, vector IDs and authorization exact; reject non-finite, boolean and meaningfully changed timestamps. No reindex or source mutation is needed for representation noise.
+
+MEDIA / FREE TIER PIPELINE (24 October 2026)
+02-published snapshot -> live owner/lease/revision guard -> separate 04 media-v3 manifest.
+Local evidence -> permission-fenced SQLite substring search with semantic_complete=false.
+Optional embeddings -> private prepared-text cache -> brokered countTokens -> measured single-item
+embedContent REST request -> staging vectors -> expected-ID verification -> atomic active pointer.
+429/503 stop external dispatch and retain successful checkpoints; 02 owns queues/backoff/consent.
+Transcript v1 stays separate; explicit v2 transcript snapshots unwrap only actual transcript versions.
+No prepared sample count implies whole-video coverage. Original frame URLs always reauthorize in 02.
+Use FREE_TIER_MEDIA.md and FREE_TIER_TEST_REPORT.md for exact contracts, dependencies and results.

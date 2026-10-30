@@ -13,8 +13,10 @@ from youtube_backend.schemas import (
 )
 from youtube_backend.urls import canonical_url
 
+from .authorization import MemberContext, guard_context
 from .models import GeneratedAnswer, error
 from .prompts import input_size, json_text, payload
+from .transcript import has_performer_cues, wants_performer_attribution, wants_transcript
 
 
 @dataclass
@@ -34,18 +36,21 @@ class AnswerService:
     def __init__(self, settings, model, knowledge):
         self.settings, self.model, self.knowledge = settings, model, knowledge
 
-    def _run(self, sources, context):
+    def _run(self, sources, context, kinds):
         context.check()
-        sources = [Source.model_validate(s) for s in sources]
+        sources = [Source.model_validate(s).model_copy(deep=True) for s in sources]
         if not sources or len({s.video_id for s in sources}) != len(sources):
             raise error("invalid_scope", "Provide distinct authorized sources", status=422)
+        context = guard_context(context, sources, kinds)
         return Run(sources, context)
 
     def _request(self, schema, request, run):
         request = schema.model_validate(request).model_dump(mode="json")
-        if set(request["scope"]["video_ids"]) != {s.video_id for s in run.sources}:
+        authorized = {s.video_id for s in run.sources}
+        if not authorized.issubset(request["scope"]["video_ids"]):
             raise error("invalid_scope", "Request and authorized source IDs differ", status=422)
         # Channel/date/ownership filters were resolved by 02 when freezing Source records.
+        request["scope"]["video_ids"] = [s.video_id for s in run.sources]
         return request
 
     async def _bounded(self, run, function):
@@ -124,8 +129,15 @@ class AnswerService:
         return list(reversed(selected))
 
     async def answer(self, request, sources, history, context):
-        run = self._run(sources, context)
+        run = self._run(sources, context, {"chat"})
         request = self._request(ChatRequest, request, run)
+        if isinstance(run.context, MemberContext):
+            run.context.conversation(request.get("conversation_id"))
+            history = run.context.history(history)
+        if wants_performer_attribution(request["question"]):
+            return await self._performer_attribution(run, request)
+        if wants_transcript(request["question"]):
+            return await self._transcript(run)
         history = self._history(history, run)
         # Carry recent user context into retrieval without asking a model to change scope.
         query = request["question"]
@@ -134,15 +146,31 @@ class AnswerService:
             if item["role"] == "user" and len(candidate.encode("utf-8")) <= 6500:
                 query = candidate
         expected = await self._bounded(
-            run, lambda _: self.knowledge.inventory(run.sources, context)
+            run, lambda _: self.knowledge.inventory(run.sources, run.context)
         )
-        hits = await self._bounded(
-            run,
-            lambda _: self.knowledge.search(
-                query, run.sources, context, top_k=self.settings.retrieval_top_k
-            ),
-        )
-        nodes = [self._record(run, hit.chunk.evidence()) for hit in hits]
+        short = None
+        if expected and expected <= 80 and callable(getattr(self.knowledge, "short_context", None)):
+            short = await self._bounded(
+                run, lambda _: self.knowledge.short_context(run.sources, run.context)
+            )
+        if short:
+            nodes = [self._record(run, chunk.evidence()) for chunk in short]
+            if (
+                input_size(payload("answer", request, nodes, history))
+                > self.settings.max_context_tokens
+            ):
+                short = None
+        if not short:
+            hits = await self._bounded(
+                run,
+                lambda _: self.knowledge.search(
+                    query, run.sources, run.context, top_k=self.settings.retrieval_top_k
+                ),
+            )
+            nodes = [self._record(run, hit.chunk.evidence()) for hit in hits]
+        else:
+            hits = short
+            run.notes.append("ใช้บทถอดเสียงครบในงบข้อมูลโดยไม่เรียกค้นเวกเตอร์ซ้ำ")
         data = payload("answer", request, nodes, history)
         while nodes and input_size(data) > self.settings.max_context_tokens:
             nodes.pop()
@@ -158,7 +186,43 @@ class AnswerService:
             output = GeneratedAnswer(
                 status="insufficient_evidence", message="ไม่พบหลักฐานที่เพียงพอในวิดีโอที่เลือก"
             )
-        run.notes.append("Question answering uses ranked retrieval, not whole-video analysis.")
+        # Escalate only an unsupported answer, without paying for another embedding.
+        # Enumerate bounded original evidence; never count unread chunks as processed.
+        if output.status == "insufficient_evidence" and expected:
+            if callable(getattr(getattr(run.context, "repository", None), "stage", None)):
+                run.context.repository.stage(
+                    run.context.job_id, run.context.lease_token, "expanding_evidence"
+                )
+            cursor, seen, expanded = None, set(), list(nodes)
+            included = {cid for node in expanded for cid in node["citation_ids"]}
+            for _ in range(4):
+                page = await self._bounded(
+                    run,
+                    lambda _, cursor=cursor: self.knowledge.read(
+                        run.sources,
+                        run.context,
+                        limit=self.settings.answer_read_page_size,
+                        cursor=cursor,
+                    ),
+                )
+                for chunk in page.items:
+                    record = chunk.evidence()
+                    if record.chunk_id in included:
+                        continue
+                    node = self._record(run, record)
+                    candidate = payload("answer", request, [*expanded, node], history)
+                    if input_size(candidate) <= self.settings.max_context_tokens:
+                        expanded.append(node)
+                        included.add(record.chunk_id)
+                cursor = page.next_cursor
+                if cursor is None or cursor in seen:
+                    break
+                seen.add(cursor)
+            if included - run.processed:
+                output = await self._generate(run, payload("answer", request, expanded, history))
+                run.processed.update(included)
+                run.notes.append("ค้นหลักฐานเพิ่มเติมจากบทถอดเสียงเมื่อการค้นครั้งแรกไม่เพียงพอ")
+        run.notes.append("แชตค้นหลักฐานตามคำถาม อาจไม่ได้อ่านครบทุกช่วงของคลิป")
         return await self._finish(run, output, expected, full=False)
 
     def _groups(self, task, request, nodes):
@@ -179,17 +243,16 @@ class AnswerService:
             groups.append(current)
         return groups
 
-    async def analyze(self, request, sources, context):
-        run = self._run(sources, context)
-        request = self._request(AnalysisRequest, request, run)
-        if request["type"] == "compare" and len(run.sources) < 2:
-            raise error("invalid_scope", "Comparison needs at least two videos", status=422)
-        nodes, cursors, cursor, expected, snapshot = [], set(), None, None, None
+    async def _read_all(self, run):
+        chunks, cursors, cursor, expected, snapshot = [], set(), None, None, None
         while True:
             page = await self._bounded(
                 run,
                 lambda _, cursor=cursor: self.knowledge.read(
-                    run.sources, context, limit=self.settings.answer_read_page_size, cursor=cursor
+                    run.sources,
+                    run.context,
+                    limit=self.settings.answer_read_page_size,
+                    cursor=cursor,
                 ),
             )
             signature = (page.total, page.inventory.model_dump_json())
@@ -202,9 +265,10 @@ class AnswerService:
                     raise error(
                         "invalid_inventory", "Chunk enumeration returned duplicate evidence"
                     )
-                nodes.append(self._record(run, chunk.evidence()))
+                self._record(run, chunk.evidence())
+                chunks.append(chunk)
             if page.next_cursor is None:
-                if len(nodes) != page.total:
+                if len(chunks) != page.total:
                     raise error("invalid_inventory", "Chunk enumeration is incomplete")
                 break
             if page.next_cursor in cursors or not page.items:
@@ -213,6 +277,107 @@ class AnswerService:
             cursor = page.next_cursor
         if not page.inventory.complete:
             run.notes.append("Some selected videos have no available index; coverage is partial.")
+        return chunks, expected
+
+    async def _transcript(self, run):
+        chunks, expected = await self._read_all(run)
+        statements, size = [], 0
+        for source in run.sources:
+            selected = [chunk for chunk in chunks if chunk.video_id == source.video_id]
+            if not selected:
+                continue
+            segments = await self._bounded(
+                run, lambda _, source=source: self.knowledge.transcript(source, run.context)
+            )
+            refs = {}
+            for chunk in selected:
+                for segment_id in chunk.segment_ids:
+                    refs.setdefault(segment_id, []).append(chunk.chunk_id)
+            if set(refs) != {segment.segment_id for segment in segments}:
+                raise error("source_changed", "Transcript and indexed segment inventory differ")
+            # Use original segments once in stored order, preserving repeated verses.
+            # Overlapping/split RAG chunks are citation anchors, not display text.
+            text, citations = "", []
+            for segment in segments:
+                size += len(segment.text.encode("utf-8"))
+                if size > 1000000 or len(segment.text) > 11000:
+                    raise error("transcript_too_large", "Transcript exceeds the display budget")
+                if text and len(text) + len(segment.text) + 1 > 11000:
+                    statements.append(
+                        {"text": text, "citation_ids": list(dict.fromkeys(citations))}
+                    )
+                    text, citations = "", []
+                text += ("\n" if text else "") + segment.text
+                citations.extend(refs[segment.segment_id])
+            if text:
+                statements.append({"text": text, "citation_ids": list(dict.fromkeys(citations))})
+            if (
+                len(statements) > 100
+                or len({cid for statement in statements for cid in statement["citation_ids"]})
+                > 1000
+            ):
+                raise error("transcript_too_large", "Transcript exceeds the display budget")
+        run.processed.update(run.records)
+        run.notes.append(
+            "แสดงบทถอดเสียงทั้งหมดที่นำเข้าได้ตามลำดับเดิม คำบรรยายอัตโนมัติอาจคลาดเคลื่อนหรือขาดบางช่วงจากเสียงจริง"
+        )
+        output = GeneratedAnswer(
+            status="answered" if statements else "insufficient_evidence",
+            statements=statements,
+            message="" if statements else "ไม่พบบทถอดเสียงที่พร้อมแสดงในคลิปที่เลือก",
+        )
+        result = await self._finish(run, output, expected, full=True)
+        result.provider_metadata = ProviderMetadata(
+            provider="transcript", requested_model="none", latency_ms=0
+        )
+        return result
+
+    async def _performer_attribution(self, run, request):
+        chunks, expected = await self._read_all(run)
+        nodes = [self._record(run, chunk.evidence()) for chunk in chunks]
+        statements = []
+        # Inspect the entire selected caption inventory, not just top-k hits.
+        # Only caption passages with possible explicit speaker/performer cues go
+        # to the model. Titles/history cannot supply a missing attribution.
+        candidates = [node for node in nodes if has_performer_cues(node["text"])]
+        for group in self._groups("performer_attribution", request, candidates):
+            output = await self._generate(run, payload("performer_attribution", request, group))
+            statements.extend(output.statements)
+            if len(statements) > 100:
+                raise error(
+                    "analysis_budget_exceeded", "Attribution output exceeds statement limit"
+                )
+        run.processed.update(run.records)
+        run.notes.append(
+            "ตรวจจากบทถอดเสียงและเวลาของทุกส่วนที่นำเข้าได้ "
+            "ไม่ได้ระบุตัวบุคคลจากเสียงหรือภาพ และชื่อศิลปินอย่างเดียวไม่ยืนยันว่าใครร้องท่อนไหน"
+        )
+        output = GeneratedAnswer(
+            status="answered" if statements else "insufficient_evidence",
+            statements=statements,
+            message=""
+            if statements
+            else (
+                "ยังระบุท่อนของผู้ร้องที่ถามไม่ได้จากข้อมูลที่นำเข้า "
+                "ระบบตรวจบทถอดเสียงพร้อมเวลาแล้ว แต่ยังไม่มีหลักฐานระบุชื่อผู้ร้องกับช่วงนั้นอย่างชัดเจน "
+                "ต้องมีคำบรรยายที่ติดชื่อผู้ร้อง หรือข้อมูลจากเจ้าของคลิปที่ระบุว่าใครร้องช่วงเวลาใด"
+            ),
+        )
+        return await self._finish(
+            run,
+            output,
+            expected,
+            full=True,
+            checked_ids=list(run.records) if not statements else None,
+        )
+
+    async def analyze(self, request, sources, context):
+        run = self._run(sources, context, {"analysis", "research"})
+        request = self._request(AnalysisRequest, request, run)
+        if request["type"] == "compare" and len(run.sources) < 2:
+            raise error("invalid_scope", "Comparison needs at least two videos", status=422)
+        chunks, expected = await self._read_all(run)
+        nodes = [self._record(run, chunk.evidence()) for chunk in chunks]
         if not nodes:
             return await self._finish(
                 run,
@@ -283,7 +448,7 @@ class AnswerService:
             nodes.append(node)
         return nodes
 
-    async def _finish(self, run, output, expected, *, full):
+    async def _finish(self, run, output, expected, *, full, checked_ids=None):
         # Recheck ALL processed original records, including those not retained as final citations.
         ids = sorted(run.processed)
         for offset in range(0, len(ids), 1000):
@@ -295,6 +460,8 @@ class AnswerService:
             if any(by_id.get(cid) != run.records[cid] for cid in batch):
                 raise error("source_changed", "Evidence changed before answer finalization")
         cited_ids = list(dict.fromkeys(c for s in output.statements for c in s.citation_ids))
+        if checked_ids is not None:
+            cited_ids = list(dict.fromkeys(checked_ids))
         if len(cited_ids) > 1000:
             raise error("analysis_budget_exceeded", "Final citations exceed backend limit")
         labels = {cid: str(i + 1) for i, cid in enumerate(cited_ids)}
@@ -329,7 +496,7 @@ class AnswerService:
         )
         if full and not complete and not run.notes:
             run.notes.append("Selected evidence could not be processed completely.")
-        if run.notes:
+        if full and run.notes:
             text += "\n\nข้อจำกัด / Limitations: " + " ".join(dict.fromkeys(run.notes))
         usage = {}
         for meta in run.metadata:

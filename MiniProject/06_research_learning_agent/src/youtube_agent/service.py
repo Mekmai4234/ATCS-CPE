@@ -23,10 +23,19 @@ from youtube_backend.schemas import (
 )
 from youtube_backend.urls import canonical_url
 
-from .gemini import byte_size, json_text
+from .authorization import member_service
+from .gemini import GeminiModel, byte_size, json_text
 from .models import TOOL_MODELS, Usage, error
 
 CONTENTS = {"study_plan": StudyPlanContent, "quiz": QuizContent, "flashcards": FlashcardsContent}
+SOURCE_ERRORS = {
+    "source_changed",
+    "invalid_evidence",
+    "index_configuration_mismatch",
+    "index_incomplete",
+    "incomplete_index",
+    "invalid_coverage",
+}
 
 
 @dataclass
@@ -40,6 +49,10 @@ class Run:
     processed: set = field(default_factory=set)
     pending: set = field(default_factory=set)
     artifacts: list = field(default_factory=list)
+    step: int = 0
+    model_calls: int = 0
+    tool_calls: int = 0
+    research: bool = False
 
     def remaining(self):
         self.context.check()
@@ -47,11 +60,15 @@ class Run:
 
 
 class AgentService:
-    def __init__(self, settings, model, knowledge, *, analyzer=None):
+    def __init__(
+        self, settings, model, knowledge, *, analyzer=None, media_answerer=None, media_selector=None
+    ):
         self.settings = settings
         self.model = model
         self.knowledge = knowledge
         self.analyzer = analyzer
+        self.media_answerer = media_answerer
+        self.media_selector = media_selector
 
     def _run(self, sources, context):
         context.check()
@@ -66,12 +83,26 @@ class AgentService:
             Usage(self.settings.llm_model, provider="none"),
         )
 
-    async def _bounded(self, run, function, *, reserve=True):
+    async def _bounded(self, run, function, *, reserve=True, model=False):
+        if model:
+            if run.model_calls >= self.settings.agent_max_model_calls:
+                raise error("agent_budget_exhausted", "Model call budget exhausted")
+            run.model_calls += 1
+        else:
+            limit = self.settings.agent_max_tool_calls - (2 if reserve else 0)
+            if run.tool_calls >= limit:
+                raise error(
+                    "agent_budget_exhausted", "Tool budget reached final validation reserve"
+                )
+            run.tool_calls += 1
         remaining = run.remaining() - (
             self.settings.agent_finalize_reserve_seconds if reserve else 0
         )
         if remaining <= 0:
             raise error("agent_budget_exhausted", "Research finalization reserve reached")
+        before_call = getattr(run.context, "before_agent_call", None)
+        if before_call is not None:
+            before_call()
         async with asyncio.timeout(min(remaining, self.settings.llm_timeout_seconds)):
             value = await function(min(remaining, self.settings.llm_timeout_seconds))
         run.context.check()
@@ -80,17 +111,78 @@ class AgentService:
     def _event(self, run, step, name, state, summary):
         run.context.event(ProgressEvent(step=step, tool_name=name, state=state, summary=summary))
 
-    def _records(self, run, values):
-        allowed = {s.video_id: s for s in run.sources}
+    def _records(self, run, values, *, sources=None):
+        allowed = {s.video_id: s for s in (sources if sources is not None else run.sources)}
         records = [Evidence.model_validate(v) for v in values]
+        unique = {}
         for item in records:
             source = allowed.get(item.video_id)
             if not source or source.transcript_version != item.transcript_version:
                 raise error("invalid_evidence", "Tool evidence exceeds authorized sources")
-            old = run.evidence.get(item.chunk_id)
+            old = unique.get(item.chunk_id, run.evidence.get(item.chunk_id))
             if old is not None and old != item:
                 raise error("invalid_evidence", "Evidence ID changed within the run")
-        return records
+            unique[item.chunk_id] = item
+        if run.total is not None and len(set(run.evidence) | set(unique)) > run.total:
+            raise error("invalid_coverage", "Evidence exceeds the indexed chunk inventory")
+        return list(unique.values())
+
+    def _request(self, schema, request, run):
+        request = schema.model_validate(request).model_dump(mode="json")
+        # Channel/date filters may legitimately narrow the original explicit video set in 02.
+        if not {s.video_id for s in run.sources}.issubset(request["scope"]["video_ids"]):
+            raise error(
+                "invalid_scope", "Authorized sources exceed the requested videos", status=422
+            )
+        return request
+
+    async def _deliver(self, run, result):
+        """Recheck exported evidence before using the finalization reserve to publish."""
+        citations = list(result.citations)
+        for artifact in getattr(result, "artifacts", []):
+            citations.extend(artifact.citations)
+        for citation in citations:
+            if citation.kind == "video":
+                from youtube_backend.video_evidence import verify_video_citation
+
+                with run.context.repository.db.read() as connection:
+                    job = run.context.repository._owned(
+                        connection, run.context.job_id, run.context.lease_token
+                    )
+                    verify_video_citation(run.context.repository, connection, job, citation)
+        ids = sorted({c.chunk_id for c in citations if c.kind == "transcript"})
+        for offset in range(0, len(ids), 1000):
+            batch = ids[offset : offset + 1000]
+            current = await self._bounded(
+                run,
+                lambda _, chunk_ids=batch: self.knowledge.evidence(
+                    run.sources, chunk_ids, run.context
+                ),
+                reserve=False,
+            )
+            records = self._records(run, current)
+            if {e.chunk_id for e in records} != set(batch):
+                raise error("source_changed", "Cited evidence is no longer available")
+            if any(e != run.evidence[e.chunk_id] for e in records):
+                raise error("source_changed", "Cited evidence changed before finalization")
+        if run.total is not None:
+            count = await self._bounded(
+                run, lambda _: self.knowledge.inventory(run.sources, run.context), reserve=False
+            )
+            if type(count) is not int or count != run.total:
+                raise error("source_changed", "Index inventory changed before finalization")
+        run.context.check()
+        state = getattr(result, "state", "completed")
+        self._event(
+            run,
+            run.step,
+            "run_controller",
+            state,
+            f"Validated output; processed_chunks={result.coverage.processed_chunks}; "
+            f"complete={result.coverage.complete}; model_calls={run.model_calls}; "
+            f"tool_calls={run.tool_calls}",
+        )
+        return result
 
     def _remember(self, run, records):
         run.evidence.update({e.chunk_id: e for e in records})
@@ -183,9 +275,41 @@ class AgentService:
                 run, [e.evidence() if hasattr(e, "evidence") else e for e in page.items]
             )
             records.update({e.chunk_id: e for e in batch})
-            self._input_fits(
-                {"request": request, "evidence": [e.model_dump() for e in records.values()]}
-            )
+            try:
+                self._input_fits(
+                    {"request": request, "evidence": [e.model_dump() for e in records.values()]}
+                )
+            except AppError as exc:
+                if exc.code != "context_budget_exceeded":
+                    raise
+                # Large libraries use ranked evidence per source, not a silent prefix.
+                # Coverage remains partial: only successful model inputs are credited.
+                records = {}
+                for source in run.sources:
+                    hits = await self._bounded(
+                        run,
+                        lambda _, source=source: self.knowledge.search(
+                            request.get("topic") or "main concepts key points",
+                            [source],
+                            run.context,
+                            top_k=8,
+                        ),
+                    )
+                    for hit in hits:
+                        record = self._records(run, [hit.chunk.evidence()])[0]
+                        candidate = {**records, record.chunk_id: record}
+                        if (
+                            byte_size(
+                                {
+                                    "request": request,
+                                    "evidence": [e.model_dump() for e in candidate.values()],
+                                }
+                            )
+                            <= self.settings.max_context_tokens // 2
+                        ):
+                            records = candidate
+                self._remember(run, list(records.values()))
+                break
             self._remember(run, batch)
             cursor = page.next_cursor
             if cursor is None:
@@ -198,9 +322,18 @@ class AgentService:
                 "insufficient_evidence", "No transcript evidence for learning output", status=409
             )
         schema = CONTENTS[request["type"]]
+        if run.research and run.model_calls >= self.settings.agent_max_model_calls - 1:
+            raise error("agent_budget_exhausted", "Preserving the final answer model allowance")
         generated = await self._bounded(
             run,
-            lambda timeout: self.model.generate(request, list(records.values()), schema, timeout),
+            lambda timeout: self.model.generate(
+                request,
+                list(records.values()),
+                schema,
+                timeout,
+                **({"context": run.context} if isinstance(self.model, GeminiModel) else {}),
+            ),
+            model=True,
         )
         run.usage.add(generated.metadata)
         try:
@@ -234,17 +367,28 @@ class AgentService:
         return artifact
 
     async def artifact(self, request, sources, context):
-        request = ArtifactRequest.model_validate(request).model_dump(mode="json")
+        member = member_service(self, context)
+        if member is not None:
+            return await member.artifact(request, sources, context)
         run = self._run(sources, context)
-        await self._inventory(run)
+        request = self._request(ArtifactRequest, request, run)
+        if self.media_answerer and (
+            self.media_selector is None or self.media_selector(request["topic"])
+        ):
+            from .video_learning import video_artifact
+
+            native = await video_artifact(self, request, run, CONTENTS[request["type"]])
+            if native is not None:
+                return await self._deliver(run, native)
         try:
+            self._event(run, 0, "create_learning_artifact", "running", "Collecting scoped evidence")
+            await self._inventory(run)
             result = await self._artifact(request, run)
+            return await self._deliver(run, result)
         except TimeoutError:
             raise error(
                 "agent_budget_exhausted", "Artifact exceeded its time budget", status=504
             ) from None
-        context.check()
-        return result
 
     async def _tool(self, name, args, request, run):
         if name == "search_evidence":
@@ -264,7 +408,7 @@ class AgentService:
                     sources, run.context, limit=args.limit, cursor=args.cursor
                 ),
             )
-            records = self._records(run, [e.evidence() for e in page.items])
+            records = self._records(run, [e.evidence() for e in page.items], sources=sources)
             observation = {
                 "evidence": [e.model_dump() for e in records],
                 "next_cursor": page.next_cursor,
@@ -296,7 +440,10 @@ class AgentService:
                 await self._bounded(
                     run, lambda _: self.knowledge.evidence(sources, ids, run.context)
                 ),
+                sources=sources,
             )
+            if len({c.citation_id for c in answer.citations}) != len(answer.citations):
+                raise error("invalid_citation", "Comparison citation IDs are not unique")
             by_id = {e.chunk_id: e for e in records}
             for citation in answer.citations:
                 evidence = by_id.get(citation.chunk_id)
@@ -312,6 +459,8 @@ class AgentService:
             observation = {
                 "answer": answer.answer,
                 "status": answer.status,
+                "citations": [c.model_dump() for c in answer.citations],
+                "coverage": answer.coverage.model_dump(),
                 "evidence": [e.model_dump() for e in records],
             }
         else:
@@ -354,8 +503,12 @@ class AgentService:
         )
 
     async def research(self, request, sources, context):
-        request = ResearchRequest.model_validate(request).model_dump(mode="json")
+        member = member_service(self, context)
+        if member is not None:
+            return await member.research(request, sources, context)
         run = self._run(sources, context)
+        run.research = True
+        request = self._request(ResearchRequest, request, run)
         history = [
             {
                 "role": "user",
@@ -369,6 +522,7 @@ class AgentService:
         try:
             await self._inventory(run)
             for step in range(1, self.settings.agent_max_steps + 1):
+                run.step = step
                 self._input_fits(
                     [{k: v for k, v in entry.items() if k != "native"} for entry in history]
                 )
@@ -379,12 +533,27 @@ class AgentService:
                             "remaining_steps": self.settings.agent_max_steps - step + 1,
                             "remaining_seconds": max(0, run.remaining()),
                             "coverage": self._coverage(run).model_dump(),
+                            "final_only": run.model_calls
+                            == self.settings.agent_max_model_calls - 1,
                         },
                     }
                 )
                 reply = await self._bounded(
-                    run, lambda timeout: self.model.decide(history, timeout)
+                    run,
+                    lambda timeout: self.model.decide(
+                        history,
+                        timeout,
+                        **({"context": run.context} if isinstance(self.model, GeminiModel) else {}),
+                    ),
+                    model=True,
                 )
+                if (
+                    run.model_calls == self.settings.agent_max_model_calls
+                    and reply.name != "finish_research"
+                ):
+                    return await self._deliver(
+                        run, self._partial(run, "Final model allowance reached.")
+                    )
                 run.usage.add(reply.metadata)
                 # Only credit observations after the subsequent decision successfully returned.
                 run.processed.update(run.pending)
@@ -407,14 +576,18 @@ class AgentService:
                 else:
                     fingerprint = (reply.name, json_text(args.model_dump()))
                     if fingerprint in seen:
-                        return self._partial(run, "Repeated action without a new observation.")
+                        return await self._deliver(
+                            run, self._partial(run, "Repeated action without a new observation.")
+                        )
                     seen.add(fingerprint)
                     self._event(
                         run, step, reply.name, "running", "Executing validated scoped action"
                     )
                     if reply.name == "finish_research":
                         if not args.citation_ids:
-                            return self._partial(run, "No cited final answer was supplied.")
+                            return await self._deliver(
+                                run, self._partial(run, "No cited final answer was supplied.")
+                            )
                         citations = self._citations(run, args.citation_ids)
                         coverage = self._coverage(run)
                         result = ResearchResult(
@@ -425,10 +598,8 @@ class AgentService:
                             coverage=coverage,
                             provider_metadata=run.usage.result(),
                         )
-                        self._event(
-                            run, step, reply.name, result.state, "Validated research result"
-                        )
-                        return result
+                        self._event(run, step, reply.name, "validating", "Rechecking final sources")
+                        return await self._deliver(run, result)
                     try:
                         observation = await self._tool(reply.name, args, request, run)
                     except AppError as exc:
@@ -449,13 +620,29 @@ class AgentService:
                 history.append(
                     {"role": "tool", "name": reply.name, "call_id": call_id, "result": observation}
                 )
-            return self._partial(run, "Agent decision step limit reached.")
+            return await self._deliver(
+                run, self._partial(run, "Agent decision step limit reached.")
+            )
         except TimeoutError:
             context.check()
-            return self._partial(run, "Agent operation exceeded its remaining time budget.")
+            return await self._deliver(
+                run, self._partial(run, "Agent operation exceeded its remaining time budget.")
+            )
         except AppError as exc:
             context.check()
+            if getattr(exc, "pause", False) or exc.code in {
+                "free_tier_unverified",
+                "free_model_unverified",
+                "quota_policy_mismatch",
+                "quota_wait",
+                "provider_rate_limited",
+                "provider_unavailable",
+            }:
+                if not run.evidence:
+                    raise
+                return await self._deliver(run, self._partial(run, f"Stopped: {exc.code}."))
+            if exc.code in SOURCE_ERRORS:
+                raise
             if exc.code in {"agent_budget_exhausted", "context_budget_exceeded"} or run.evidence:
-                self._event(run, 0, "run_controller", "partial", exc.code)
-                return self._partial(run, f"Stopped: {exc.code}.")
+                return await self._deliver(run, self._partial(run, f"Stopped: {exc.code}."))
             raise

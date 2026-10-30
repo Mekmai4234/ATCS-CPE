@@ -1,0 +1,263 @@
+{
+  "notice": "Synthetic examples generated from real module-02 routes with test Google/provider doubles. Replace IDs and challenge/session CSRF at runtime; these are not real accounts or Google results.",
+  "auth_challenge": {
+    "status": 200,
+    "body": {
+      "nonce": "EXAMPLE_NONCE_REPLACE_WITH_CHALLENGE",
+      "csrf_token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "client_id": "test-client"
+    }
+  },
+  "google_login_request": {
+    "credential": "GIS_CALLBACK_ID_TOKEN",
+    "csrf_token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "auth_session": {
+    "status": 200,
+    "body": {
+      "user": {
+        "user_id": "efbf321b-b64e-4151-a207-133f3b8ba122",
+        "email": "example-member@example.com",
+        "name": "Member example-member",
+        "picture": null,
+        "role": "user",
+        "status": "active"
+      },
+      "csrf_token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  },
+  "chat_request": {
+    "question": "RAG",
+    "scope": {
+      "video_ids": [
+        "dQw4w9WgXcQ"
+      ]
+    }
+  },
+  "chat_answered": {
+    "status": 200,
+    "body": {
+      "status": "answered",
+      "answer": "[FIXTURE] RAG ค้นหลักฐานก่อนสร้างคำตอบ [c1]",
+      "citations": [
+        {
+          "citation_id": "c1",
+          "chunk_id": "dQw4w9WgXcQ:g1:ea0dea430067:s1",
+          "video_id": "dQw4w9WgXcQ",
+          "title": "[FIXTURE] RAG lesson dQw4w9WgXcQ",
+          "start_seconds": 0.0,
+          "end_seconds": 12.0,
+          "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=0s"
+        },
+        {
+          "citation_id": "c2",
+          "chunk_id": "dQw4w9WgXcQ:g1:ea0dea430067:s2",
+          "video_id": "dQw4w9WgXcQ",
+          "title": "[FIXTURE] RAG lesson dQw4w9WgXcQ",
+          "start_seconds": 12.0,
+          "end_seconds": 27.0,
+          "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=12s"
+        },
+        {
+          "citation_id": "c3",
+          "chunk_id": "dQw4w9WgXcQ:g1:ea0dea430067:s3",
+          "video_id": "dQw4w9WgXcQ",
+          "title": "[FIXTURE] RAG lesson dQw4w9WgXcQ",
+          "start_seconds": 27.0,
+          "end_seconds": 40.0,
+          "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=27s"
+        }
+      ],
+      "coverage": {
+        "expected_videos": 1,
+        "processed_videos": 1,
+        "expected_chunks": 3,
+        "processed_chunks": 3,
+        "complete": true,
+        "notes": [
+          "FIXTURE: deterministic data; no model was called"
+        ]
+      },
+      "provider_metadata": {
+        "provider": "fixture",
+        "requested_model": "gemini-3.5-flash",
+        "returned_model": null,
+        "usage": {},
+        "latency_ms": 0.0
+      },
+      "conversation_id": "6b7cc4b3-f223-4014-895e-9a6396fdc2f5",
+      "job_id": "4686c900-c634-4ff8-b9df-165375c31daa",
+      "mode": "fixture",
+      "sources_available": true
+    }
+  },
+  "chat_pending_request": {
+    "question": "RAG follow-up",
+    "scope": {
+      "video_ids": [
+        "dQw4w9WgXcQ"
+      ]
+    },
+    "conversation_id": "6b7cc4b3-f223-4014-895e-9a6396fdc2f5"
+  },
+  "chat_accepted": {
+    "status": 202,
+    "body": {
+      "job_id": "6c858451-987c-48b8-847e-ea2c7b5cbabc",
+      "state": "queued"
+    },
+    "location": "/api/jobs/6c858451-987c-48b8-847e-ea2c7b5cbabc"
+  },
+  "job_queued": {
+    "status": 200,
+    "body": {
+      "job_id": "6c858451-987c-48b8-847e-ea2c7b5cbabc",
+      "request_id": "39f5e23a-2a7d-4082-ab56-dcf2f3be2cc0",
+      "kind": "chat",
+      "video_id": null,
+      "conversation_id": "6b7cc4b3-f223-4014-895e-9a6396fdc2f5",
+      "state": "queued",
+      "stage": "queued",
+      "attempt_count": 0,
+      "max_attempts": 3,
+      "error_code": null,
+      "retryable": false,
+      "cancel_requested": false,
+      "result": null,
+      "created_at": "2026-10-23T18:34:36.107149+00:00",
+      "updated_at": "2026-10-23T18:34:36.107149+00:00",
+      "available_at": "2026-10-23T18:34:36.107149+00:00",
+      "mode": "fixture",
+      "run_id": null,
+      "sources_available": true
+    }
+  },
+  "history": {
+    "status": 200,
+    "body": {
+      "conversation_id": "6b7cc4b3-f223-4014-895e-9a6396fdc2f5",
+      "messages": [
+        {
+          "message_id": "6bb52c53-1fdd-4c24-ab7e-066609a2b5db",
+          "conversation_id": "6b7cc4b3-f223-4014-895e-9a6396fdc2f5",
+          "job_id": "4686c900-c634-4ff8-b9df-165375c31daa",
+          "role": "user",
+          "content": "RAG",
+          "scope": [
+            {
+              "video_id": "dQw4w9WgXcQ",
+              "generation": 1,
+              "transcript_version": "ea0dea430067d29b4bcb1d36402fdf844853cfffa262d586b39587b3002a4119"
+            }
+          ],
+          "created_at": "2026-10-23T18:34:36.060860+00:00",
+          "citations": [],
+          "state": "completed"
+        },
+        {
+          "message_id": "d7d6b28c-bbf4-400b-a050-8f2a96bc1bac",
+          "conversation_id": "6b7cc4b3-f223-4014-895e-9a6396fdc2f5",
+          "job_id": "4686c900-c634-4ff8-b9df-165375c31daa",
+          "role": "assistant",
+          "content": "[FIXTURE] RAG ค้นหลักฐานก่อนสร้างคำตอบ [c1]",
+          "scope": [
+            {
+              "video_id": "dQw4w9WgXcQ",
+              "generation": 1,
+              "transcript_version": "ea0dea430067d29b4bcb1d36402fdf844853cfffa262d586b39587b3002a4119"
+            }
+          ],
+          "created_at": "2026-10-23T18:34:36.081430+00:00",
+          "citations": [
+            {
+              "citation_id": "c1",
+              "chunk_id": "dQw4w9WgXcQ:g1:ea0dea430067:s1",
+              "video_id": "dQw4w9WgXcQ",
+              "title": "[FIXTURE] RAG lesson dQw4w9WgXcQ",
+              "start_seconds": 0.0,
+              "end_seconds": 12.0,
+              "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=0s",
+              "source_available": true
+            },
+            {
+              "citation_id": "c2",
+              "chunk_id": "dQw4w9WgXcQ:g1:ea0dea430067:s2",
+              "video_id": "dQw4w9WgXcQ",
+              "title": "[FIXTURE] RAG lesson dQw4w9WgXcQ",
+              "start_seconds": 12.0,
+              "end_seconds": 27.0,
+              "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=12s",
+              "source_available": true
+            },
+            {
+              "citation_id": "c3",
+              "chunk_id": "dQw4w9WgXcQ:g1:ea0dea430067:s3",
+              "video_id": "dQw4w9WgXcQ",
+              "title": "[FIXTURE] RAG lesson dQw4w9WgXcQ",
+              "start_seconds": 27.0,
+              "end_seconds": 40.0,
+              "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=27s",
+              "source_available": true
+            }
+          ],
+          "state": "completed"
+        }
+      ],
+      "total": 2,
+      "limit": 2,
+      "offset": 0
+    },
+    "path": "/api/conversations/6b7cc4b3-f223-4014-895e-9a6396fdc2f5?limit=2&offset=0"
+  },
+  "chat_no_evidence": {
+    "status": 200,
+    "body": {
+      "status": "insufficient_evidence",
+      "answer": "[FIXTURE] ไม่มีหลักฐานสำหรับคำถามนี้",
+      "citations": [],
+      "coverage": {
+        "expected_videos": 1,
+        "processed_videos": 1,
+        "expected_chunks": 3,
+        "processed_chunks": 3,
+        "complete": true,
+        "notes": [
+          "FIXTURE: deterministic data; no model was called"
+        ]
+      },
+      "provider_metadata": {
+        "provider": "fixture",
+        "requested_model": "gemini-3.5-flash",
+        "returned_model": null,
+        "usage": {},
+        "latency_ms": 0.0
+      },
+      "conversation_id": "4e7e1f6f-d6d9-471f-85d3-ff1f94037a6b",
+      "job_id": "1559411a-38bd-4aea-8497-d99b9024eaac",
+      "mode": "fixture",
+      "sources_available": true
+    }
+  },
+  "empty_scope": {
+    "status": 422,
+    "body": {
+      "error": {
+        "code": "validation_error",
+        "message": "Request does not match the API schema",
+        "retryable": false,
+        "request_id": "d8f95162-3ffa-464a-a4ae-fe3707d90d44"
+      }
+    }
+  },
+  "unauthenticated": {
+    "status": 401,
+    "body": {
+      "error": {
+        "code": "authentication_required",
+        "message": "Sign in with Google first",
+        "retryable": false,
+        "request_id": "47b2a615-5778-4431-8b1a-2cb03a661f2e"
+      }
+    }
+  }
+}

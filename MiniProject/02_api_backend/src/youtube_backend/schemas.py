@@ -123,6 +123,8 @@ class Citation(Schema):
     start_seconds: float = Field(ge=0)
     end_seconds: float = Field(gt=0)
     url: str = ""
+    kind: Literal["transcript", "video"] = "transcript"
+    observation_cache_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
 
 
 class Coverage(Schema):
@@ -282,6 +284,7 @@ class ImportResponse(Schema):
 
 
 class JobResponse(Schema):
+    wait: dict[str, Any] | None = None
     job_id: str
     request_id: str
     kind: str
@@ -341,6 +344,23 @@ class TranscriptResponse(Schema):
 class ConversationResponse(Schema):
     conversation_id: str
     messages: list[dict[str, Any]]
+    total: int
+    limit: int
+    offset: int
+    scope: Scope | None = None
+
+
+class ConversationSummary(Schema):
+    conversation_id: str
+    title: str
+    created_at: str
+    updated_at: str
+    message_count: int
+    video_ids: list[str]
+
+
+class ConversationList(Schema):
+    items: list[ConversationSummary]
     total: int
     limit: int
     offset: int

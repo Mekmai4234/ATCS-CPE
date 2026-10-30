@@ -1,12 +1,26 @@
 # Module 05 — AI Answers and Analysis
 
+Latest visual / Free Tier work: [VISUAL_HANDOFF.md](VISUAL_HANDOFF.md).
+Executed checks: [VISUAL_TEST_REPORT.md](VISUAL_TEST_REPORT.md).
+**Live compatibility change:** 05 Gemini count/generate/catalog calls now require a
+trusted shared broker with verified Free Tier/model grants. Without it they fail with
+`quota_pending` before network access. The current 02 backend has no such broker;
+the new multimodal consumer is not mounted on existing HTTP routes.
+
+Earlier member authorization work: [MEMBER_AUTHORIZATION.md](MEMBER_AUTHORIZATION.md).
+Member verification: [MEMBER_TEST_REPORT.md](MEMBER_TEST_REPORT.md).
+Earlier review fixes and combined verification: [REVIEW_FIX_REPORT.md](REVIEW_FIX_REPORT.md).
+Previous follow-up results: [FOLLOWUP_REPORT.md](FOLLOWUP_REPORT.md).
+Live acceptance prerequisites and review workflow: [ACCEPTANCE.md](ACCEPTANCE.md).
+
 `youtube_answers` generates cited answers, whole-video summaries and comparisons.
 02 owns HTTP routes, durable jobs, history, retries and result storage. 04 owns versioned
 evidence and embeddings. 05 supplies `answer(request, sources, history, context)` and
 `analyze(request, sources, context)`, returning 02's existing `AnswerResult`.
 
-All implementation changes are local to this folder. Existing 02/03/04/06 source and
-their factories are unchanged. The optional `youtube_answers.team:create_adapters`
+This member integration changes only module 05. It depends on 02's authenticated
+backend contract (PR #18); permission-aware 04/06 integration is tested separately.
+The optional `youtube_answers.team:create_adapters`
 composition connects existing 03 ingestion, 04 RAG, 05 answers and 06 research/artifacts,
 with 06's comparison tool delegated to 05 and one shared RAG service.
 
@@ -37,11 +51,14 @@ This verifies mechanisms; it does not establish real-video answer quality.
 Copy this module's `.env.example` to `.env` only if no local file already exists.
 Credentials are server-only. Never commit `.env` or include keys in shell arguments.
 
-Standalone 05 precedence: process environment > 05/.env > shared root .env > defaults.
-The full team factory uses process > 05/.env > 06/.env > 03/.env > 04/.env > root .env
-for each service's own settings. This ensures explicit module-05 overrides apply across
-the composition. The backend's existing Settings does not automatically load 05/.env;
-set its adapter/database variables explicitly in both API and worker terminals below.
+The full-team factory consumes the backend's **resolved Settings**, with dotenv loading
+disabled for all downstream services. Shared fields always use the supplied backend values;
+module-specific fields missing from a legacy backend use process values/defaults only.
+Use 02's **yk-full** launcher to select one file and export all service fields for API,
+worker and reindex/GC: process environment > selected file > launcher defaults. Module-local
+dotenv files must not silently select a different database, Chroma store or embedding model.
+The narrow 05 factory follows the same resolved-backend rule; direct manual construction
+of `AnswerSettings` is a separate standalone API, not the full runtime configuration contract.
 
 | Setting | Default | Purpose |
 |---|---|---|
@@ -62,29 +79,34 @@ Generation and embedding models remain independent. Verify actual Gemini model/a
 access before using live mode; the configured identifier is not a claim of availability.
 Requested and returned model/version, aggregate usage and provider-call latency are kept.
 
-## Run the optional full team integration
+## Run the full team integration
 
-Use a new SQLite/Chroma pair, separate from previous fixture/demo state. Configure 05/.env
-with a key and the compatible 04 embedding settings from `.env.example`. The root legacy
-OpenAI proposal must not override Gemini embeddings. Do not change an existing index's
-configuration without following 04's explicit reindex procedure.
+The main runtime dependency set is **02_api_backend/full**, factory
+`youtube_answers.team:create_adapters`. The older `02_api_backend/integration` set connects
+only 04/06 and cannot supply 05 answers. `05 --extra team` remains the development/test
+environment; it does not add 02's launcher when that backend version is absent.
 
-In terminal 1, from MiniProject:
+This branch now includes `develop@6520b4c`, containing 02's full launcher (PR #9),
+04's store safeguards (PR #10) and 03's follow-up changes (PR #14). The full-flow test
+consumer was updated to validate resolved service values instead of the removed private
+`ENV_FILES` constant. See [ACCEPTANCE.md](ACCEPTANCE.md) for maintenance commands.
+
+Copy the example only if 05/.env does not exist, fill the key locally, and select a fresh
+SQLite/Chroma pair. Every command must select the same file and process environment.
+From MiniProject after the prerequisite is integrated:
 
 ```powershell
-$env:ADAPTER_MODE = "custom"
-$env:ADAPTER_FACTORY = "youtube_answers.team:create_adapters"
-$env:BACKEND_INTEGRATION_PROFILE = "live"
-$env:DATABASE_URL = "sqlite:///./runtime/answers05/app.db"
-python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-db upgrade head
-python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-rag init
-python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-api
+python -m uv sync --project 02_api_backend/full --locked
+python -m uv run --project 02_api_backend/full --locked yk-full --env-file 05_ai_answers_analysis/.env config
+python -m uv run --project 02_api_backend/full --locked yk-full --env-file 05_ai_answers_analysis/.env init
+python -m uv run --project 02_api_backend/full --locked yk-full --env-file 05_ai_answers_analysis/.env check
+python -m uv run --project 02_api_backend/full --locked yk-full --env-file 05_ai_answers_analysis/.env api
 ```
 
-In terminal 2, set the **same four environment variables**, then:
+In terminal 2, select the same configuration:
 
 ```powershell
-python -m uv run --project 05_ai_answers_analysis --extra team --locked yk-worker
+python -m uv run --project 02_api_backend/full --locked yk-full --env-file 05_ai_answers_analysis/.env worker
 ```
 
 Open [Swagger](http://127.0.0.1:8000/docs). Import a caption-accessible YouTube URL through
@@ -134,23 +156,82 @@ image does not package this integration; the commands above use the local 05 env
 - Local budgeting reserves serialized UTF-8 bytes for evidence, policy and schema. Live
   requests also use Gemini countTokens on content plus a serialized-config byte allowance.
   This deliberately conservative allowance is not exact full-request token accounting.
+- Gemini 3 Flash requests explicitly use LOW thinking so that default reasoning does not
+  consume the shared `ANSWER_MAX_OUTPUT_TOKENS` budget before answer JSON is complete.
+  Other model families retain their defaults. The token cap is unchanged. A MAX_TOKENS
+  finish becomes `generation_output_truncated`; incomplete output is never published or
+  automatically retried as a valid answer. Ask a narrower question or increase the configured
+  cap deliberately for longer responses.
+- Provider HTTP 503 becomes `generation_provider_busy`; HTTP 429 becomes
+  `generation_rate_limited`. Both are retryable without exposing provider messages.
+  Module 02 spaces busy retries by at least 15 then 30 seconds, and quota retries by
+  at least 60 then 120 seconds, subject to the existing attempt cap and original job
+  deadline. A wait beyond that deadline is not queued. Other permanent provider
+  failures retain `generation_provider_error`. These retries cannot guarantee
+  recovery while the upstream service remains unavailable.
 
 ## Evaluation and limits
+
+### Performer attribution
+
+Questions such as `Jay ร้องท่อนไหน` scan every available authorized caption chunk,
+not just ranked top-k results. Possible explicit caption labels or attribution cues
+are sent to the model for grounded attribution; an artist's name in a title, a lyric
+or conversation history cannot identify that artist's passage. No voice or face
+identification is performed. If there is no supporting attribution, the result stays
+`insufficient_evidence`, explains the caption/time basis and missing evidence, and
+includes the checked sources with timestamps. Complete coverage means the imported
+captions were inspected, not that the requested identity was established. Existing
+source version, ownership and publication checks also apply to these checked citations.
+
+### Full transcript display
+
+Explicit requests such as `ขอเนื้อเพลงทั้งหมด`, `เพลงร้องว่าอย่างไร`, or
+`show full lyrics` display the entire stored transcript in original caption order.
+The service paginates all authorized index chunks, checks their segment IDs against
+the frozen original transcript version, and uses those chunks as timestamp citations.
+It renders each original segment once, preserving intentional repeated verses while
+avoiding duplication caused by RAG chunk overlap. No model generation or embedding
+search is used for this display operation (`provider=transcript`, model `none`).
+
+Coverage refers to imported captions, not proof that every audible word or official
+lyric is present. Missing indexes remain explicit partial coverage; mismatched segment
+inventories fail closed. Meaning, summary, translation and specific-verse questions
+continue to use ordinary grounded RAG. Existing account, lease, cancellation, version
+and publication checks still apply. To bound response size, displays are limited to
+1,000,000 UTF-8 caption bytes, 100 statement blocks and 1,000 final citation anchors;
+an individual caption must fit 11,000 characters. Oversized requests fail with
+`transcript_too_large` rather than silently publishing an incomplete transcript.
 
 `fixtures/evaluation.json` includes supported Thai, unsupported, conflicting cross-video,
 follow-up and transcript-injection cases with manual review criteria. An optional live
 smoke check makes paid generation requests on this small synthetic corpus only:
 
 ```powershell
-python -m uv run --project 05_ai_answers_analysis --locked python 05_ai_answers_analysis/scripts/live_check.py --live --output runtime/answers05/live-check.json
+python -m uv run --project 05_ai_answers_analysis --locked python 05_ai_answers_analysis/scripts/live_check.py --live --env-file 05_ai_answers_analysis/.env --output runtime/answers05/live-synthetic.json
 ```
 
-It checks expected status and citation identity and saves outputs for semantic review.
+It attempts an account-visible model catalog lookup, then checks expected status and citation
+identity and saves outputs for semantic review. Catalog visibility does not prove generation
+access; alias lookup failures are recorded separately from generation results.
 It does not fetch YouTube, create embeddings or modify an application database. Inspect
 each claim against the fixture, source attribution, contradictions, relevance and Thai
 readability. Passing structural checks does not prove factual support or prompt-injection
 resistance. Real-video grounding, model access, production throughput and live team behavior
 still require separate evaluation. No live calls were made during offline verification.
+
+For **real-video** import → ready → QA/summary/compare acceptance, use the new
+`yk-answers-acceptance` client and `fixtures/real_acceptance.template.json` as described in
+[ACCEPTANCE.md](ACCEPTANCE.md). It records wall latency, provider usage and a human review
+packet pairing each cited paragraph with actual transcript segments and timestamps.
+It refuses fixture/limited runtimes and never labels structural success as semantic acceptance.
+
+The acceptance client defaults to a **210-second HTTP read/write timeout** (the default
+180-second backend job budget plus a 30-second delivery margin), with a 10-second connect
+timeout and a separate 300-second polling budget. Override `--request-timeout` and
+`--poll-timeout` when the server has different budgets. All values must be finite and
+positive. The report records these budgets. A request timeout does not mean the server
+cancelled its job: inspect existing jobs before submitting another request.
 
 Long analyses can exceed context, call-count or job-time limits and fail explicitly.
 There are no resumable 05 checkpoints or guaranteed partial synthesis after a hard timeout.

@@ -1,4 +1,4 @@
-"""Explicit live YouTube -> real 02/04 storage check, using labelled fixture vectors."""
+"""Live YouTube -> native authenticated 02/04, with fixture identity and vectors."""
 
 import argparse
 import asyncio
@@ -23,6 +23,31 @@ from youtube_ingestion.captions import SubprocessCaptions
 from youtube_ingestion.config import IngestionSettings
 from youtube_ingestion.integration import IngestionAdapters
 from youtube_ingestion.service import IngestionService
+
+
+async def fixture_login(app, client):
+    """Exercise real challenge/session/CSRF; only external Google verification is fake."""
+    challenge = await client.get("/api/auth/challenge")
+    challenge.raise_for_status()
+    data = challenge.json()
+    app.state.auth.verifier = lambda token, audience: dict(
+        sub="03-acceptance-fixture",
+        aud=audience,
+        iss="https://accounts.google.com",
+        exp=time.time() + 300,
+        nonce=data["nonce"],
+        email="03-acceptance@example.invalid",
+        name="[FIXTURE] Ingestion acceptance",
+    )
+    response = await client.post(
+        "/api/auth/google",
+        headers={"Origin": "http://localhost:3000"},
+        json={"credential": "fixture-only", "csrf_token": data["csrf_token"]},
+    )
+    response.raise_for_status()
+    client.headers.update(
+        {"Origin": "http://localhost:3000", "X-CSRF-Token": response.json()["csrf_token"]}
+    )
 
 
 class RecordedCaptions(SubprocessCaptions):
@@ -50,6 +75,9 @@ async def check(state, video_ids):
     settings = Settings(
         _env_file=None,
         app_env="test",
+        auth_enabled=True,
+        session_cookie_secure=False,
+        google_client_id="03-acceptance-fixture",
         adapter_mode="custom",
         # Deliberately distinct identity, unusable by the production live factory.
         adapter_factory="acceptance_only:live_captions_fixture_vectors",
@@ -66,6 +94,9 @@ async def check(state, video_ids):
         embedding_provider="fixture",
         semantic_quality_evaluated=False,
         gemini_called=False,
+        identity_provider="fixture-google-verifier",
+        authentication_enabled=True,
+        real_google_login_evaluated=False,
         cases=[],
     )
     try:
@@ -96,6 +127,7 @@ async def check(state, video_ids):
             async with httpx.AsyncClient(
                 transport=httpx.ASGITransport(app=app), base_url="http://test"
             ) as client:
+                await fixture_login(app, client)
                 for video_id in video_ids:
                     case_start = time.monotonic()
                     body = {"urls": [f"https://youtu.be/{video_id}"]}
@@ -103,7 +135,9 @@ async def check(state, video_ids):
                     response.raise_for_status()
                     job_id = response.json()["jobs"][0]["job_id"]
                     await app.state.worker.run_once(job_id)
-                    job = app.state.repository.get_job(job_id)
+                    polled = await client.get(f"/api/jobs/{job_id}")
+                    polled.raise_for_status()
+                    job = polled.json()
                     case = dict(
                         video_id=video_id,
                         stage=job["stage"],
@@ -113,7 +147,12 @@ async def check(state, video_ids):
                     if job["stage"] == "ready":
                         segments, offset = [], 0
                         while True:
-                            page = app.state.repository.transcript(video_id, 200, offset)
+                            response = await client.get(
+                                f"/api/videos/{video_id}/transcript",
+                                params={"limit": 200, "offset": offset},
+                            )
+                            response.raise_for_status()
+                            page = response.json()
                             segments.extend(page["segments"])
                             offset += len(page["segments"])
                             if offset >= page["total"]:
@@ -163,6 +202,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state", required=True, type=Path)
     parser.add_argument("--video-id", required=True, action="append")
+    parser.add_argument(
+        "--fixture-identity",
+        required=True,
+        action="store_true",
+        help="Acknowledge offline Google verification in an isolated test-only app",
+    )
     parser.add_argument(
         "--fixture-embeddings",
         required=True,

@@ -1,0 +1,28 @@
+{
+  "mode": "pinned-unmerged-candidate",
+  "external_google_verifier": "test-only fixture",
+  "real_google_verified": false,
+  "public_release_accepted": false,
+  "upstream_python": {
+    "02": 96,
+    "03": 107,
+    "04": 126,
+    "05": 114,
+    "06": 102,
+    "02_integration": 9,
+    "02_full": 36
+  },
+  "07_acceptance": 20,
+  "07_regressions": 4,
+  "07_strict_auth": 11,
+  "total_python_passed": 625,
+  "frontend_unit_passed": 69,
+  "browser_fixture_passed": 47,
+  "browser_fixture_opt_in_skips": 7,
+  "browser_real_adapter_api_worker_passed": 7,
+  "browser_api_routes_mocked": false,
+  "browser_backend_adapter": "FixtureAdapters",
+  "cookie_secure_and_production_factory_checked_separately_in_https_containers": true,
+  "release_attestation_created": false,
+  "screenshots": "Real frontend adapter with synthetic fixture accounts/providers; not real Google accounts"
+}

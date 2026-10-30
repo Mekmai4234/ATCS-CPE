@@ -9,6 +9,8 @@ import pytest
 from conftest import VIDEO_A, VIDEO_B, ScriptedModel, metadata
 from google import genai
 from google.genai import types
+from identity_helpers import OwnedTestRepository, login
+from quota_helpers import OfflineBroker
 from youtube_agent.config import AgentSettings
 from youtube_agent.models import ModelReply
 from youtube_agent.service import AgentService
@@ -83,6 +85,9 @@ async def integrated(tmp_path):
     settings = Settings(
         _env_file=None,
         app_env="test",
+        auth_enabled=True,
+        session_cookie_secure=False,
+        google_client_id="05-offline-client",
         adapter_mode="custom",
         adapter_factory="youtube_answers.integration:create_adapters",
         database_url=f"sqlite:///{(tmp_path / 'app.db').as_posix()}",
@@ -118,12 +123,17 @@ async def integrated(tmp_path):
         analyzer=answers.analyze,
     )
     adapters = TeamAdapters(answers, FixtureIngestion(), agent)
+    # All provider callbacks in this fixture are labelled local doubles.
+    adapters.provider_operations = dict.fromkeys(
+        ("index", "answer", "analyze", "research", "artifact"), "local"
+    )
     worker = Worker(repo, adapters, settings)
     app = create_app(settings, db, adapters)
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app),
         base_url="http://test",
     ) as client:
+        user = await login(client, app, "member-a")
         for video in (VIDEO_A, VIDEO_B):
             response = await client.post(
                 "/api/videos/import",
@@ -132,11 +142,15 @@ async def integrated(tmp_path):
             assert response.status_code == 202, response.text
             job_id = response.json()["jobs"][0]["job_id"]
             await worker.run_once(job_id)
-            assert repo.get_job(job_id)["stage"] == "ready", repo.get_job(job_id)
+            owned_repo = OwnedTestRepository(repo, user["user_id"])
+            assert owned_repo.get_job(job_id)["stage"] == "ready", owned_repo.get_job(job_id)
         yield SimpleNamespace(
             settings=settings,
             db=db,
-            repo=repo,
+            repo=owned_repo,
+            raw_repo=repo,
+            owner=user,
+            app=app,
             answers=answers,
             adapters=adapters,
             worker=worker,
@@ -145,6 +159,51 @@ async def integrated(tmp_path):
         )
     await adapters.close()
     db.close()
+
+
+async def test_http_performer_absence_has_checked_citations_and_complete_scan(integrated):
+    env = integrated
+    before = len(env.model.payloads)
+    response = await env.client.post(
+        "/api/chat",
+        json={"question": "Jay ร้องท่อนไหน", "scope": {"video_ids": [VIDEO_A]}},
+    )
+    assert response.status_code in {200, 202}, response.text
+    job_id = response.json()["job_id"]
+    if response.status_code == 202:
+        await env.worker.run_once(job_id)
+    job = env.repo.get_job(job_id)
+    assert job["state"] == "completed", job
+    result = job["result"]
+    assert result["status"] == "insufficient_evidence"
+    assert result["coverage"]["complete"] and result["citations"]
+    assert len(env.model.payloads) == before
+    assert "บทถอดเสียงพร้อมเวลา" in result["answer"]
+
+
+async def test_http_full_transcript_uses_original_captions_without_model(integrated):
+    env = integrated
+    before = len(env.model.payloads)
+    response = await env.client.post(
+        "/api/chat",
+        json={"question": "ขอเนื้อเพลงทั้งหมด", "scope": {"video_ids": [VIDEO_A]}},
+    )
+    assert response.status_code in {200, 202}, response.text
+    job_id = response.json()["job_id"]
+    if response.status_code == 202:
+        await env.worker.run_once(job_id)
+    job = env.repo.get_job(job_id)
+    assert job["state"] == "completed", job
+    result = job["result"]
+    lines = [
+        "[FIXTURE] RAG retrieves evidence before answering questions.",
+        "[FIXTURE] คำตอบต้องมีหลักฐานและอ้างอิงวิดีโอต้นทาง",
+    ]
+    assert all(result["answer"].count(line) == 1 for line in lines)
+    assert result["answer"].index(lines[0]) < result["answer"].index(lines[1])
+    assert result["coverage"]["complete"]
+    assert result["provider_metadata"]["provider"] == "transcript"
+    assert result["citations"] and len(env.model.payloads) == before
 
 
 async def test_http_chat_citations_history_and_database_reopen(integrated):
@@ -176,7 +235,8 @@ async def test_http_chat_citations_history_and_database_reopen(integrated):
     assert history.status_code == 200 and len(history.json()["messages"]) == 2
     reopened = Database(env.settings.database_url)
     try:
-        assert Repository(reopened, env.settings).get_job(job_id)["result"] == result
+        restored = OwnedTestRepository(Repository(reopened, env.settings), env.owner["user_id"])
+        assert restored.get_job(job_id)["result"] == result
     finally:
         reopened.close()
 
@@ -351,7 +411,7 @@ async def test_real_sdk_wire_through_02_05_04(integrated):
             retry_options=types.HttpRetryOptions(attempts=1),
         ),
     )
-    model = GeminiModel(AnswerSettings(_env_file=None), client=client)
+    model = GeminiModel(AnswerSettings(_env_file=None), client=client, broker=OfflineBroker())
     env.answers.answers.model = model
     try:
         queued = env.repo.enqueue(
@@ -405,7 +465,6 @@ async def test_full_team_factory_constructs_shared_services_without_network(
 ):
     from youtube_answers import team
 
-    monkeypatch.setattr(team, "ENV_FILES", ())
     for key, value in {
         "GEMINI_API_KEY": "test-only-secret",
         "EMBEDDING_PROVIDER": "gemini",
@@ -414,7 +473,14 @@ async def test_full_team_factory_constructs_shared_services_without_network(
         "CHROMA_PERSIST_DIR": str(tmp_path / "unused-live-store"),
     }.items():
         monkeypatch.setenv(key, value)
-    settings = integrated.settings.model_copy(update={"backend_integration_profile": "live"})
+    settings = integrated.settings.model_copy(
+        update={
+            "backend_integration_profile": "live",
+            "adapter_factory": "youtube_answers.team:create_adapters",
+            "gemini_api_key": AnswerSettings(_env_file=None).gemini_api_key,
+            "chroma_persist_dir": str(tmp_path / "unused-live-store"),
+        }
+    )
     adapters = await team.create_adapters(settings=settings, repository=integrated.repo)
     try:
         assert adapters.agent.knowledge.rag is adapters.answers.rag
@@ -433,3 +499,24 @@ async def test_full_team_factory_rejects_offline_profile(integrated):
     with pytest.raises(AppError) as caught:
         await team.create_adapters(settings=settings, repository=integrated.repo)
     assert caught.value.code == "integration_configuration"
+
+
+async def test_real_acceptance_rejects_seeded_fixture_transcripts_despite_live_health(integrated):
+    from youtube_answers.acceptance import AcceptanceCase, AcceptancePlan, AcceptanceRunner
+
+    plan = AcceptancePlan(
+        videos=[f"https://youtu.be/{VIDEO_A}", f"https://youtu.be/{VIDEO_B}"],
+        expected_model="gemini-3.5-flash",
+        cases=[
+            AcceptanceCase(
+                id="qa",
+                category="supported",
+                kind="chat",
+                request={"question": "RAG", "scope": {"video_ids": [VIDEO_A]}},
+                review_criteria="Review actual imported evidence.",
+            )
+        ],
+    )
+    with pytest.raises(AppError) as caught:
+        await AcceptanceRunner(integrated.client).run(plan)
+    assert caught.value.code == "acceptance_synthetic_source"

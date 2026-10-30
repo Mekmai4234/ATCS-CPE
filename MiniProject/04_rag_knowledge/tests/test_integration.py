@@ -143,6 +143,26 @@ async def test_schema_setup_is_repeatable_and_rejects_unknown_version(env):
         initialize(env.db)
 
 
+async def test_additive_setup_restores_embedding_cache_without_replacing_library(env):
+    from youtube_rag.embedding_cache import EmbeddingCache, embeddings
+
+    source = await env.ready()
+    query = env.query(VIDEO_A)
+    before = await env.rag.inventory([source], query.execution)
+    cursor_key = env.rag.manifest.cursor_key()
+    with env.db.write() as connection:
+        embeddings.drop(connection)
+
+    initialize(env.db)
+    cache = EmbeddingCache(env.db, env.config)
+    scope = {"sources": [source.model_dump()]}
+    assert cache.get(scope, "query", "query") is None
+    assert env.rag.manifest.cursor_key() == cursor_key
+    assert await env.rag.inventory([source], query.execution) == before
+    hits = await env.rag.search("Embeddings", [source], query.execution, top_k=1)
+    assert hits and hits[0].chunk.video_id == source.video_id
+
+
 async def test_inventory_receipt_mismatch_prevents_backend_ready(env, monkeypatch):
     pipeline = ReferencePipeline(env.repo, env.settings, env.adapters, [transcript()])
     worker = Worker(env.repo, pipeline, env.settings)

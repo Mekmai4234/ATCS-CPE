@@ -2,10 +2,14 @@
 
 Overview
 --------
-The implemented backend owns application persistence, HTTP contracts, job coordination,
-history and delivery. The optional 02-owned team composition connects unchanged 04/06
-packages. It uses real Chroma and the real agent controller; offline model/embedding doubles
-are labelled. Live 03 ingestion and 05 answer/analysis remain pending.
+The backend owns Google identity verification, hashed opaque sessions, CSRF enforcement,
+account-scoped persistence, HTTP contracts and durable execution. Full composition connects
+03-06; the smaller optional integration environment connects 04/06 with labelled offline
+doubles. Source storage is shared, library membership authorizes access, and private job,
+conversation and artifact owners come only from the authenticated server principal.
+Worker lease/publication checks revalidate active account and authorized sources. Last-member
+deletion waits for source readers and rechecks membership under the SQLite writer lock.
+Explicit administrator bootstrap and paired legacy migration are documented in AUTH.md.
 
 Architecture
 ------------
@@ -63,3 +67,45 @@ without this identity require explicit migration planning rather than automatic 
 Static missing capabilities fail before a request creates a doomed job. Health does not call
 paid providers. Hard total timeouts stop auto-retry even at timer/wall-clock rounding boundaries;
 per-call chat timeouts can retry while a total budget remains.
+
+Full-system configuration and deployment
+----------------------------------------
+The 02-owned yk-full entrypoint exports every resolved 02/03/04/05/06 setting to
+child processes, overriding module-local dotenv files without editing modules.
+The existing 05 team factory owns service composition. An additive 02 SQLite table
+and a Chroma-directory marker bind fresh stores to one profile/factory/fingerprint.
+Explicit init and startup/maintenance checks do not rebind or migrate legacy data.
+The full Docker image is separate from the 04/06-only integration image.
+See full/README.md and FULL_TEST_REPORT.md for deployment and verification limits.
+
+Free-only provider admission and media v2
+----------------------------------------
+Revision 0003 adds media and quota tables without rewriting transcript/history v1.
+Publication and GC share durable owner/lease/generation/deadline writer fences.
+Images, OCR/visual revisions and private analysis cache never confer permission by ID.
+Local adapters may operate without a Gemini policy; every external request in a
+broker-aware adapter requires an operator-attested model/endpoint and atomic project
+reservation. Independent workers serialize RPM/input-TPM/local-24h-RPD and concurrency
+decisions in the same SQLite database, with per-member caps and interactive priority.
+Sent failures retain estimated charges; observed usage reconciles them. 429 and 503
+remain distinct, provider retry hints are filtered, and long enrichment waits pause
+durably without a lease. Member consent to retry creates one new bounded job.
+Never enable billing, rotate keys to bypass limits, invent transcript versions or
+claim account Free Tier verification from local counters. See FREE_TIER_MEDIA.md.
+
+Floating chat HTTP/session contract
+-----------------------------------
+The floating and full-page interfaces reuse chat, job polling and paginated history.
+CORS wraps authentication middleware so trusted credentialed browser clients can
+read 401/403 and clear private state. Unknown origins remain unapproved and CSRF
+checks remain required. No widget-specific API, user role input or auth fallback exists.
+The frontend owns session-revision checks that discard responses from a previous
+account. A job freezes its source scope; historical context sent to the provider is
+filtered to sources/versions permitted by the new turn. Removed sources are marked
+unavailable in owner-visible saved results/history, never used for new retrieval.
+See FLOATING_CHAT_CONTRACT.md and FLOATING_CHAT_TEST_REPORT.md for exact examples,
+errors, lifecycle rules and the boundaries of browser/provider verification.
+
+TEST LEASE ISOLATION
+The general test fixture uses a 30-second lease to avoid incidental expiry under shared CI load.
+Expiry and heartbeat tests retain explicit clock/short-lease scenarios. Production defaults are unchanged.

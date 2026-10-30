@@ -1,0 +1,80 @@
+name: youtube-knowledge-team07
+
+x-team: &team
+  build:
+    context: ..
+    dockerfile: 07_testing_deployment/Dockerfile
+    target: runtime
+  image: youtube-knowledge-team07:local
+  init: true
+  environment: &configuration
+    MINIPROJECT_ROOT: /app
+    APP_ENV: development
+    ADAPTER_MODE: custom
+    ADAPTER_FACTORY: youtube_answers.team:create_adapters
+    BACKEND_INTEGRATION_PROFILE: live
+    DATABASE_URL: sqlite:////app/runtime/app.db
+    CHROMA_PERSIST_DIR: /app/runtime/chroma
+    EMBEDDING_PROVIDER: gemini
+    EMBEDDING_MODEL: gemini-embedding-2
+    EMBEDDING_DIMENSIONS: "1536"
+    EMBEDDING_TOKENIZER: utf8-byte-budget-v1
+    CHUNK_TARGET_TOKENS: "600"
+    CHUNK_OVERLAP_TOKENS: "100"
+    RETRIEVAL_TOP_K: "8"
+    GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    OPENAI_API_KEY: ""
+    LLM_MODEL: ${LLM_MODEL:-gemini-3.5-flash}
+    ENABLE_STREAMING: "false"
+    API_HOST: 0.0.0.0
+    API_PORT: "8000"
+    WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+    TRANSCRIPT_LANGUAGES: th,en
+    INGEST_TIMEOUT_SECONDS: "30"
+  volumes:
+    - team-state:/app/runtime
+
+services:
+  initialize:
+    <<: *team
+    command: ["python", "07_testing_deployment/scripts/preflight.py", "--require-key", "--initialize"]
+    restart: "no"
+  api:
+    <<: *team
+    command: ["python", "07_testing_deployment/scripts/preflight.py", "--run", "api"]
+    ports:
+      - "127.0.0.1:${TEAM07_PORT:-8007}:8000"
+    depends_on:
+      initialize:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  worker:
+    <<: *team
+    command: ["python", "07_testing_deployment/scripts/preflight.py", "--run", "worker"]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+  tests:
+    profiles: ["test"]
+    build:
+      context: ..
+      dockerfile: 07_testing_deployment/Dockerfile
+      target: test
+    init: true
+    network_mode: none
+    environment:
+      MINIPROJECT_ROOT: /app
+      GEMINI_API_KEY: ""
+      OPENAI_API_KEY: ""
+      RUN_LIVE_EMBEDDING_TESTS: "0"
+      APP_ENV: test
+      RUFF_CACHE_DIR: /app/07_testing_deployment/runtime/ruff-cache
+
+volumes:
+  team-state:

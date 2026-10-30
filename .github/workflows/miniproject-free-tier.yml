@@ -1,0 +1,32 @@
+name: MiniProject strict Free Tier integration gate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  strict-feature-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: MiniProject
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.9'
+          python-version: '3.11'
+      - run: uv run --no-project python 07_testing_deployment/scripts/source.py record --record 07_testing_deployment/runtime/checkout-source.json
+      - run: uv sync --locked --project 07_testing_deployment
+      - run: uv run --locked --project 07_testing_deployment python 07_testing_deployment/scripts/check.py --group free-tier
+      - run: uv run --no-project python 07_testing_deployment/scripts/source.py verify --record 07_testing_deployment/runtime/checkout-source.json
+        if: always()
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: strict-free-tier
+          path: |
+            MiniProject/07_testing_deployment/runtime/**/*.json
+            MiniProject/07_testing_deployment/runtime/**/*.xml
+            MiniProject/07_testing_deployment/runtime/**/*.log
+          retention-days: 7

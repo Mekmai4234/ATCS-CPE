@@ -1,0 +1,124 @@
+name: MiniProject historical pinned integration (manual only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: miniproject-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  python:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: MiniProject
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.9'
+          python-version: '3.11'
+      - id: candidate
+        run: uv run --no-project python 07_testing_deployment/scripts/candidate.py --manifest 07_testing_deployment/integration.json --github-output
+      - name: Verify committed consumer lock (never regenerate)
+        run: uv lock --check --project "${{ steps.candidate.outputs.root }}/07_testing_deployment"
+      - run: uv sync --locked --project "${{ steps.candidate.outputs.root }}/07_testing_deployment"
+      - name: Combined upstream, acceptance, regression and lint
+        run: uv run --locked --project "${{ steps.candidate.outputs.root }}/07_testing_deployment" python "${{ steps.candidate.outputs.root }}/07_testing_deployment/scripts/check.py"
+      - name: Strict auth on the exact same candidate
+        run: uv run --locked --project "${{ steps.candidate.outputs.root }}/07_testing_deployment" python "${{ steps.candidate.outputs.root }}/07_testing_deployment/scripts/check.py" --group auth
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: auth-python-${{ matrix.os }}
+          path: |
+            ${{ steps.candidate.outputs.root }}/candidate.json
+            ${{ steps.candidate.outputs.root }}/07_testing_deployment/runtime/**/*.json
+            ${{ steps.candidate.outputs.root }}/07_testing_deployment/runtime/**/*.xml
+            ${{ steps.candidate.outputs.root }}/07_testing_deployment/runtime/**/*.log
+          retention-days: 7
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: MiniProject
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.9'
+          python-version: '3.11'
+      - id: candidate
+        run: uv run --no-project python 07_testing_deployment/scripts/candidate.py --manifest 07_testing_deployment/integration.json --github-output
+      - run: uv sync --locked --project "${{ steps.candidate.outputs.root }}/07_testing_deployment"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --global pnpm@11.25.0
+      - run: pnpm install --frozen-lockfile
+        working-directory: ${{ steps.candidate.outputs.root }}/01_web_app
+      - run: pnpm typecheck && pnpm format:check && pnpm test && pnpm build && pnpm test:production
+        working-directory: ${{ steps.candidate.outputs.root }}/01_web_app
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: ${{ steps.candidate.outputs.root }}/01_web_app
+      - run: pnpm exec playwright test --config ../07_testing_deployment/playwright.config.ts
+        working-directory: ${{ steps.candidate.outputs.root }}/01_web_app
+      - name: Real HttpSessionPort, API and worker (external Google fixture only)
+        run: uv run --locked --project "${{ steps.candidate.outputs.root }}/07_testing_deployment" python "${{ steps.candidate.outputs.root }}/07_testing_deployment/scripts/browser_identity.py"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: auth-browser
+          path: |
+            ${{ steps.candidate.outputs.root }}/candidate.json
+            ${{ steps.candidate.outputs.root }}/07_testing_deployment/runtime/browser-report/
+            ${{ steps.candidate.outputs.root }}/07_testing_deployment/runtime/browser-results/
+            ${{ steps.candidate.outputs.root }}/07_testing_deployment/runtime/browser-identity-report/
+            ${{ steps.candidate.outputs.root }}/07_testing_deployment/runtime/browser-identity-results/
+            ${{ steps.candidate.outputs.root }}/07_testing_deployment/runtime/browser-identity-*/*.json
+            ${{ steps.candidate.outputs.root }}/07_testing_deployment/runtime/browser-identity-*/*.log
+            ${{ steps.candidate.outputs.root }}/01_web_app/runtime/screenshots/
+            ${{ steps.candidate.outputs.root }}/runtime/screenshots/
+          retention-days: 7
+  packaging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: MiniProject
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.9'
+          python-version: '3.11'
+      - id: candidate
+        run: uv run --no-project python 07_testing_deployment/scripts/candidate.py --manifest 07_testing_deployment/integration.json --github-output
+      - run: uv sync --locked --project "${{ steps.candidate.outputs.root }}/07_testing_deployment"
+      - run: docker build -f 07_testing_deployment/Dockerfile.web -t youtube-knowledge-team07-web:auth-check .
+        working-directory: ${{ steps.candidate.outputs.root }}
+      - run: docker compose -f 07_testing_deployment/compose.yaml build api
+        working-directory: ${{ steps.candidate.outputs.root }}
+      - name: Production auth factory and HTTPS drill (no release attestation)
+        run: uv run --locked --project "${{ steps.candidate.outputs.root }}/07_testing_deployment" python "${{ steps.candidate.outputs.root }}/07_testing_deployment/scripts/docker_auth.py"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: auth-containers
+          path: |
+            ${{ steps.candidate.outputs.root }}/candidate.json
+            ${{ steps.candidate.outputs.root }}/07_testing_deployment/runtime/**/*.json
+            ${{ steps.candidate.outputs.root }}/07_testing_deployment/runtime/**/*.log
+          retention-days: 7

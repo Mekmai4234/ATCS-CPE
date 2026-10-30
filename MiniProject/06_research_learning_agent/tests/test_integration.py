@@ -6,9 +6,12 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+import sqlalchemy as sa
 from conftest import VIDEO_A, VIDEO_B, ScriptedModel, metadata
 from google import genai
 from google.genai import types
+from member_helpers import OwnedRepository, login
+from youtube_backend import database as backend_db
 from youtube_backend.config import Settings
 from youtube_backend.database import Database
 from youtube_backend.errors import AppError
@@ -81,6 +84,9 @@ async def integrated(tmp_path):
     settings = Settings(
         _env_file=None,
         app_env="test",
+        auth_enabled=True,
+        session_cookie_secure=False,
+        google_client_id="06-offline-client",
         adapter_mode="custom",
         adapter_factory="youtube_agent.integration:create_adapters",
         database_url=f"sqlite:///{(tmp_path / 'app.db').as_posix()}",
@@ -111,27 +117,38 @@ async def integrated(tmp_path):
     )
     worker = Worker(repo, adapters, settings)
     app = create_app(settings, db, adapters)
-    async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        for video in (VIDEO_A, VIDEO_B):
-            imported = await client.post(
-                "/api/videos/import", json={"urls": [f"https://youtu.be/{video}"]}
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            owner = await login(client, app, "member-a")
+            owned_repo = OwnedRepository(repo, owner["user_id"])
+            for video in (VIDEO_A, VIDEO_B):
+                imported = await client.post(
+                    "/api/videos/import", json={"urls": [f"https://youtu.be/{video}"]}
+                )
+                assert imported.status_code == 202, imported.text
+                job_id = imported.json()["jobs"][0]["job_id"]
+                await worker.run_once(job_id)
+                imported_job = owned_repo.get_job(job_id)
+                assert imported_job["stage"] == "ready", imported_job
+            yield SimpleNamespace(
+                repo=owned_repo,
+                raw_repo=repo,
+                app=app,
+                owner=owner,
+                db=db,
+                worker=worker,
+                adapters=adapters,
+                settings=settings,
+                client=client,
+                model=model,
             )
-            job_id = imported.json()["jobs"][0]["job_id"]
-            await worker.run_once(job_id)
-            assert repo.get_job(job_id)["stage"] == "ready"
-        yield SimpleNamespace(
-            repo=repo,
-            db=db,
-            worker=worker,
-            adapters=adapters,
-            settings=settings,
-            client=client,
-            model=model,
-        )
-    await adapters.close()
-    db.close()
+    finally:
+        try:
+            await adapters.close()
+        finally:
+            db.close()
 
 
 async def test_http_research_artifacts_polling_and_reopened_database(integrated):
@@ -161,7 +178,7 @@ async def test_http_research_artifacts_polling_and_reopened_database(integrated)
     # A fresh DB engine and repository can read persisted results/events/artifacts.
     reopened = Database(env.settings.database_url)
     try:
-        other = Repository(reopened, env.settings)
+        other = OwnedRepository(Repository(reopened, env.settings), env.owner["user_id"])
         assert other.get_job(job_id)["result"] == result
         assert other.artifact(artifact_id)["content"] == artifact["content"]
     finally:
@@ -261,9 +278,16 @@ async def test_step_exhaustion_persists_honest_partial(integrated):
     assert job["result"]["citations"]
 
 
-async def test_real_sdk_wire_through_backend_worker_and_chroma(integrated):
+async def test_real_sdk_wire_through_backend_worker_and_chroma(integrated, monkeypatch):
     """The complete 02 -> 06 -> SDK HTTP mock -> 04 loop, not a scripted model gateway."""
     calls = []
+
+    async def wire_broker(context, callback, **request):
+        context.check()
+        return await callback()
+
+    # SDK wire test only. Actual durable project admission has a separate contract suite.
+    monkeypatch.setattr(ExecutionContext, "gemini_call", wire_broker, raising=False)
 
     def handler(request):
         if request.url.path.endswith(":countTokens"):
@@ -349,3 +373,63 @@ async def test_real_sdk_wire_through_backend_worker_and_chroma(integrated):
         assert len(calls) == 4  # Three decisions and one artifact generation.
     finally:
         await http.aclose()
+
+
+async def test_two_member_research_events_artifacts_and_cancel(integrated):
+    env = integrated
+    scope = {"video_ids": [VIDEO_A]}
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=env.app), base_url="http://test"
+    ) as other:
+        await login(other, env.app, "member-b")
+        assert (
+            await other.post("/api/research", json={"goal": "RAG", "scope": scope})
+        ).status_code == 404
+        response = await env.client.post("/api/research", json={"goal": "RAG", "scope": scope})
+        job_id = response.json()["job_id"]
+        assert (await other.get(f"/api/research/{job_id}")).status_code == 404
+        assert (await other.post(f"/api/research/{job_id}/cancel")).status_code == 404
+        await env.worker.run_once(job_id)
+        result = env.repo.get_job(job_id)
+        assert result["state"] == "completed", result
+        artifact_id = result["result"]["artifact_ids"][0]
+        assert (await other.get(f"/api/learning-artifacts/{artifact_id}")).status_code == 404
+        assert (await env.client.get(f"/api/learning-artifacts/{artifact_id}")).status_code == 200
+
+
+@pytest.mark.parametrize("kind", ["research", "artifact"])
+async def test_backend_publication_fence_after_agent_returns(integrated, monkeypatch, kind):
+    env = integrated
+    request = {"scope": {"video_ids": [VIDEO_A]}}
+    request.update({"goal": "Learn RAG"} if kind == "research" else {"type": "quiz"})
+    job = env.repo.enqueue(kind, request)
+    original = env.raw_repo.finish
+    attempted = []
+
+    def revoke_before_transaction(job_id, token, result=None, state="completed"):
+        if job_id == job["job_id"]:
+            assert result is not None  # The agent returned a valid candidate; publication is next.
+            attempted.append(job_id)
+            with env.db.write() as connection:
+                connection.execute(
+                    backend_db.user_videos.delete().where(
+                        backend_db.user_videos.c.user_id == env.owner["user_id"],
+                        backend_db.user_videos.c.video_id == VIDEO_A,
+                    )
+                )
+        return original(job_id, token, result, state)
+
+    monkeypatch.setattr(env.raw_repo, "finish", revoke_before_transaction)
+    await env.worker.run_once(job["job_id"])
+    stored = env.repo.get_job(job["job_id"])
+    assert attempted == [job["job_id"]]
+    assert stored["state"] in {"cancelled", "failed"} and stored["result"] is None
+    with env.db.read() as connection:
+        assert (
+            connection.scalar(
+                sa.select(sa.func.count())
+                .select_from(backend_db.artifacts)
+                .where(backend_db.artifacts.c.job_id == job["job_id"])
+            )
+            == 0
+        )

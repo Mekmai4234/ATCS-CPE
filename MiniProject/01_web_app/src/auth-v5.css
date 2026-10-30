@@ -1,0 +1,597 @@
+/* Approved v5 login and Buddy presentation; auth and conversation state stay in React. */
+body .login-page.login-v5 {
+  --v5-ink: #083d3b;
+  --v5-muted: #526d67;
+  --v5-green: #00866e;
+  --v5-line: #cfe3d9;
+  min-height: 100dvh;
+  background: radial-gradient(ellipse at 35% 65%, #d9fff0 0, #f6fdfa 65%);
+  color: var(--v5-ink);
+  padding: 0 0 40px;
+}
+body .login-v5 .mint-backdrop {
+  display: none;
+}
+body .login-v5 .login-header {
+  max-width: 1600px;
+  padding: 24px 60px;
+  min-height: 96px;
+}
+body .login-v5 .login-layout {
+  max-width: 1600px;
+  padding: 10px 60px 40px;
+  display: grid;
+  grid-template-columns: 1.22fr 1fr;
+  gap: 36px;
+  align-items: center;
+}
+body .login-v5 .login-story {
+  min-height: 0;
+  padding: 20px 0 0;
+  text-align: center;
+}
+body .login-v5 .login-story h1 {
+  font:
+    700 clamp(58px, 5vw, 80px)/1.2 Kanit,
+    'IBM Plex Sans Thai',
+    sans-serif;
+  letter-spacing: -0.035em;
+  margin: 0;
+  text-wrap: balance;
+}
+body .login-v5 .login-story > p {
+  font-size: 28px;
+  line-height: 1.5;
+  margin: 14px 0 0;
+  color: var(--v5-muted);
+  font-weight: 600;
+}
+body .login-v5 .login-mascot-stage {
+  margin-top: 20px;
+  min-height: 0;
+  height: 550px;
+  display: block;
+}
+body .login-v5 .login-mascot-stage::before,
+body .login-v5 .login-mascot-stage::after {
+  display: none;
+}
+body .login-v5 .login-v5-scene {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center;
+  mix-blend-mode: multiply;
+  border-radius: 32px;
+}
+body .login-v5 .login-card {
+  width: 100%;
+  max-width: 620px;
+  margin: 0;
+  padding: 52px 42px 36px;
+  border: 1px solid #d8eee3;
+  border-radius: 32px;
+  background: #fffffff7;
+  box-shadow: 0 16px 48px #0e806209;
+  text-align: center;
+}
+body .login-v5 .login-card h2 {
+  font:
+    700 clamp(42px, 4vw, 62px)/1.25 Kanit,
+    'IBM Plex Sans Thai',
+    sans-serif;
+  letter-spacing: -0.03em;
+  margin: 0 0 14px;
+  color: var(--v5-ink);
+  text-wrap: balance;
+}
+body .login-v5 .login-card > p {
+  font-size: 19px;
+  line-height: 1.65;
+  color: var(--v5-muted);
+}
+body .login-v5 .login-card .google-sign-in {
+  margin: 32px 0 0;
+}
+body .login-v5 .google-button-host {
+  display: flex;
+  justify-content: center;
+  width: min(100%, 400px);
+  min-height: 44px;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+body .login-v5 .google-button-host > div {
+  max-width: 100%;
+}
+body .login-v5 .google-popup-help {
+  margin: 12px auto 0;
+  font-size: 14px;
+  color: var(--v5-muted);
+}
+body .login-v5 .google-popup-help summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  list-style: none;
+}
+body .login-v5 .google-popup-help summary::-webkit-details-marker {
+  display: none;
+}
+body .login-v5 .google-popup-help p {
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0 0 8px;
+}
+body .login-v5 .login-card .login-v5-status {
+  margin: 12px 0 0;
+  font-size: 15px;
+}
+body .login-v5 .login-card .login-v5-status.is-signed-out {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: #217a62;
+  font-size: 14px;
+}
+body .login-v5 .login-card .signup-note {
+  margin: 22px 0 0;
+  font-size: 15px;
+  color: var(--v5-muted);
+}
+body .login-v5 .login-divider {
+  margin: 32px 0 26px;
+  border-color: var(--v5-line);
+}
+body .login-v5 .login-benefits {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+}
+body .login-v5 .login-benefits li {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--v5-muted);
+}
+body .login-v5 .login-benefits svg {
+  width: 28px;
+  height: 28px;
+  color: var(--v5-green);
+}
+body .login-v5 .login-card .login-privacy {
+  font-size: 14px;
+  padding-top: 26px;
+  margin: 28px 0 10px;
+  border-top: 1px solid var(--v5-line);
+}
+body .login-v5 .login-links {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 13px;
+  margin-top: 6px;
+}
+body .login-v5 .login-links a {
+  color: var(--v5-green);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+body .login-v5 .login-unavailable {
+  padding: 24px;
+  margin-top: 24px;
+  border-radius: 18px;
+}
+body .login-v5 .login-unavailable p {
+  font-size: 15px;
+}
+body .login-v5 .demo-login {
+  margin-top: 28px;
+  border-radius: 18px;
+  padding: 20px;
+}
+body .login-v5 .demo-login p {
+  font-size: 14px;
+  margin: 8px 0 16px;
+}
+body .login-v5 .demo-login button {
+  min-height: 48px;
+}
+
+body .buddy-v5 .buddy-panel {
+  border: 1px solid #cfe3d9;
+  border-radius: 28px;
+  background: #fffefa;
+  box-shadow: 0 20px 70px #123b3426;
+  color: #083d3b;
+}
+body .buddy-v5 .buddy-chat-header {
+  padding: 12px 18px;
+  gap: 10px;
+  min-height: 66px;
+  border-bottom: 1px solid #cfe3d9;
+  background: #fffefa;
+}
+body .buddy-v5 .buddy-chat-header > div {
+  margin-right: auto;
+}
+body .buddy-v5 .buddy-chat-header strong {
+  font:
+    800 22px/1.4 'Manrope Variable',
+    'IBM Plex Sans Thai',
+    sans-serif;
+  color: #083d3b;
+}
+body .buddy-v5 .buddy-chat-header button {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #083d3b;
+  display: grid;
+  place-items: center;
+}
+body .buddy-v5 .buddy-chat-header button:hover {
+  background: #d8f5e9;
+}
+body .buddy-v5 .buddy-chat-toolbar {
+  padding: 0 22px 6px;
+  gap: 12px;
+}
+body .buddy-v5 .buddy-chat-toolbar button {
+  min-height: 40px;
+  font-size: 13px;
+  text-decoration: none;
+}
+body .buddy-v5 .buddy-scope {
+  margin: 0 22px 8px;
+  background: white;
+  border: 1px solid #cfe3d9;
+  border-radius: 14px;
+  max-height: 180px;
+  font-size: 14px;
+}
+body .buddy-v5 .buddy-scope summary {
+  min-height: 48px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+}
+body .buddy-v5 .buddy-scope fieldset {
+  padding: 12px 16px;
+  gap: 14px;
+}
+body .buddy-v5 .buddy-scope label {
+  font-size: 14px;
+  gap: 10px;
+}
+body .buddy-v5 .buddy-scope label small,
+body .buddy-v5 .buddy-scope legend {
+  font-size: 12px;
+}
+body .buddy-v5 .buddy-scope input {
+  width: 20px;
+  height: 20px;
+}
+body .buddy-v5 .buddy-messages {
+  padding: 4px 24px 18px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+body .buddy-v5 .buddy-v5-welcome {
+  text-align: center;
+  padding: 0 0 24px;
+}
+body .buddy-v5 .buddy-v5-welcome .buddy-art {
+  display: block;
+  width: 200px;
+  height: 190px;
+  object-fit: contain;
+  margin: auto;
+}
+body .buddy-v5 .buddy-v5-welcome h3 {
+  font:
+    700 40px/1.25 Kanit,
+    'IBM Plex Sans Thai',
+    sans-serif;
+  letter-spacing: -0.035em;
+  margin: 0;
+  color: #083d3b;
+}
+body .buddy-v5 .buddy-v5-welcome h3 span {
+  color: #ff7c6c;
+}
+body .buddy-v5 .buddy-question {
+  padding: 14px 18px;
+  font-size: 16px;
+  line-height: 1.6;
+  background: #d8f5e9;
+  border-radius: 18px 18px 4px 18px;
+  margin-bottom: 8px;
+}
+body .buddy-v5 .buddy-v5-sources {
+  font-size: 12px;
+  color: #526d67;
+  margin: 0 0 12px;
+}
+body .buddy-v5 .buddy-v5-sources summary {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  cursor: pointer;
+}
+body .buddy-v5 .buddy-v5-sources p {
+  margin: 0;
+  padding-bottom: 12px;
+  line-height: 1.7;
+}
+body .buddy-v5 .buddy-reply-heading {
+  margin: 16px 0 12px;
+  font-size: 14px;
+  color: #00866e;
+}
+body .buddy-v5 .buddy-reply-heading .buddy-rig {
+  display: none;
+}
+body .buddy-v5 .buddy-message .answer-text {
+  font-size: 16px;
+  line-height: 1.8;
+}
+body .buddy-v5 .buddy-message .citations {
+  font-size: 13px;
+}
+body .buddy-v5 .buddy-message h4 {
+  font-size: 16px;
+}
+body .buddy-v5 .buddy-message .coverage,
+body .buddy-v5 .buddy-job-status,
+body .buddy-v5 .buddy-messages .notice {
+  font-size: 13px;
+  line-height: 1.6;
+}
+body .buddy-v5 .buddy-suggestions {
+  padding: 4px 22px 10px;
+  gap: 8px;
+}
+body .buddy-v5 .buddy-suggestions button {
+  min-height: 40px;
+  font-size: 12px;
+  padding: 8px 12px;
+}
+body .buddy-v5 .buddy-composer {
+  padding: 7px;
+  margin: 0 20px 10px;
+  border: 1px solid #bdd8cb;
+  border-radius: 18px;
+  background: white;
+  gap: 8px;
+}
+body .buddy-v5 .buddy-composer textarea {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  min-height: 46px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+body .buddy-v5 .buddy-composer .primary {
+  min-width: 46px;
+  width: 46px;
+  height: 46px;
+  min-height: 46px;
+  border-radius: 13px;
+  background: #00866e;
+  color: white;
+  align-self: center;
+}
+body .buddy-v5 .buddy-scope-help {
+  padding: 0 22px 12px;
+  font-size: 12px;
+  background: transparent;
+}
+body .buddy-v5 .buddy-scope-help:empty {
+  display: none;
+}
+body .buddy-v5 .buddy-new-message {
+  bottom: 155px;
+  font-size: 13px;
+  min-height: 40px;
+}
+body .buddy-v5 .buddy-panel[data-compact='true'] .buddy-v5-welcome {
+  display: none;
+}
+body .buddy-v5 .buddy-panel[data-compact='true'] .buddy-scope {
+  max-height: 80px;
+}
+body .buddy-v5 button:focus-visible,
+body .buddy-v5 summary:focus-visible,
+body .buddy-v5 a:focus-visible,
+body .login-v5 summary:focus-visible {
+  outline: 3px solid #b57515;
+  outline-offset: 3px;
+}
+@media (max-width: 1100px) {
+  body .login-v5 .login-header {
+    padding: 22px 32px;
+  }
+  body .login-v5 .login-layout {
+    padding: 10px 32px 32px;
+    gap: 24px;
+    grid-template-columns: 1fr 1fr;
+  }
+  body .login-v5 .login-story h1 {
+    font-size: 58px;
+  }
+  body .login-v5 .login-story > p {
+    font-size: 23px;
+  }
+  body .login-v5 .login-mascot-stage {
+    height: 450px;
+  }
+  body .login-v5 .login-card {
+    padding: 40px 28px 28px;
+  }
+  body .login-v5 .login-card h2 {
+    font-size: 46px;
+  }
+}
+@media (max-width: 800px) {
+  body .login-v5 .login-header {
+    padding: 20px 22px;
+    min-height: 80px;
+  }
+  body .login-v5 .login-layout {
+    grid-template-columns: 1fr;
+    padding: 8px 22px 32px;
+    gap: 24px;
+    max-width: 620px;
+  }
+  body .login-v5 .login-story {
+    padding-top: 8px;
+    min-height: 0;
+  }
+  body .login-v5 .login-story h1 {
+    font-size: 52px;
+  }
+  body .login-v5 .login-story > p {
+    font-size: 22px;
+    margin-top: 10px;
+  }
+  body .login-v5 .login-mascot-stage {
+    height: 350px;
+    margin-top: 12px;
+  }
+  body .login-v5 .login-v5-scene {
+    border-radius: 24px;
+  }
+  body .login-v5 .login-card {
+    padding: 34px 28px 26px;
+    margin: 0 auto;
+  }
+  body .login-v5 .login-card h2 {
+    font-size: 46px;
+  }
+  body .login-v5 .login-card > p {
+    font-size: 17px;
+  }
+}
+@media (max-width: 480px) {
+  body .login-v5 .login-header {
+    padding: 18px 20px;
+  }
+  body .login-v5 .login-header .buddy-logo {
+    font-size: 25px;
+  }
+  body .login-v5 .login-header .brand-buddy {
+    width: 40px;
+    height: 40px;
+  }
+  body .login-v5 .help-link {
+    font-size: 13px;
+    gap: 5px;
+  }
+  body .login-v5 .help-link svg {
+    width: 20px;
+    height: 20px;
+  }
+  body .login-v5 .login-layout {
+    padding: 6px 18px 28px;
+    gap: 16px;
+  }
+  body .login-v5 .login-story h1 {
+    font-size: 46px;
+  }
+  body .login-v5 .login-story > p {
+    font-size: 20px;
+  }
+  body .login-v5 .login-mascot-stage {
+    height: 270px;
+  }
+  body .login-v5 .login-card {
+    padding: 32px 22px 24px;
+    border-radius: 28px;
+  }
+  body .login-v5 .login-card h2 {
+    font-size: 42px;
+  }
+  body .login-v5 .login-benefits {
+    gap: 10px;
+  }
+  body .login-v5 .login-benefits li {
+    font-size: 12px;
+    gap: 10px;
+  }
+  body .login-v5 .login-card .signup-note,
+  body .login-v5 .login-card .login-privacy {
+    font-size: 13px;
+  }
+  body .login-v5 .login-links {
+    font-size: 12px;
+    gap: 4px 12px;
+  }
+  body .buddy-v5 .buddy-panel {
+    border-radius: 24px;
+  }
+  body .buddy-v5 .buddy-chat-header {
+    padding: 9px 14px;
+    min-height: 60px;
+  }
+  body .buddy-v5 .buddy-chat-toolbar {
+    padding-inline: 18px;
+  }
+  body .buddy-v5 .buddy-scope {
+    margin-inline: 18px;
+  }
+  body .buddy-v5 .buddy-messages {
+    padding-inline: 20px;
+  }
+  body .buddy-v5 .buddy-v5-welcome .buddy-art {
+    height: 155px;
+    width: 170px;
+  }
+  body .buddy-v5 .buddy-v5-welcome h3 {
+    font-size: 34px;
+  }
+  body .buddy-v5 .buddy-suggestions {
+    padding-inline: 18px;
+  }
+  body .buddy-v5 .buddy-composer {
+    margin-inline: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body .login-v5 *,
+  body .buddy-v5 * {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}

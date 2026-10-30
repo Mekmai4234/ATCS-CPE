@@ -5,14 +5,16 @@ from datetime import date
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import FastAPI, Header, Query, Request
+from fastapi import FastAPI, Header, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
+from .admin import MemberUpdate, change_member, require_admin
+from .auth import AuthService, GoogleLogin, actor_id, public_user
 from .config import Settings
-from .database import Database
+from .database import SCHEMA_REVISION, Database
 from .errors import AppError
 from .repository import Repository
 from .runtime import ManagedAdapters
@@ -22,6 +24,7 @@ from .schemas import (
     ArtifactRequest,
     ChatRequest,
     ChatResponse,
+    ConversationList,
     ConversationResponse,
     ErrorResponse,
     ImportRequest,
@@ -47,7 +50,8 @@ def create_app(settings=None, database=None, adapters=None):
     database = database or Database(settings.database_url)
     repository = Repository(database, settings)
     runtime = ManagedAdapters(settings, repository, adapters)
-    worker = Worker(repository, runtime, settings)
+    worker = Worker(repository, runtime, settings, report_liveness=False)
+    auth = AuthService(database, settings)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -64,22 +68,19 @@ def create_app(settings=None, database=None, adapters=None):
         title="YouTube Knowledge API (02)",
         version="0.1.0",
         lifespan=lifespan,
-        description="Single-user prototype. Fixture mode is explicitly synthetic. "
+        docs_url="/docs" if settings.app_env in {"development", "test"} else None,
+        redoc_url=None,
+        openapi_url="/openapi.json" if settings.app_env in {"development", "test"} else None,
+        description="Account-scoped backend. Fixture mode is explicitly synthetic. "
         "Long tasks return 202 and are polled through /api/jobs/{job_id}.",
         responses={
-            code: {"model": ErrorResponse} for code in (400, 404, 409, 422, 500, 502, 503, 504)
+            code: {"model": ErrorResponse}
+            for code in (400, 401, 403, 404, 409, 422, 429, 500, 502, 503, 504)
         },
     )
     app.state.settings, app.state.repository = settings, repository
     app.state.worker, app.state.adapters = worker, runtime
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[settings.web_origin],
-        allow_credentials=False,
-        allow_methods=["GET", "POST", "DELETE"],
-        allow_headers=["Content-Type", "Idempotency-Key"],
-        expose_headers=["X-Request-ID", "X-Adapter-Mode", "Location"],
-    )
+    app.state.auth = auth
 
     def error_response(request, code, message, status, retryable=False, job_id=None):
         detail = dict(
@@ -97,13 +98,35 @@ def create_app(settings=None, database=None, adapters=None):
         correlation_id = str(uuid4())
         request.state.request_id = correlation_id
         token = request_id.set(correlation_id)
+        identity_token = actor_id.set(None)
         started = time.monotonic()
         try:
             try:
+                if (
+                    settings.auth_enabled
+                    and request.url.path.startswith("/api/")
+                    and (
+                        request.url.path not in {"/api/auth/challenge", "/api/auth/google"}
+                        and request.method != "OPTIONS"
+                    )
+                ):
+                    from starlette.concurrency import run_in_threadpool
+
+                    user, _ = await run_in_threadpool(
+                        auth.current, request, mutate=request.method not in {"GET", "HEAD"}
+                    )
+                    actor_id.set(user["user_id"])
+                    request.state.user = user
                 response = await call_next(request)
+                if request.url.path.startswith("/api/"):
+                    response.headers["Cache-Control"] = "no-store"
+            except AppError as error:
+                response = error_response(request, error.code, error.message, error.status_code)
             except Exception:
                 # No raw dependency exception, query string, body, or API key in logs/responses.
                 response = error_response(request, "internal_error", "Unexpected server error", 500)
+            if request.url.path.startswith("/api/"):
+                response.headers["Cache-Control"] = "no-store"
             response.headers["X-Request-ID"] = correlation_id
             response.headers["X-Adapter-Mode"] = settings.adapter_mode
             logger.info(
@@ -115,7 +138,19 @@ def create_app(settings=None, database=None, adapters=None):
             )
             return response
         finally:
+            actor_id.reset(identity_token)
             request_id.reset(token)
+
+    # Registered last so CORS wraps authentication failures created by correlation
+    # itself. A credentialed frontend must be able to read 401/403 and clear state.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.auth_trusted_origins or [settings.web_origin],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "DELETE"],
+        allow_headers=["Content-Type", "Idempotency-Key", "X-CSRF-Token"],
+        expose_headers=["X-Request-ID", "X-Adapter-Mode", "Location"],
+    )
 
     @app.exception_handler(AppError)
     async def app_error(request, error):
@@ -138,13 +173,27 @@ def create_app(settings=None, database=None, adapters=None):
     @app.get("/health")
     def health():
         database.check_schema()
+        from .quota import QuotaBroker
+
+        try:
+            QuotaBroker(repository).policy()
+            policy_state = "operator_attested"
+        except AppError:
+            policy_state = "unverified"
+        from .workspace import worker_status
+
         return dict(
             status="ok",
-            schema_revision="0001",
+            worker=worker_status(settings),
+            schema_revision=SCHEMA_REVISION,
             mode=settings.adapter_mode,
             adapters_configured=settings.adapter_mode != "unavailable",
             live_provider_verified=False,
-            single_user=True,
+            full_pair_preflight=settings.backend_full_preflight,
+            single_user=not settings.auth_enabled,
+            authentication_required=settings.auth_enabled,
+            gemini_free_policy=policy_state,
+            media_contract_version=2,
             capabilities=runtime.capabilities,
             integration_profile=settings.backend_integration_profile
             if settings.adapter_mode == "custom"
@@ -216,9 +265,27 @@ def create_app(settings=None, database=None, adapters=None):
         code = job["error_code"] or "task_failed"
         status = (
             503
-            if code == "dependency_unavailable"
+            if code
+            in {
+                "dependency_unavailable",
+                "free_tier_unverified",
+                "free_model_unverified",
+                "gemini_broker_required",
+                "quota_policy_mismatch",
+                "provider_unavailable",
+            }
+            else 429
+            if code in {"quota_wait", "provider_rate_limited"}
             else 504
             if code == "task_timeout"
+            else 422
+            if code
+            in {
+                "invalid_video_time",
+                "invalid_video_time_range",
+                "video_time_out_of_bounds",
+                "ambiguous_video_time",
+            }
             else (409 if code in {"cancelled", "source_changed"} else 502)
         )
         return error_response(
@@ -272,8 +339,123 @@ def create_app(settings=None, database=None, adapters=None):
     def get_artifact(artifact_id: str):
         return repository.artifact(artifact_id)
 
+    @app.get("/api/conversations", response_model=ConversationList)
+    def conversations(
+        limit: Limit = 20, offset: Offset = 0, q: Annotated[str, Query(max_length=200)] = ""
+    ):
+        return repository.conversations(limit, offset, q)
+
     @app.get("/api/conversations/{conversation_id}", response_model=ConversationResponse)
     def history(conversation_id: str, limit: Limit = 50, offset: Offset = 0):
         return repository.conversation(conversation_id, limit, offset)
+
+    @app.get("/api/auth/challenge")
+    def login_challenge(request: Request, response: Response):
+        return auth.challenge(request, response)
+
+    @app.get("/api/v2/videos/{video_id}/evidence")
+    def media_evidence(video_id: str):
+        from .media import MediaStore
+
+        return MediaStore(repository).evidence(video_id)
+
+    @app.get("/api/media/assets/{asset_id}")
+    def media_asset(asset_id: str):
+        from .media import MediaStore
+
+        content, mime = MediaStore(repository).asset(asset_id)
+        return Response(
+            content,
+            media_type=mime,
+            headers={"X-Content-Type-Options": "nosniff", "Content-Disposition": "inline"},
+        )
+
+    @app.post("/api/v2/videos/{video_id}/enrichment", status_code=202, response_model=Accepted)
+    async def enrich(video_id: str, idempotency_key: IdempotencyKey = None):
+        from .media import MediaStore
+
+        await runtime.start()
+        if not callable(getattr(runtime.adapter, "enrich", None)):
+            raise AppError("dependency_unavailable", "Local media adapter is not connected", 503)
+        return accepted(MediaStore(repository).enqueue(video_id, idempotency_key=idempotency_key))
+
+    @app.get("/ready")
+    def ready():
+        from .workspace import worker_status
+
+        database.check_schema()
+        status = worker_status(settings)
+        return JSONResponse(
+            dict(status="ready" if status["ready"] else "degraded", worker=status),
+            status_code=200 if status["ready"] else 503,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.get("/api/member/jobs")
+    def member_work(limit: Limit = 50, offset: Offset = 0, include_completed: bool = False):
+        from .workspace import member_jobs
+
+        return member_jobs(
+            repository, limit=limit, offset=offset, include_completed=include_completed
+        )
+
+    @app.get("/api/worker-status")
+    def processing_status():
+        from .workspace import worker_status
+
+        return worker_status(settings)
+
+    @app.post("/api/auth/google")
+    def google_login(body: GoogleLogin, request: Request, response: Response):
+        return auth.login(request, response, body)
+
+    @app.get("/api/auth/me")
+    def me(request: Request):
+        user, csrf = auth.current(request)
+        return dict(user=public_user(user), csrf_token=csrf)
+
+    @app.post("/api/auth/logout")
+    def logout(request: Request, response: Response):
+        return auth.logout(request, response)
+
+    @app.get("/api/admin/users")
+    def members(q: str = "", limit: Limit = 50, offset: Offset = 0):
+        import sqlalchemy as sa
+
+        from . import database as db
+
+        with database.read() as c:
+            require_admin(c)
+            statement = sa.select(db.users).order_by(db.users.c.created_at)
+            if q:
+                statement = statement.where(
+                    sa.or_(
+                        db.users.c.name.contains(q, autoescape=True),
+                        db.users.c.email.contains(q, autoescape=True),
+                    )
+                )
+            items = c.execute(statement.limit(limit).offset(offset)).mappings().all()
+            return dict(items=[public_user(user) for user in items], limit=limit, offset=offset)
+
+    @app.post("/api/admin/users/{user_id}")
+    def update_member(user_id: str, body: MemberUpdate):
+        return change_member(database, user_id, body)
+
+    @app.get("/api/admin/stats")
+    def system_stats():
+        import sqlalchemy as sa
+
+        from . import database as db
+
+        with database.read() as c:
+            require_admin(c)
+            return dict(
+                users=c.scalar(sa.select(sa.func.count()).select_from(db.users)),
+                jobs=dict(
+                    c.execute(
+                        sa.select(db.jobs.c.state, sa.func.count()).group_by(db.jobs.c.state)
+                    ).all()
+                ),
+            )
 
     return app

@@ -15,10 +15,15 @@ class IngestionAdapters(UnavailableAdapters):
 
     def __init__(self, ingestion, knowledge):
         self.ingestion, self.knowledge = ingestion, knowledge
+        self.provider_operations = dict(getattr(knowledge, "provider_operations", {}))
         self.closed = False
 
     async def ingest(self, video_id, context):
         return await self.ingestion.ingest(video_id, context)
+
+    async def prepare_media(self, path, context):
+        # Internal opt-in handoff only; 02's current transcript worker does not call it.
+        return await self.ingestion.prepare_media(path, context)
 
     async def index(self, *args):
         return await self.knowledge.index(*args)

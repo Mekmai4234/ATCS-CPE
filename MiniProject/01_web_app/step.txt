@@ -1,30 +1,84 @@
 ### 01_web_app - Workflow Steps
 
-A) Video Import and Library
+A) Install, Start and Verify
 ---------------------------
-1. The user opens the video library and pastes one or more YouTube links.
-2. The frontend checks for empty input and obvious URL-format errors.
-3. Send { urls[] } to POST /api/videos/import; the backend performs authoritative validation.
-4. Receive jobs[] and create a card for each accepted video/job.
-5. Poll GET /api/jobs/{job_id} and refresh metadata from GET /api/videos.
-6. Display the real stage: queued, fetching_transcript, indexing, ready,
-   no_transcript, or failed. Display a percentage only if measured progress is provided.
-7. Show the thumbnail, title, channel, and an embedded-player or external-video action.
-8. Enable AI source selection when a video is ready; explain unavailable transcripts or errors.
+From MiniProject/01_web_app with Node.js 22.12+ and pnpm 11.25.0:
+1. pnpm install --frozen-lockfile
+2. pnpm dev -> http://127.0.0.1:3000
+3. Run the auth-enabled module-02 backend from current develop. Set Google Client ID/origin.
+   Default relative /api uses the Vite proxy target NEXT_PUBLIC_API_BASE_URL.
+4. For explicit synthetic data only, set VITE_DEMO_MODE=true before startup, then select A/B/admin.
+5. pnpm typecheck; pnpm test; pnpm test:browser; pnpm build
+6. Browser tests need installed Google Chrome and free ports 3001/3002/3003.
+7. For real module-02 HTTP with fixture adapters, use a Python environment containing
+   its dependencies. Legacy single-user smoke requires an old ref; current member flow
+   is checked with the identity command below, not by disabling auth.
+8. Read README.md and TEST_REPORT.md for limits and observed verification.
+9. For auth-enabled HTTP + worker with an external-verifier fixture, run:
+   python tests/identity_smoke.py --checkout
+   This uses actual checkout source, an isolated database and frontend entry on port 3004.
+   To check a Git snapshot instead, use --ref origin/develop without --checkout.
+10. Read MINT_BUDDY_REPORT.md and AUTH_INTEGRATION.md. Keep Draft until real Google and
+    combined release acceptance pass. Production needs HTTPS, Secure cookies and /api proxy.
 
-B) Questions and Follow-up
+A2) Floating Buddy and Motion
+----------------------------
+1. Sign in; login/public-info pages never expose the private widget.
+2. Use the round Buddy launcher or the navigation restore button. Select ready clips.
+3. Type Enter to send, Shift+Enter for newline; IME composition does not submit.
+4. Minimize/reopen or open full chat to continue the same conversation. Changing source
+   scope starts a new conversation on the next submission and displays an explanation.
+5. Suggestions populate the draft only. No model is called by opening the widget.
+6. Drag within the viewport or choose one of four corners/reset from its keyboard menu.
+7. Mobile uses a modal sheet; desktop is non-modal. Escape/minimize returns launcher focus.
+8. Load known conversation history explicitly; backend currently has no conversation-list API.
+9. Logout unmounts messages, scope, pending polling and the widget. Only coordinates persist.
+10. Review design/buddy-rig/README.md for calibrated layers, final prompts and still fallback.
+
+B) Video Import and Library
+---------------------------
+1. Collect one URL per line (up to 50); preserve input while submitting/retrying.
+2. POST { urls[] } to /api/videos/import. The server validates each URL.
+3. Map jobs[] to input URLs by input_index; show accepted/existing/rejected separately.
+4. Poll known job IDs sequentially; distinguish job state from video stage.
+5. Stop on completed/partial/failed/cancelled, including completed imports whose
+   stage is no_transcript. Pause with a resume action on bounded observation failures.
+6. Refresh paginated /api/videos. Load further pages explicitly.
+7. Show channel/date filters for loaded items; do not send unsupported playlist filters.
+8. Only ready clips can be selected. Preserve explicit selection and filter constraints.
+9. Deletion requires confirmation, hides the source, and observes durable cleanup.
+10. Offer manual import/delete retry only for failed retryable jobs.
+
+C) Questions and Follow-up
 --------------------------
-1. The user selects ready videos and optionally narrows channel/date/playlist filters.
-2. Send { question, conversation_id, scope } to POST /api/chat.
-3. Show the submitted message immediately and a loading state for the answer.
-4. Receive { status, answer, citations[], coverage, conversation_id }.
-5. Render the answer and source cards, or an insufficient-evidence explanation.
-6. A citation click opens the original video at start_seconds or seeks the embedded player.
-7. A follow-up question carries the conversation ID and current explicit source scope.
+1. Validate nonempty ready video selection and nonempty channel/date intersection.
+2. Freeze question, conversation_id and scope into one logical operation.
+3. POST /api/chat with a fresh Idempotency-Key for that operation.
+4. On 200, render the final answer. On 202, retain job_id and poll /api/jobs/{job_id}.
+5. A transport retry reuses the identical payload/key; a known job resumes by GET.
+6. Show insufficient_evidence, partial coverage, failure and cancellation explicitly.
+7. Render citations with title/time and safe external YouTube links. Disable source
+   links when sources_available=false; never trust a supplied model URL directly.
+8. Store returned conversation_id for follow-ups without expanding current scope.
+9. Allow cooperative cancellation of known pending tasks, observing final state.
 
-C) Research and Learning
--------------------------
-1. The user enters a research goal or selects a summary, comparison, quiz, or flashcard task.
-2. Submit the matching request to the API and display progress for long-running research.
-3. Render the returned artifact with its citations and any partial-coverage notice.
-4. Preserve the current task/input on recoverable errors so the user can retry.
+D) Analysis, Research and Learning
+----------------------------------
+1. Summary/compare POST /api/analysis returns 202; comparison needs two filtered clips.
+2. Research POST /api/research returns job_id/run_id. Poll jobs for state and fetch
+   progress events with after_event_id; display completed/partial/failure accurately.
+3. Quiz/flashcards/study_plan POST /api/learning-artifacts returns 202.
+4. On completion, fetch each result.artifact_ids entry from its artifact endpoint.
+5. Render typed learning content, per-item citations, source availability and coverage.
+6. Show synthetic fixture mode whenever reported by response headers/body.
+7. Browser memory holds current UI history; reload restoration is not implemented.
+
+INTEGRATED CHECKOUT
+1. Install with pnpm install --frozen-lockfile.
+2. Run pnpm format:check, pnpm test, pnpm build and pnpm test:production.
+3. Run pnpm exec playwright test and the module-07 floating config.
+4. Run module-07 browser_identity.py --checkout for the real HTTP/API/worker flow.
+5. Register the actual Google origin and verify real login separately; demo screenshots do not prove it.
+
+VISUAL EVIDENCE ACCEPTANCE
+Run unit/browser/build/production checks and identity_smoke.py --checkout sequentially (Playwright runners share ports/output directories). Agree the module-02 contract and run joint module-07 visual integration before production release. Fixture visual tests alone are insufficient.

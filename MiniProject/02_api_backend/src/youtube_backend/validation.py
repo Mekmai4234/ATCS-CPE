@@ -16,10 +16,19 @@ async def validate_result(result, sources, adapters, context, full_task=False):
         isinstance(result, ArtifactResult) or getattr(result, "state", None) == "completed"
     ) and not result.citations:
         raise AppError("invalid_citation", "Completed learning outputs require citations", 502)
-    evidence = await adapters.evidence(sources, [c.chunk_id for c in result.citations], context)
+    transcript_ids = [c.chunk_id for c in result.citations if c.kind == "transcript"]
+    evidence = await adapters.evidence(sources, transcript_ids, context) if transcript_ids else []
     normalized = [Evidence.model_validate(e) for e in evidence]
     by_id = {e.chunk_id: e for e in normalized}
     for citation in result.citations:
+        if citation.kind == "video":
+            from .video_evidence import verify_video_citation
+
+            with context.repository.db.read() as connection:
+                job = context.repository._owned(connection, context.job_id, context.lease_token)
+                verify_video_citation(context.repository, connection, job, citation)
+            citation.url = f"{canonical_url(citation.video_id)}&t={int(citation.start_seconds)}s"
+            continue
         source = allowed.get(citation.video_id)
         record = by_id.get(citation.chunk_id)
         if (

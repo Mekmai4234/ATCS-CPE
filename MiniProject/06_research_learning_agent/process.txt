@@ -35,6 +35,9 @@ Techniques and Limits
 - Bound steps, total deadline and each await; reserve time for finalization.
 - Count a retrieved observation after a successful subsequent decision, or valid artifact generation.
 - Validate citation identity and source intervals; semantic support still requires evaluation.
+- Re-read output citations and inventory before returning, including partial outputs/artifacts.
+- Comparison observations retain 05 reference-label mapping and its coverage declaration.
+- Tests exercise actual 05 AnswerService using the same authorized RAG instance.
 - Ignore transcript instructions as authorization; operational events exclude private reasoning.
 - Detect repeated actions, missing evidence and pagination that makes no progress.
 - Use a local UTF-8 byte guard. Live preflight counts native contents with countTokens and
@@ -44,5 +47,38 @@ Techniques and Limits
 
 Verification and Operations
 README.md contains reproducible Windows/Linux Docker commands and integration notes.
-TEST_REPORT.md records actual results, synthetic/live distinctions and remaining integration work.
+DEPENDENCY_REVIEW_REPORT.md records current packaging/consumer results; prior reports are historical.
+Actual-05 tests have a separate acceptance environment; the public agent manifest keeps
+its original dependency metadata. Core and acceptance Docker targets both use --locked.
+The default evaluation dataset is a package resource, available in installed wheels and
+consumer Docker images without copying an extra repository fixtures directory.
+The evaluation runner accepts explicit transcript exports in a NEW isolated store and records
+outputs/latency/usage plus pending human-review criteria. Live services require --live.
 No other module's source, global Compose, shared env template or database migrations are changed.
+
+Member execution flow
+1. Resolve the durable job owner and frozen sources from 02; never from model arguments.
+2. Reserve a slot in the module-owned agent06_permits table or an injected distributed quota authority.
+3. Recheck identity, active account and current source membership before and after every bounded call.
+4. Forward the guarded context through retrieval, comparison and artifact generation; spend operation budget before calls.
+5. On revocation or suspension, abort without final/partial/artifact content; preserve existing cancellation fences.
+6. Recheck before events/output; 02 must check ownership and permissions again when persisting or serving results.
+7. Cookie expiry alone does not invalidate background ownership; current sessions still gate API reads.
+
+Auth regression flow (2026-10-22)
+1. Evaluation initializes a NEW database, creates a synthetic non-admin owner and binds 02's server actor context.
+2. Dataset imports, leased jobs and artifacts use that owner; actor context is reset even on failure.
+3. HTTP integration fixtures authenticate through challenge, nonce, session and CSRF before creating owned sources/jobs.
+4. Real 05 comparison uses the same backend/RAG scope; grant revocation during generation prevents later calls and output.
+5. Publication-fence tests revoke membership after Agent output exists but before 02.finish enters its write transaction; no result/artifact may persist.
+6. Core and acceptance environments use refreshed 06 locks against the recorded common dependency candidate.
+
+Free Tier execution flow (2026-10-25)
+1. Resolve actor/sources, enforce local call/time/tool allowances and retain final validation capacity.
+2. Admit each real countTokens/generateContent through 02 gemini_call with role agent, bounded token estimate and unique request fingerprint.
+3. Normalize 429/503 before broker settlement; never retry or change key/model/provider in 06.
+4. On quota wait stop expanding and return revalidated local partial evidence, or propagate the backend pause when no evidence exists.
+5. Internal media flow reads readiness and stored OCR/visual text via 04 lexical retrieval before optional planning.
+6. Delegate only authorized frame IDs to the trusted 05 bridge; cache hits still require current source/owner checks, and repeated actions cannot loop.
+7. Validate learning IDs against the exact inspected evidence kind/version and resolve every exported frame/time citation again before delivery.
+8. Public media publication and future multi-call project reservations require the explicit joint contract described in FREE_TIER_AGENT.md.
