@@ -81,27 +81,61 @@ test("corners, resize and pointercancel never strand the launcher", async ({
   await expect(panel(page).getByRole("textbox")).toBeVisible();
 });
 
-test("unavailable localStorage retains keyboard opening and reset alternative", async ({
-  page,
-}) => {
-  await page.addInitScript(() =>
-    Object.defineProperty(window, "localStorage", {
-      get() {
-        throw new DOMException("Storage unavailable", "SecurityError");
-      },
-    }),
-  );
-  await enter(page);
-  await opener(page).focus();
-  await page.keyboard.press("Enter");
-  await expect(panel(page)).toBeVisible();
-  await minimize(page).click();
-  await page
-    .getByRole("button", { name: "ตำแหน่งและการแสดงแชต", exact: true })
-    .click();
-  await page.getByRole("button", { name: "คืนตำแหน่ง", exact: true }).click();
-  await contained(page);
-});
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 375, height: 812 },
+]) {
+  test(`unavailable localStorage retains keyboard opening and Home reset (${viewport.width})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.addInitScript(() =>
+      Object.defineProperty(window, "localStorage", {
+        get() {
+          throw new DOMException("Storage unavailable", "SecurityError");
+        },
+      }),
+    );
+    await enter(page);
+    await opener(page).focus();
+    await page.keyboard.press("Enter");
+    await expect(panel(page)).toBeVisible();
+    await minimize(page).click();
+    const home = await opener(page).boundingBox();
+    const nav = await page.locator(".v5-mobile-nav").boundingBox();
+    const bottom = nav?.height
+      ? Math.min(viewport.height, nav.y)
+      : viewport.height - (viewport.width <= 900 ? 80 : 0);
+    const expectedX = Math.max(16, viewport.width - home.width - 16);
+    const expectedY = Math.max(16, bottom - home.height - 16);
+    await drag(page, 100, 120);
+    await expect(panel(page)).toBeHidden();
+    await expect
+      .poll(async () =>
+        Math.hypot(
+          (await opener(page).boundingBox()).x - expectedX,
+          (await opener(page).boundingBox()).y - expectedY,
+        ),
+      )
+      .toBeGreaterThan(20);
+    await opener(page).focus();
+    await page.keyboard.press("Home");
+    await expect
+      .poll(async () =>
+        Math.abs((await opener(page).boundingBox()).x - expectedX),
+      )
+      .toBeLessThanOrEqual(1);
+    await expect
+      .poll(async () =>
+        Math.abs((await opener(page).boundingBox()).y - expectedY),
+      )
+      .toBeLessThanOrEqual(1);
+    await contained(page);
+    await expect(panel(page)).toBeHidden();
+    await page.keyboard.press("Enter");
+    await expect(panel(page)).toBeVisible();
+  });
+}
 
 test("synthetic composition and Shift+Enter preserve the composer across minimize", async ({
   page,
