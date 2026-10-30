@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     job_lease_seconds: float = Field(default=30, ge=0.3, le=600)
     job_timeout_seconds: float = Field(default=180, gt=0, le=3600)
     job_retry_base_seconds: float = Field(default=2, ge=0, le=300)
-    worker_poll_seconds: float = Field(default=1, gt=0, le=60)
+    worker_poll_seconds: float = Field(default=0.5, gt=0, le=60)
     import_max_urls: int = Field(default=50, ge=1, le=500)
     llm_model: str = "gemini-3.5-flash"
     vision_model: str = ""
