@@ -25,6 +25,8 @@ lyrics, history, a user claim, or a list of artists does not identify who sings 
 Do not infer identity from vocal style, voice or appearance. If no explicit time-linked
 attribution supports the requested person, return insufficient_evidence and explain
 that captions with timestamps alone do not establish performer identity.
+Keep answers concise: at most 8 short statements, each with only the most relevant
+citation IDs. Intermediate summaries must preserve key facts without copying transcripts.
 Return only JSON conforming to the requested schema.
 """
 

@@ -14,7 +14,7 @@ class AnswerSettings(BaseSettings):
     llm_model: str = Field(default="gemini-3.5-flash", min_length=1, max_length=200)
     llm_timeout_seconds: float = Field(default=60, gt=0, le=600)
     max_context_tokens: int = Field(default=24000, ge=4096, le=1000000)
-    answer_max_output_tokens: int = Field(default=1200, ge=128, le=32000)
+    answer_max_output_tokens: int = Field(default=8192, ge=128, le=32000)
     enable_streaming: bool = False
     retrieval_top_k: int = Field(default=8, ge=1, le=100)
     answer_read_page_size: int = Field(default=100, ge=1, le=200)
