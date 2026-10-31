@@ -34,7 +34,13 @@ interface Props {
   busy: boolean;
   status: string;
   error: string;
-  waiting?: { id: string; label: string; status: string; follow: () => void }[];
+  waiting?: {
+    id: string;
+    label: string;
+    status: string;
+    follow: () => void;
+    resume?: () => void;
+  }[];
   scopeNotice: string;
   scopeHelp?: string;
   newConversation: () => void;
@@ -513,6 +519,11 @@ export default function FloatingBuddy(props: Props) {
               {props.waiting?.map((item) => (
                 <article className="deferred-jobs" key={item.id}>
                   <strong>{item.label}</strong>
+                  {item.resume && (
+                    <button disabled={props.locked} onClick={item.resume}>
+                      ให้งานที่พักทำต่อ
+                    </button>
+                  )}
                   <p role="status">{item.status}</p>
                   <button disabled={props.locked} onClick={item.follow}>
                     ติดตามงานเดิมอีกครั้ง

@@ -701,8 +701,8 @@ export default function App({
     onNavigate?.('/chat');
     updateTurns((previous) => previous.filter((turn) => turn.type !== 'chat'));
   }
-  async function resumeChat() {
-    const op = operationRef.current;
+  async function resumeChat(deferredOp?: Operation) {
+    const op = deferredOp || operationRef.current;
     if (!op?.jobId || op.type !== 'chat' || busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
@@ -718,7 +718,12 @@ export default function App({
       busyRef.current = false;
       if (alive.current) setBusy(false);
     }
-    if (replacement && alive.current && operationRef.current?.jobId === op.jobId) {
+    if (
+      replacement &&
+      alive.current &&
+      (!operationRef.current || operationRef.current.jobId === op.jobId)
+    ) {
+      setDeferred((previous) => previous.filter((item) => item.jobId !== op.jobId));
       void execute({ ...op, jobId: replacement.job_id }, true);
     }
   }
@@ -1858,6 +1863,11 @@ export default function App({
                     >
                       ติดตามงานเดิมอีกครั้ง
                     </button>
+                    {item.type === 'chat' && jobs[item.jobId!]?.state === 'paused' && (
+                      <button disabled={taskLocked} onClick={() => void resumeChat(item)}>
+                        ให้งานที่พักทำต่อ
+                      </button>
+                    )}
                     <button onClick={() => void jobAction(item.jobId!, 'cancel')}>
                       ขอยกเลิกงานที่พัก
                     </button>
@@ -1933,6 +1943,10 @@ export default function App({
               id: item.jobId!,
               label: item.label,
               status: jobs[item.jobId!] ? jobStatus(jobs[item.jobId!]) : 'กำลังตรวจสอบสถานะคำขอ',
+              resume:
+                item.type === 'chat' && jobs[item.jobId!]?.state === 'paused'
+                  ? () => void resumeChat(item)
+                  : undefined,
               follow: () => {
                 setDeferred((previous) => previous.filter((value) => value.jobId !== item.jobId));
                 void execute(item, true);
