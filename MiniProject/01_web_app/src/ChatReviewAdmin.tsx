@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Api, ApiError } from './api';
+const labelNames: Record<string, string> = {
+  user_dissatisfied: 'ผู้ใช้ไม่พอใจ',
+  answer_risk_suspected: 'ระบบสงสัยคำตอบเสี่ยง',
+  direct_abuse: 'คำพูดคุกคาม',
+  rule_bypass_suspected: 'สงสัยสั่งข้ามกติกา',
+};
+const statusNames: Record<string, string> = {
+  new: 'ใหม่',
+  in_review: 'กำลังตรวจ',
+  reviewed: 'ตรวจแล้ว',
+};
 type Case = {
   case_id: string;
   question_excerpt: string;
@@ -68,8 +79,8 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
       status,
       rating,
       label,
-      after: after ? String(Date.parse(after) / 1000) : '',
-      before: before ? String(Date.parse(before) / 1000 + 86399) : '',
+      after: after ? String(new Date(`${after}T00:00:00`).getTime() / 1000) : '',
+      before: before ? String(new Date(`${before}T23:59:59`).getTime() / 1000) : '',
     }))
       if (v) p.set(k, v);
     void api
@@ -247,7 +258,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
           <small>
             สมาชิก {item.member_ref} ·{' '}
             {['user', 'user_report'].includes(item.source) ? 'ผู้ใช้รายงาน' : 'ระบบสงสัย'} ·{' '}
-            {item.label} · {item.status}
+            {labelNames[item.label] || item.label} · {statusNames[item.status] || item.status}
           </small>
           <button disabled={loading} onClick={() => void open(item.case_id)}>
             เปิดดู
@@ -295,8 +306,8 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
           )}
           {detail.feedback && (
             <p>
-              ผู้ใช้รายงาน: {detail.feedback.rating} · {detail.feedback.reason} ·{' '}
-              {detail.feedback.comment}
+              ผู้ใช้รายงาน: {detail.feedback.rating === 'dislike' ? 'ไม่ถูกใจ' : 'ถูกใจ'} ·{' '}
+              {detail.feedback.reason} · {detail.feedback.comment}
             </p>
           )}
           <ul>

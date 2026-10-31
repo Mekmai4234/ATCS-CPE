@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Api } from './api';
+import { Api, ApiError } from './api';
 export default function ChatPolicyNotice({ api }: { api: Api }) {
   const [notice, setNotice] = useState('');
   useEffect(() => {
@@ -15,7 +15,12 @@ export default function ChatPolicyNotice({ api }: { api: Api }) {
           setNotice(data.review_notice);
         }
       })
-      .catch(() => {});
+      .catch((error) => {
+        if (c.signal.aborted) return;
+        if (error instanceof ApiError && [404, 501].includes(error.status || 0))
+          api.chatPolicyUnsupported = true;
+        else setNotice('โหลดนโยบายแชทไม่สำเร็จ กรุณารีเฟรชก่อนส่งคำถาม');
+      });
     return () => {
       c.abort();
       api.chatPolicyAvailable = false;
