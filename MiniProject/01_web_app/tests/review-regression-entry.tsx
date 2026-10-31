@@ -11,6 +11,24 @@ const api = new Api('', async (input, init) => {
   const path = String(input);
   if (path.startsWith('/api/admin/chat-messages?'))
     return json({ items: [{ message_id: 'normal' }], total: 1 });
+  if (
+    path.startsWith('/api/admin/chat-reviews?') &&
+    new URLSearchParams(location.search).has('shared')
+  )
+    return json({
+      items: [
+        { case_id: 'case', message_id: 'same-message', question_excerpt: 'first' },
+        { case_id: 'case2', message_id: 'same-message', question_excerpt: 'second' },
+      ],
+      total: 2,
+      stats: {},
+    });
+  if (path === '/api/admin/chat-reviews/case2')
+    return json({
+      case: { case_id: 'case2', message_id: 'same-message', status: 'new', notes: 'second notes' },
+      question: { content: 'second case question' },
+      answer: { content: 'answer' },
+    });
   if (path.startsWith('/api/admin/chat-reviews?'))
     return json({
       items: [{ case_id: 'case', question_excerpt: 'question', status }],
@@ -23,13 +41,35 @@ const api = new Api('', async (input, init) => {
     status = data.status;
     return json(data);
   }
+  if (
+    path === '/api/admin/chat-reviews/case' &&
+    new URLSearchParams(location.search).has('blocked')
+  )
+    return json({
+      case: { case_id: 'case', status: 'new', notes: '' },
+      moderation: {
+        direction: 'input',
+        action: 'block',
+        reason: 'direct_abuse',
+        policy_version: 'chat-local-v1',
+        draft: 'ORIGINAL BLOCKED QUESTION <script>alert(1)</script>',
+        visible_to_user: false,
+      },
+    });
   if (path === '/api/admin/chat-reviews/case')
     return json({
       case: { case_id: 'case', status, notes },
       question: { content: 'question' },
       answer: { content: 'answer' },
+      review_signal: {
+        policy_version: 'chat-review-draft-v1',
+        reason: 'insufficient_evidence',
+        source: 'system_rule',
+        confirmed: false,
+      },
       moderation: {
-        action: 'review_signal',
+        direction: 'output',
+        action: 'signal',
         draft: 'PRIVATE_SIGNAL_METADATA',
         visible_to_user: false,
       },
