@@ -134,7 +134,8 @@ test('floating Buddy uses the actual checkout API, shared conversation, history 
   });
   await page.locator('.buddy-launcher').click();
   const buddy = page.getByRole('dialog', { name: 'Buddy AI แชตจากคลิป' });
-  await buddy.locator('.buddy-scope > summary').click();
+  if (!(await buddy.getByRole('checkbox').isVisible()))
+    await buddy.locator('.buddy-scope > summary').click();
   await buddy.getByRole('checkbox').check();
   await buddy.getByLabel('ข้อความถึง Buddy', { exact: true }).fill('Explain RAG from my clip');
   await buddy.getByLabel('ข้อความถึง Buddy', { exact: true }).press('Enter');
@@ -163,7 +164,8 @@ test('floating Buddy uses the actual checkout API, shared conversation, history 
   await page.getByRole('button', { name: 'เพิ่มคลิป (เพิ่มวิดีโอ)', exact: true }).click();
   await expect.poll(async () => page.locator('input[type="checkbox"]:enabled').count()).toBe(2);
   await page.locator('.buddy-launcher').click();
-  await buddy.locator('.buddy-scope > summary').click();
+  if (!(await buddy.getByRole('checkbox').nth(1).isVisible()))
+    await buddy.locator('.buddy-scope > summary').click();
   await buddy.getByRole('checkbox').nth(1).check();
   await buddy
     .getByLabel('ข้อความถึง Buddy', { exact: true })
