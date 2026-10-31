@@ -1,4 +1,23 @@
 import { test, expect } from '@playwright/test';
+
+for (const mode of ['คิวตรวจ', 'แชทที่บันทึกทั้งหมด']) {
+  test(`clicking the active ${mode} tab preserves loaded rows and detail`, async ({ page }) => {
+    await page.goto('/tests/review-regression.html?admin=1');
+    const tab = page.getByRole('button', { name: mode, exact: true });
+    if (mode !== 'คิวตรวจ') await tab.click();
+    const open = page.getByRole('button', { name: 'เปิดดู', exact: true });
+    await expect(open).toHaveCount(1);
+    await open.click();
+    const question = page
+      .getByText(mode === 'คิวตรวจ' ? 'question' : 'normal question', { exact: true })
+      .last();
+    await expect(question).toBeVisible();
+    await tab.click();
+    await expect(open).toHaveCount(1);
+    await expect(question).toBeVisible();
+    await expect(tab).toHaveAttribute('aria-pressed', 'true');
+  });
+}
 test('notes survive reopen and outcome updates; signal metadata is not a withheld draft', async ({
   page,
 }) => {

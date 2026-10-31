@@ -193,6 +193,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
       <button
         aria-pressed={mode === 'cases'}
         onClick={() => {
+          if (mode === 'cases') return;
           setItems([]);
           setDetail(null);
           setMode('cases');
@@ -204,6 +205,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
       <button
         aria-pressed={mode === 'messages'}
         onClick={() => {
+          if (mode === 'messages') return;
           setItems([]);
           setDetail(null);
           setMode('messages');
