@@ -9,10 +9,19 @@ from .quota_status import quota_status
 from .repository import ACTIVE, digest, row, uid
 
 
-def resume(repo, job_id):
+def resume(repo, job_id, moderation_token=None):
     old = repo.get_job(job_id)
     if old["kind"] not in {"chat", "analysis", "artifact", "research"}:
         return repo.retry(job_id)
+    moderation_event_id = None
+    if old["kind"] == "chat":
+        if not old["payload"]["request"].get("question"):
+            raise AppError("retry_not_allowed", "History has been deleted", 409)
+        from .moderation import admit
+
+        moderation_event_id = admit(
+            repo, dict(old["payload"]["request"], moderation_token=moderation_token)
+        )
     # A committed replacement is returned before checking a now-consumed budget.
     key = digest([old["owner_id"], "explicit-resume", job_id])
     with repo.db.read() as c:
@@ -49,12 +58,19 @@ def resume(repo, job_id):
         job = repo._new_job(
             c,
             old["kind"],
-            dict(old["payload"], resumes=job_id),
+            dict(old["payload"], resumes=job_id, moderation_event_id=moderation_event_id),
             conversation_id=old["conversation_id"],
             idempotency_key=key,
             request_hash=old["request_hash"],
         )
         if old["kind"] == "chat":
+            if moderation_event_id:
+                c.execute(
+                    db.review["events"]
+                    .update()
+                    .where(db.review["events"].c.event_id == moderation_event_id)
+                    .values(job_id=job["job_id"])
+                )
             c.execute(
                 db.messages.insert().values(
                     message_id=uid(),
