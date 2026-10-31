@@ -1,5 +1,5 @@
-// Keep module 01's real-adapter scenarios and add 07's research/worker acceptance.
-import "../../../01_web_app/tests/browser/identity.spec";
+// Both owners run through projects in playwright.identity.config.ts, each with
+// an isolated API/worker/database provided by scripts/browser_identity.py.
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
