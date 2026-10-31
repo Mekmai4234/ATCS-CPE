@@ -571,7 +571,11 @@ export default function FloatingBuddy(props: Props) {
                       event.currentTarget.form?.requestSubmit();
                   }
                 }}
-                placeholder="ถาม Buddy เกี่ยวกับคลิป…"
+                placeholder={
+                  props.selected.length
+                    ? 'ถาม Buddy เกี่ยวกับคลิป…'
+                    : 'ทักทายหรือถามเกี่ยวกับ Buddy…'
+                }
               />
               <button
                 className="primary"
@@ -588,8 +592,9 @@ export default function FloatingBuddy(props: Props) {
               </button>
             </form>
             <small id="buddy-scope-help" className="buddy-scope-help" role="status">
-              {(smallTalkReply(props.question) ? 'ทักทาย Buddy ได้เลย' : props.scopeHelp) ||
-                (!props.selected.length ? 'เลือกคลิปอย่างน้อย 1 คลิปก่อนส่งคำถาม' : '')}
+              {smallTalkReply(props.question) || (!props.selected.length && !props.question.trim())
+                ? 'ทักทาย Buddy ได้เลย · เลือกคลิปเมื่อถามเนื้อหา'
+                : props.scopeHelp}
             </small>
           </section>
         </>

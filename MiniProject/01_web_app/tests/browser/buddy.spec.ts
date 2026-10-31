@@ -377,7 +377,11 @@ test('greetings need no clip, the picker stays collapsed, and no chat API is cal
   });
   await open(page);
   await expect(dialog(page).locator('.buddy-scope')).not.toHaveAttribute('open', '');
+  await expect(
+    dialog(page).getByText('ทักทาย Buddy ได้เลย · เลือกคลิปเมื่อถามเนื้อหา', { exact: true }),
+  ).toBeVisible();
   const input = dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true });
+  await expect(input).toHaveAttribute('placeholder', 'ทักทายหรือถามเกี่ยวกับ Buddy…');
   await input.fill('สวัสดี');
   await input.press('Enter');
   await expect(
