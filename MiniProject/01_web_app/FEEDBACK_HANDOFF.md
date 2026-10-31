@@ -1,18 +1,29 @@
-# Feedback UI foundation — 31 October 2026
+# Feedback integration â€” 31 October 2026
 
-Draft module-01 component only; not enabled in production chat.
+Module 01 now uses the merged 02 CHAT_REVIEW_CONTRACT.md.
 
-AnswerFeedback is controlled by server-confirmed state. It supports toggle/withdraw,
-optional dislike reason/comment (500 characters), explicit save/retry, disabled pending
-controls, 44px targets and accessible selected state. It renders untrusted comments as text.
+- GET/PUT/DELETE feedback uses stable assistant IDs, session cookies and CSRF.
+- Shared full/floating ResultView loads current server votes; history restores message ID/visibility.
+- Per-session Api context/event bus updates views; no feedback/credentials are persisted locally.
+  Unmount/session changes abort reads and discard stale write callbacks. GET sequence fences
+  prevent older reads replacing newer updates. Thai reason labels map to backend reason codes.
+- Policy notice loads from server. When that endpoint is available, new chat submissions
+  precheck the same frozen request. Warn uses native accessible confirmation and the opaque
+  server token; block never calls chat. Edited draft/scope/conversation invalidates in-flight
+  checks. Retries retain the original operation/key; existing backend admission remains authoritative.
+- Withheld ResultView emits only a neutral placeholder, without draft/citations/feedback.
+- Admin review tab uses separate audited list/detail/PATCH routes; it never reads private
+  member conversations. SQL pagination/filter params, explicit review outcomes, expired/
+  forbidden states and separate restricted draft display are supported. Content is text-escaped.
 
-02 dependencies: stable assistant message ID on 200/poll/history; authenticated feedback
-read/write/delete with CSRF; capability-gated admin review APIs and audit; versioned input
-confirmation. Endpoint names in the plan are proposals, not implemented API contracts.
-The parent must key by member+message, fetch fresh state on session/history changes,
-share updates across views and discard unmounted/session-stale requests. No localStorage,
-client-side synthetic IDs, optimistic success or admin access bypass is provided.
+Validation: 123 unit tests, TypeScript. Actual checkout real-HTTP identity regression 8/8
+passed; added real feedback/block/warn/admin workflow passes separately after a label fix.
+Only external Google/model providers are fixtures; application HTTP, cookies, CSRF,
+SQLite migrations and worker are real. All state is isolated in 01/runtime.
 
-Pending: wire full/floating/history, reload persistence, admin review and disclosure,
-input guards and screenshots of integrated UI after 02 delivers the agreed contract.
-This PR does not claim end-to-end feedback acceptance.
+Remaining acceptance: expired warn-token/new resume UI, cross-session delayed-write and
+withheld end-to-end corpus, explicit admin access-revocation/expiry UI regression, full
+merged-source CI, final human copy/privacy review and deployment. Existing moderation
+and retention are backend-owned; no actual user DB migration/capability toggle/deploy.
+05 signal ingestion still needs a separately versioned owner-02 sink; do not assume
+chat-local-v1 accepts new answer-signal metadata. No live AI quality/latency/SLA claim.

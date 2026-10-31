@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useRef, useId, useState } from 'react';
 import './feedback.css';
 
 export type Feedback = { rating: 'like' | 'dislike'; reason: string; comment: string };
@@ -28,6 +28,13 @@ export default function AnswerFeedback({
   onSaved: (value: Feedback | null) => void;
 }) {
   const id = useId();
+  const active = useRef(true);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -42,15 +49,17 @@ export default function AnswerFeedback({
     setSaved(false);
     try {
       const confirmed = await port.save(messageId, next);
+      if (!active.current) return;
       onSaved(confirmed);
       setSaved(true);
       setRetry(undefined);
       if (confirmed?.rating !== 'dislike') setDetails(false);
     } catch {
+      if (!active.current) return;
       setError(true);
       setRetry({ value: next });
     } finally {
-      setPending(false);
+      if (active.current) setPending(false);
     }
   }
   return (

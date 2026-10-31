@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import App from './App';
+import ChatPolicyNotice from './ChatPolicyNotice';
+import { FeedbackApi } from './feedbackSession';
 import AdminView from './AdminView';
 import { Api, ApiError } from './api';
 import { BuddyLogo, ForestBackdrop } from './Forest';
@@ -72,6 +74,7 @@ function MemberArea({
       );
     return (
       <AdminView
+        api={api}
         session={session}
         port={port}
         onHome={() => navigate('/')}
@@ -81,15 +84,18 @@ function MemberArea({
     );
   }
   return (
-    <App
-      api={api}
-      member={session.member}
-      initialView={routeView(path)}
-      initialConversationId={path.startsWith('/chat/') ? path.slice(6) : undefined}
-      onNavigate={navigate}
-      onLogout={logout}
-      adminEnabled={session.member.role === 'admin' && !!session.adminSections.length}
-    />
+    <FeedbackApi.Provider key={session.sessionId} value={api}>
+      <ChatPolicyNotice api={api} />
+      <App
+        api={api}
+        member={session.member}
+        initialView={routeView(path)}
+        initialConversationId={path.startsWith('/chat/') ? path.slice(6) : undefined}
+        onNavigate={navigate}
+        onLogout={logout}
+        adminEnabled={session.member.role === 'admin' && !!session.adminSections.length}
+      />
+    </FeedbackApi.Provider>
   );
 }
 
