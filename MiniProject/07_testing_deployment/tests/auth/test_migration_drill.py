@@ -112,7 +112,7 @@ async def test_legacy_migration_operator_bootstrap_claim_and_paired_restore(tmp_
     with TestClient(app) as client:
         assert login(client, app)["role"] == "admin"
         assert client.get("/api/videos").json()["total"] == owned
-        assert client.get("/health").json()["schema_revision"] == "0003"
+        assert client.get("/health").json()["schema_revision"] == "0004"
     rollback = tmp_path / "rollback-copy"
     recovery.restore(tmp_path / "pre-migration", rollback)
     import sqlite3
