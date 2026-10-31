@@ -264,7 +264,7 @@ def test_suppressed_output_never_published_or_rateable_audited_draft_retention_a
     assert detail["moderation"]["visible_to_user"] is False
     with env.db.write() as c:
         c.execute(db.review["events"].update().values(content_expires_at=time.time() - 1))
-    assert reviewer.get(path).json()["moderation"]["draft"] is None
+    assert reviewer.get(path).status_code == 404
     assert purge_expired(env.repo) == 1
     assert reviewer.get(path).status_code == 404
     assert client.delete(f"/api/conversations/{cid}").status_code == 200
@@ -392,6 +392,25 @@ def test_resume_requires_fresh_bound_ack_and_cannot_bypass_block(budget):
     )
     with env.db.write() as c:
         c.execute(
+            db.review["events"]
+            .update()
+            .where(db.review["events"].c.event_id == check["attempt_id"])
+            .values(expires_at=time.time() - 1)
+        )
+        jobs_before = c.scalar(sa.select(sa.func.count()).select_from(db.jobs))
+        events_before = c.scalar(sa.select(sa.func.count()).select_from(db.review["events"]))
+    assert env.client.post(path).json() == response.json()
+    assert (
+        env.client.post(path, json={"moderation_token": check["acknowledgment_token"]}).json()
+        == response.json()
+    )
+    with env.db.read() as c:
+        assert c.scalar(sa.select(sa.func.count()).select_from(db.jobs)) == jobs_before
+        assert (
+            c.scalar(sa.select(sa.func.count()).select_from(db.review["events"])) == events_before
+        )
+    with env.db.write() as c:
+        c.execute(
             db.jobs.update()
             .where(db.jobs.c.job_id == job["job_id"])
             .values(
@@ -400,5 +419,153 @@ def test_resume_requires_fresh_bound_ack_and_cannot_bypass_block(budget):
         )
     assert (
         env.client.post(path, json={"moderation_token": check["acknowledgment_token"]}).status_code
+        == 409
+    )
+
+
+@pytest.mark.parametrize("remove_token", [False, True])
+def test_review_replay_after_ack_expiry_is_read_only(identity, remove_token):
+    env = identity
+    client, _ = setup(env)
+    request = body("damn explain RAG")
+    check = client.post("/api/chat/check", json=request).json()
+    submitted = dict(request, moderation_token=check["acknowledgment_token"])
+    calls = []
+    original = env.app.state.adapters.adapter.answer
+
+    async def counted(*args):
+        calls.append(1)
+        return await original(*args)
+
+    env.app.state.adapters.adapter.answer = counted
+    headers = {"Idempotency-Key": "review-replay"}
+    first = client.post("/api/chat", json=submitted, headers=headers)
+    assert first.status_code == 200
+    with env.db.write() as c:
+        c.execute(
+            db.review["events"]
+            .update()
+            .where(db.review["events"].c.event_id == check["attempt_id"])
+            .values(expires_at=time.time() - 1)
+        )
+        jobs_before = c.scalar(sa.select(sa.func.count()).select_from(db.jobs))
+        events_before = c.scalar(sa.select(sa.func.count()).select_from(db.review["events"]))
+    replay = client.post("/api/chat", json=request if remove_token else submitted, headers=headers)
+    assert replay.status_code == 200, replay.text
+    assert replay.json() == first.json()
+    assert len(calls) == 1
+    conflict = client.post(
+        "/api/chat", json=dict(submitted, question="Changed question"), headers=headers
+    )
+    assert (
+        conflict.status_code == 409 and conflict.json()["error"]["code"] == "idempotency_conflict"
+    )
+    # The same payload without an existing key must still pass admission.
+    assert (
+        client.post(
+            "/api/chat", json=submitted, headers={"Idempotency-Key": "new-work"}
+        ).status_code
         == 422
     )
+    with env.db.read() as c:
+        assert c.scalar(sa.select(sa.func.count()).select_from(db.jobs)) == jobs_before
+        # Only the denied NEW attempt creates a moderation event, never replay/conflict.
+        assert (
+            c.scalar(sa.select(sa.func.count()).select_from(db.review["events"]))
+            == events_before + 1
+        )
+
+
+def test_review_shared_ticket_keeps_each_queued_job_proof_after_other_chat_erasure(identity):
+    env = identity
+    client, user = setup(env)
+    request = ChatRequest.model_validate(body("damn explain RAG")).model_dump(mode="json")
+    check = client.post("/api/chat/check", json=request).json()
+    token = actor_id.set(user["user_id"])
+    try:
+        submitted = dict(request, moderation_token=check["acknowledgment_token"])
+        first = env.repo.enqueue("chat", submitted, "first-queued")
+        second = env.repo.enqueue("chat", submitted, "second-queued")
+        assert env.repo.enqueue("chat", submitted, "first-queued")["job_id"] == first["job_id"]
+    finally:
+        actor_id.reset(token)
+    assert first["payload"]["moderation_event_id"] != second["payload"]["moderation_event_id"]
+    assert client.post(f"/api/jobs/{second['job_id']}/cancel").status_code == 200
+    assert client.delete(f"/api/conversations/{second['conversation_id']}").status_code == 200
+    with env.db.read() as c:
+        proof = (
+            c.execute(
+                sa.select(db.review["events"]).where(
+                    db.review["events"].c.event_id == first["payload"]["moderation_event_id"]
+                )
+            )
+            .mappings()
+            .one()
+        )
+        assert proof["job_id"] == first["job_id"]
+    asyncio.run(env.worker.run_once(first["job_id"]))
+    assert client.get(f"/api/jobs/{first['job_id']}").json()["state"] == "completed"
+
+
+def test_review_expired_notes_are_unreadable_and_uneditable_before_purge(identity):
+    env = identity
+    client, _ = setup(env)
+    assert client.post("/api/chat", json=body("You are an idiot")).status_code == 422
+    reviewer, _ = admin(env)
+    case = reviewer.get("/api/admin/chat-reviews").json()["items"][0]
+    path = f"/api/admin/chat-reviews/{case['case_id']}"
+    private = "PRIVATE EXPIRED CONTENT COPY"
+    assert reviewer.patch(path, json={"status": "in_review", "notes": private}).status_code == 200
+    assert reviewer.get(path).json()["case"]["notes"] == private
+    with env.db.write() as c:
+        c.execute(db.review["events"].update().values(content_expires_at=time.time() - 1))
+    response = reviewer.get(path)
+    assert response.status_code == 404 and private not in response.text
+    assert (
+        reviewer.patch(path, json={"status": "reviewed", "outcome": "confirmed"}).status_code == 404
+    )
+    listing = reviewer.get("/api/admin/chat-reviews", params={"status": "all"})
+    assert listing.json()["total"] == 0 and private not in listing.text
+    assert purge_expired(env.repo) == 1
+    assert reviewer.get(path).status_code == 404
+    with env.db.read() as c:
+        assert private not in str(c.execute(sa.select(db.admin_audit)).mappings().all())
+
+
+def test_ticket_expiring_during_enqueue_rolls_back_job_conversation_and_proof(
+    identity, monkeypatch
+):
+    from youtube_backend import moderation
+
+    env = identity
+    client, _ = setup(env)
+    request = body("damn explain RAG")
+    ticket = client.post("/api/chat/check", json=request).json()
+    original = moderation.admit
+
+    def expires_before_bind(repo, body):
+        ticket_id = original(repo, body)
+        with repo.db.write() as c:
+            c.execute(
+                db.review["events"]
+                .update()
+                .where(db.review["events"].c.event_id == ticket_id)
+                .values(expires_at=time.time() - 1)
+            )
+        return ticket_id
+
+    monkeypatch.setattr(moderation, "admit", expires_before_bind)
+    with env.db.read() as c:
+        before = {
+            table.name: c.scalar(sa.select(sa.func.count()).select_from(table))
+            for table in (db.jobs, db.conversations, db.messages, db.review["events"])
+        }
+    assert (
+        client.post(
+            "/api/chat", json=dict(request, moderation_token=ticket["acknowledgment_token"])
+        ).status_code
+        == 422
+    )
+    with env.db.read() as c:
+        for table in (db.jobs, db.conversations, db.messages, db.review["events"]):
+            assert c.scalar(sa.select(sa.func.count()).select_from(table)) == before[table.name]
