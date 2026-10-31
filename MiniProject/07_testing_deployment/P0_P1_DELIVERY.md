@@ -1,5 +1,45 @@
 # P0/P1 delivery and remaining acceptance — 30 October 2026
 
+## Re-review — 31 October 2026: real-HTTP research gate
+
+Merged `origin/develop` before editing on every owned module branch (`9f569ea`, already
+up to date). The latest reviews accept the 02/04/06 corrections within their checked
+scope. #35's remaining finding was an outdated UI contract in
+`tests/browser/identity.spec.ts`; this follow-up changes only 07 test code.
+
+The test now uses the v5 home heading, current YouTube label/import button and visible
+research tool. It follows the full user flow instead of selecting a hidden field in
+collapsed settings. It asserts POST /api/research returns 202 with the exact selected
+source/goal, waits for rendered final evidence, checks completed progress/events and
+source-bound timestamp citations, then logs out and verifies both private video and
+research endpoints return 401. Back navigation must show login with no turns/videos.
+The actual API and dedicated worker remain in use; only external GIS/providers are
+fixtures. No API mock, skip, xfail or assertion removal was introduced.
+
+Validation:
+
+- Own 07 checkout: real-HTTP browser suite **9 passed** (8 existing identity cases
+  plus the corrected research case), cleanup successful.
+- Isolated combined checkout of all seven latest PR branches plus this test fix:
+  real-HTTP browser suite **9 passed**, Docker full 07 suite **83 passed**, combined
+  Ruff lint/format **294 Python files passed**, scoped Prettier passed.
+- Fresh focused owned-module regressions: 02 **7 passed**, 04 **12 passed**, 06 **23
+  passed**. No production changes to these modules were required by the latest review.
+- The combined source record verifies unchanged before/after tests:
+  revision `815f8cefacef92b77a84f513da11a0986ac25bc2`, source SHA-256
+  `f342a007d121c6a5b33593544efdcf99f016bd66037a6d017e65d0f8dc987e7c`.
+  The dirty flag records this exact uncommitted 07 test correction, not a source swap.
+
+Evidence is retained in ignored runtime directories:
+`browser-identity-cb5227fb2a` in the module worktree and
+`C:/t/vb-review-20261031/MiniProject/07_testing_deployment/runtime/browser-identity-9a18396bb8`
+in the isolated snapshot. These are fixture-only, loopback runs with separate databases;
+no real provider request, user-data mutation, quota reset or production deployment.
+The combined snapshot uses other owners' commits without editing their source. Earlier
+shared formatter blockers are resolved in this combined snapshot. New GitHub CI runs
+on the independently updated PR heads are still a separate gate, and P0 human-gold/live
+semantic acceptance remains pending. No PR was merged into develop by this follow-up.
+
 ## Review follow-up
 
 Merged `origin/develop` (`9f569ea`, already up to date) on the module branch before
