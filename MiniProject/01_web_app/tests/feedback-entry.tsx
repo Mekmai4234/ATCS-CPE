@@ -16,7 +16,11 @@ function Harness() {
         port={{
           save: async (_, next) => {
             setCalls((n) => n + 1);
-            await new Promise((r) => setTimeout(r, 150));
+            if (calls === 0 && new URLSearchParams(location.search).has('hold')) {
+              await new Promise<void>((resolve) =>
+                window.addEventListener('release-feedback', () => resolve(), { once: true }),
+              );
+            } else await new Promise((r) => setTimeout(r, 150));
             if (fail) throw new Error('fixture');
             return next;
           },
