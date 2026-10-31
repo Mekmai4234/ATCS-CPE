@@ -1,26 +1,23 @@
-# Proposed 05 signal sink and timing — 31 October 2026
+# Review signal policy compatibility — 31 October 2026
 
-The merged 02 add_event helper fixes policy_version to chat-local-v1; AnswerResult
-is strict and has no 05 signal field. This proposal is not permission to write 02's
-private tables or overload its policy version. No 05-to-review-queue publication is
-claimed until the owner-02 sink is agreed and implemented.
+Review #46 identified that the merged owner-02 AnswerReviewSignal receiver accepts
+chat-review-draft-v1 only. The original proposal's claim that no sink exists is now
+obsolete: ExecutionContext.review_signals stages private attempt-bound observations.
 
-Proposed payload from review_envelope: schema_version=1, signal_policy_version=
-chat-review-draft-v2, source=system_rule, signals with policy_version/reason/source/
-confirmed=false. It contains no question, answer, credential, client owner or case status.
-02 must bind owner/job/message/frozen sources from its publication transaction, preserve
-signal policy separately from moderation policy, and apply the same publication guard
-for fresh/cache/retry/resume. Do not persist a case that outlives deleted/expired source
-content. Keep user reports, unconfirmed rule observations and admin decisions distinct.
-An insufficient-evidence signal never asserts out-of-scope or factual error.
+Public review_signals and POLICY_VERSION retain the EXACT legacy v1 rule behavior,
+including its treatment of quoted instruction text. They are accepted by the real
+receiver; changed quote-aware v2 behavior is NOT relabelled as v1.
 
-The local corpus now includes quoted translation/meaning, Thai marks, hidden characters,
-technical language and override text outside quotes. It is not a human-gold semantic
-benchmark, offensive-content classifier or a measured false-positive rate.
+review_signals_v2 and POLICY_VERSION_V2 explicitly expose the experimental quote-aware
+policy. review_envelope produces that proposed v2 envelope. Never pass these outputs
+to the v1 sink until owner-02 supports a coordinated version upgrade, retained-v1 reads,
+serialization/admin display, and owner-07 publication-path regression. This PR edits
+neither receiver literals nor other modules' tests and does not mount a new producer.
 
-Operational logs measure retrieval calls, generation orchestration and total adapter
-answer duration, including failed calls. No raw text/errors or provider keys are logged.
-Total includes cache hits; retrieval may have multiple entries. They are per-operation
-measurements, not p50/p95 or an SLA; queue time remains 02/07's responsibility.
+No signal establishes semantic error, out-of-scope content, user fault or a confirmed
+admin decision. Quote-aware corpus tests use the explicit v2 interface. A v1 compatibility
+test validates real helper output against AnswerReviewSignal and preserves original
+quote behavior. Existing evidence-only prompts/publication guards remain unchanged.
 
-Validation on Windows: 240 full-suite tests passed in 116.90 seconds with warnings as errors; 16 review/timing tests passed separately; whole-module Ruff lint/format passed. No live provider calls.
+Operational retrieval/generation/total timings stay content-free and per-operation;
+no p50/p95, SLA or live-provider quality claim is made.
