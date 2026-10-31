@@ -104,7 +104,8 @@ test('transport retry preserves both idempotency key and exact frozen input', as
     else await fulfill(route, final);
   });
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
-  await expect(page.getByLabel('คำถามของคุณ')).toHaveValue('RAG คืออะไร');
+  // The submitted draft moves into the pending turn; retry must use the frozen payload.
+  await expect(page.getByLabel('คำถามของคุณ')).toHaveValue('');
   await page.getByRole('button', { name: 'ส่งคำขอเดิมซ้ำ', exact: true }).click();
   await expect(page.getByText('คำตอบจาก API', { exact: true })).toBeVisible();
   expect(attempts).toHaveLength(2);

@@ -251,7 +251,9 @@ for (const delivery of ['http', 'failed_job', 'paused_job'] as const) {
     const forbidden =
       /Gemini|Free Tier|free_tier_unverified|free_model_unverified|quota_pending|private-request-id|internal project/;
     expect(await page.locator('body').innerText()).not.toMatch(forbidden);
-    await expect(page.getByRole('button', { name: 'ส่งคำถาม', exact: true })).toBeEnabled();
+    await expect(page.getByLabel('คำถามของคุณ')).toBeEnabled();
+    if (delivery === 'paused_job') await expect(page.getByLabel('คำถามของคุณ')).toHaveValue('');
+    else await expect(page.getByRole('button', { name: 'ส่งคำถาม', exact: true })).toBeEnabled();
     await expect(page.locator('.turn')).toHaveCount(0);
     await page.locator('.buddy-launcher').click();
     const buddy = page.getByRole('dialog', { name: 'Buddy AI แชตจากคลิป' });
