@@ -1,5 +1,16 @@
 # P0/P1 delivery and remaining acceptance — 30 October 2026
 
+## Integration review: mobile capture logout
+
+The combined GitHub run 41154781430 passed frontend unit/build/production smoke,
+105 browser scenarios and five Floating Buddy scenarios, then exposed a previously
+unreached QA capture failure: the 375px view has no visible sidebar logout button.
+`ui_qa.mjs` now opens the existing account summary and scopes logout to its menu at
+all widths. No application source or gate is removed. Local capture with
+`--require-floating` passes all four widths (375/768/1024/1440), including twelve
+home/chat/login screenshots and logout back to the demo entry. Screenshot capture
+still does not grant production, live Google or semantic AI acceptance.
+
 ## Re-review — 31 October 2026: real-HTTP research gate
 
 Merged `origin/develop` before editing on every owned module branch (`9f569ea`, already
