@@ -37,6 +37,7 @@ class ChatRequest(Schema):
     question: str = Field(min_length=1, max_length=12000)
     conversation_id: str | None = Field(default=None, max_length=100)
     scope: Scope
+    moderation_token: str | None = Field(default=None, min_length=32, max_length=128)
 
 
 class AnalysisRequest(Schema):
@@ -268,6 +269,14 @@ class ChatResponse(AnswerResult):
     job_id: str
     mode: str
     sources_available: bool = True
+    assistant_message_id: str | None = None
+    visibility: Literal["published", "withheld"] = "published"
+    moderation_policy_version: str | None = None
+    feedback: dict[str, Any] | None = None
+
+
+class ResumeRequest(Schema):
+    moderation_token: str | None = Field(default=None, min_length=32, max_length=128)
 
 
 class ImportItem(Schema):

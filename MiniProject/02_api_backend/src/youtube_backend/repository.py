@@ -262,6 +262,12 @@ class Repository(Ownership):
                 raise AppError("source_changed", "Selected sources changed; submit a new task", 409)
 
     def enqueue(self, kind, request, idempotency_key=None):
+        moderation_event_id = None
+        if kind == "chat":
+            from .moderation import admit
+
+            moderation_event_id = admit(self, request)
+            request = {k: v for k, v in request.items() if k != "moderation_token"}
         request_hash = digest(request)
         from .auth import actor_id
 
@@ -282,6 +288,8 @@ class Repository(Ownership):
             if kind == "analysis" and request["type"] == "compare" and len(sources) < 2:
                 raise AppError("comparison_scope", "Comparison requires at least two videos", 422)
             payload = dict(request=request, sources=sources)
+            if moderation_event_id:
+                payload["moderation_event_id"] = moderation_event_id
             conversation_id = None
             if kind == "chat":
                 conversation_id = request.get("conversation_id")
@@ -348,6 +356,13 @@ class Repository(Ownership):
                 request_hash=request_hash,
             )
             if kind == "chat":
+                if moderation_event_id:
+                    connection.execute(
+                        db.review["events"]
+                        .update()
+                        .where(db.review["events"].c.event_id == moderation_event_id)
+                        .values(job_id=job["job_id"])
+                    )
                 connection.execute(
                     db.messages.insert().values(
                         message_id=uid(),
@@ -404,6 +419,21 @@ class Repository(Ownership):
             except AppError:
                 return False
 
+    def chat_result(self, job):
+        from .chat_review import feedback_for
+
+        result = dict(job["result"])
+        with self.db.read() as c:
+            mid = c.scalar(
+                sa.select(db.messages.c.message_id).where(
+                    db.messages.c.job_id == job["job_id"], db.messages.c.role == "assistant"
+                )
+            )
+            if mid:
+                result["assistant_message_id"] = mid
+                result["feedback"] = feedback_for(c, job["owner_id"], mid)
+        return result
+
     def public_job(self, job):
         keys = (
             "job_id",
@@ -421,6 +451,8 @@ class Repository(Ownership):
             "result",
         )
         result = {k: job[k] for k in keys}
+        if job["kind"] == "chat" and job["result"]:
+            result["result"] = self.chat_result(job)
         with self.db.read() as connection:
             wait = row(connection, db.v2["pauses"], db.v2["pauses"].c.job_id == job["job_id"])
         if wait:
@@ -874,7 +906,10 @@ class Repository(Ownership):
                     )
                 )
             elif kind == "chat":
+                from .moderation import inspect_output
+
                 message_id = uid()
+                result = inspect_output(self, connection, job, result, None)
                 connection.execute(
                     db.messages.insert().values(
                         message_id=message_id,
@@ -895,10 +930,25 @@ class Repository(Ownership):
                             data=citation,
                         )
                     )
+                for table in (db.review["events"], db.review["cases"]):
+                    if "job_id" in table.c:
+                        condition = table.c.job_id == job_id
+                    else:
+                        condition = table.c.event_id.in_(
+                            sa.select(db.review["events"].c.event_id).where(
+                                db.review["events"].c.job_id == job_id
+                            )
+                        )
+                    connection.execute(
+                        table.update()
+                        .where(condition, table.c.message_id.is_(None))
+                        .values(message_id=message_id)
+                    )
                 result = dict(
                     result,
                     conversation_id=job["conversation_id"],
                     job_id=job_id,
+                    assistant_message_id=message_id,
                     mode=self.settings.adapter_mode,
                 )
             if kind in {"artifact", "research"}:
@@ -1296,6 +1346,12 @@ class Repository(Ownership):
                 item["state"] = row(connection, db.jobs, db.jobs.c.job_id == item["job_id"])[
                     "state"
                 ]
+                if item["role"] == "assistant":
+                    from .chat_review import feedback_for
+
+                    job = row(connection, db.jobs, db.jobs.c.job_id == item["job_id"])
+                    item["visibility"] = (job["result"] or {}).get("visibility", "published")
+                    item["feedback"] = feedback_for(connection, job["owner_id"], item["message_id"])
                 items.append(item)
             latest_job = connection.execute(
                 sa.select(db.jobs.c.payload)
