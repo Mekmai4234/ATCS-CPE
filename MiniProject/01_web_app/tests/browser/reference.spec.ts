@@ -27,7 +27,8 @@ test('reference art loads, launcher starts bottom right and screenshots preserve
   const panel = page.getByRole('dialog', { name: 'Buddy AI แชตจากคลิป' });
   await expect(panel).toBeVisible();
   expect((await panel.boundingBox())!.x).toBeGreaterThan(1440 / 2);
-  await panel.getByText('คลิปที่เลือก', { exact: false }).first().click();
+  if (!(await panel.getByRole('checkbox').first().isVisible()))
+    await panel.locator('.buddy-scope summary').click();
   await panel.getByRole('checkbox').first().check();
   await panel.getByText('คลิปที่เลือก', { exact: false }).first().click();
   await panel.getByLabel('ข้อความถึง Buddy', { exact: true }).fill('RAG คืออะไร');

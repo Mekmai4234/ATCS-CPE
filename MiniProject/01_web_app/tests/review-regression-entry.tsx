@@ -10,7 +10,15 @@ const fallback = demoTransport();
 const api = new Api('', async (input, init) => {
   const path = String(input);
   if (path.startsWith('/api/admin/chat-messages?'))
-    return json({ items: [{ message_id: 'normal' }], total: 1 });
+    return json({
+      items: [
+        {
+          message_id: 'normal',
+          feedback: path.includes('rating=like') ? { rating: 'like' } : undefined,
+        },
+      ],
+      total: 1,
+    });
   if (
     path.startsWith('/api/admin/chat-reviews?') &&
     new URLSearchParams(location.search).has('shared')
