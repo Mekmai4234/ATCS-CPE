@@ -261,35 +261,43 @@ class Repository(Ownership):
             ):
                 raise AppError("source_changed", "Selected sources changed; submit a new task", 409)
 
-    def enqueue(self, kind, request, idempotency_key=None):
-        moderation_event_id = None
-        if kind == "chat":
-            from .moderation import admit
+    def _replay_job(self, connection, key, request_hash):
+        previous = row(connection, db.jobs, db.jobs.c.idempotency_key == key) if key else None
+        if previous:
+            self._private(connection, previous)
+            if previous["request_hash"] != request_hash:
+                raise AppError("idempotency_conflict", "Key already used with different input", 409)
+        return previous
 
-            moderation_event_id = admit(self, request)
+    def enqueue(self, kind, request, idempotency_key=None):
+        admission_request = request
+        if kind == "chat":
             request = {k: v for k, v in request.items() if k != "moderation_token"}
         request_hash = digest(request)
         from .auth import actor_id
 
         namespace = actor_id.get() if self.settings.auth_enabled else "legacy"
         key = digest([namespace, kind, idempotency_key]) if idempotency_key else None
+        if key:
+            with self.db.read() as connection:
+                self._actor(connection)
+                previous = self._replay_job(connection, key, request_hash)
+                if previous:
+                    return previous
+        ticket_id = None
+        if kind == "chat":
+            from .moderation import admit
+
+            ticket_id = admit(self, admission_request)
         with self.db.write() as connection:
             owner = self._actor(connection)
-            if key:
-                previous = row(connection, db.jobs, db.jobs.c.idempotency_key == key)
-                if previous:
-                    if previous["request_hash"] != request_hash:
-                        raise AppError(
-                            "idempotency_conflict", "Key already used with different input", 409
-                        )
-                    self._private(connection, previous)
-                    return previous
+            previous = self._replay_job(connection, key, request_hash)
+            if previous:
+                return previous
             sources = self._sources(connection, request["scope"])
             if kind == "analysis" and request["type"] == "compare" and len(sources) < 2:
                 raise AppError("comparison_scope", "Comparison requires at least two videos", 422)
             payload = dict(request=request, sources=sources)
-            if moderation_event_id:
-                payload["moderation_event_id"] = moderation_event_id
             conversation_id = None
             if kind == "chat":
                 conversation_id = request.get("conversation_id")
@@ -356,13 +364,10 @@ class Repository(Ownership):
                 request_hash=request_hash,
             )
             if kind == "chat":
-                if moderation_event_id:
-                    connection.execute(
-                        db.review["events"]
-                        .update()
-                        .where(db.review["events"].c.event_id == moderation_event_id)
-                        .values(job_id=job["job_id"])
-                    )
+                if ticket_id:
+                    from .moderation import bind_admission
+
+                    bind_admission(self, connection, job, ticket_id)
                 connection.execute(
                     db.messages.insert().values(
                         message_id=uid(),
