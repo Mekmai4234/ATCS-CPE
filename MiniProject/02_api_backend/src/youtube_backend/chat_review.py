@@ -153,13 +153,33 @@ def set_feedback(repo, message_id, body=None):
         return dict(message_id=message_id, feedback=feedback_for(c, owner, message_id))
 
 
+def live_cases():
+    cases, events = db.review["cases"], db.review["events"]
+    return sa.or_(
+        cases.c.event_id.is_(None),
+        sa.exists(
+            sa.select(events.c.event_id).where(
+                events.c.event_id == cases.c.event_id, events.c.content_expires_at > time.time()
+            )
+        ),
+    )
+
+
+def require_live_case(c, case):
+    if case["event_id"]:
+        event = row(c, db.review["events"], db.review["events"].c.event_id == case["event_id"])
+        if not event or event["content_expires_at"] <= time.time():
+            raise AppError("not_found", "Review case not found", 404)
+
+
 def review_list(
     repo, *, limit, offset, status="pending", rating=None, label=None, q="", after=None, before=None
 ):
     cases, feedback = db.review["cases"], db.review["feedback"]
     with repo.db.write() as c:
         admin = require_review(repo, c)
-        conditions = []
+        live = live_cases()
+        conditions = [live]
         if status == "pending":
             conditions.append(cases.c.status.in_(["new", "in_review"]))
         elif status != "all":
@@ -263,7 +283,7 @@ def review_list(
                 pending=c.scalar(
                     sa.select(sa.func.count())
                     .select_from(cases)
-                    .where(cases.c.status.in_(["new", "in_review"]))
+                    .where(live, cases.c.status.in_(["new", "in_review"]))
                 ),
                 withheld=c.scalar(
                     sa.select(sa.func.count())
@@ -311,6 +331,8 @@ def detail(repo, case_id=None, message_id=None):
         )
         if case_id and not case:
             raise AppError("not_found", "Review case not found", 404)
+        if case:
+            require_live_case(c, case)
         mid = case["message_id"] if case else message_id
         data, owner = message_detail(c, mid) if mid else ({}, case["owner_id"])
         data["case"] = case
@@ -340,6 +362,7 @@ def update_case(repo, case_id, body):
         case = row(c, table, table.c.case_id == case_id)
         if not case:
             raise AppError("not_found", "Review case not found", 404)
+        require_live_case(c, case)
         if case["status"] == "new" and body.status == "reviewed":
             raise AppError(
                 "invalid_review_transition", "Start review before recording an outcome", 409
