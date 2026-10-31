@@ -13,8 +13,10 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_legacy_migration_operator_bootstrap_claim_and_paired_restore(tmp_path):
+    import sqlalchemy as sa
     from alembic import command
     from fastapi.testclient import TestClient
+    from youtube_backend import database as db
     from youtube_backend.config import Settings
     from youtube_backend.database import Database
     from youtube_backend.main import create_app
@@ -93,6 +95,9 @@ async def test_legacy_migration_operator_bootstrap_claim_and_paired_restore(tmp_
             json=dict(credential="fixture", csrf_token=challenge["csrf_token"]),
         )
         assert response.status_code == 200, response.text
+        client.headers.update(
+            {"Origin": "http://localhost:3000", "X-CSRF-Token": response.json()["csrf_token"]}
+        )
         return response.json()["user"]
 
     app = create_app(settings(state))
@@ -105,6 +110,70 @@ async def test_legacy_migration_operator_bootstrap_claim_and_paired_restore(tmp_
         assert login(client, app)["role"] == "admin"
         owned = client.get("/api/videos").json()["total"]
         assert owned > 0
+        video_id = client.get("/api/videos").json()["items"][0]["video_id"]
+        answered = client.post(
+            "/api/chat",
+            json={"question": "Migration fixture question", "scope": {"video_ids": [video_id]}},
+        )
+        assert answered.status_code == 200, answered.text
+        saved = answered.json()
+        path = f"/api/messages/{saved['assistant_message_id']}/feedback"
+        feedback = client.put(
+            path,
+            json={
+                "rating": "dislike",
+                "reason": "insufficient_evidence",
+                "comment": "migration fixture persisted",
+            },
+        )
+        assert feedback.status_code == 200
+        assert client.get("/api/chat/policy").json()["review_enabled"] is False
+        assert client.get("/api/admin/chat-reviews").status_code == 403
+        blocked = client.post(
+            "/api/chat", json={"question": "You are an idiot", "scope": {"video_ids": [video_id]}}
+        )
+        assert blocked.status_code == 422
+        owner_id = client.get("/api/auth/me").json()["user"]["user_id"]
+        with app.state.repository.db.write() as c:
+            c.execute(db.review["events"].update().values(content_expires_at=time.time() - 1))
+            c.execute(
+                db.review["cases"]
+                .update()
+                .where(db.review["cases"].c.source == "system")
+                .values(notes="EXPIRED PRIVATE MIGRATION COPY")
+            )
+            c.execute(
+                db.v2["reservations"]
+                .insert()
+                .values(
+                    reservation_id="migration-ledger",
+                    project="fixture",
+                    policy_digest="fixture",
+                    bucket="shared",
+                    model="fixture",
+                    endpoint="generateContent",
+                    role="chat",
+                    owner_id=owner_id,
+                    job_id=saved["job_id"],
+                    lease_token="ended",
+                    call_key="fixture",
+                    state="consumed",
+                    tokens=123,
+                    created_at=1,
+                    expires_at=2,
+                    returned_allowlist=[],
+                )
+            )
+    purge = subprocess.run(
+        [sys.executable, "-m", "youtube_backend", "db", "purge-review"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=45,
+    )
+    assert purge.returncode == 0, purge.stderr
+    assert "anonymized: 1" in purge.stdout
+    assert "EXPIRED PRIVATE MIGRATION COPY" not in purge.stdout + purge.stderr
     recovery.backup(state, tmp_path / "migrated-backup", stopped=True)
     restored = tmp_path / "restored"
     recovery.restore(tmp_path / "migrated-backup", restored)
@@ -113,6 +182,31 @@ async def test_legacy_migration_operator_bootstrap_claim_and_paired_restore(tmp_
         assert login(client, app)["role"] == "admin"
         assert client.get("/api/videos").json()["total"] == owned
         assert client.get("/health").json()["schema_revision"] == "0004"
+        assert client.get(path).json() == feedback.json()
+        assert (
+            client.get(f"/api/conversations/{saved['conversation_id']}").json()["messages"][-1][
+                "message_id"
+            ]
+            == saved["assistant_message_id"]
+        )
+        assert client.get("/api/chat/policy").json()["review_enabled"] is False
+        with app.state.repository.db.read() as c:
+            assert (
+                c.scalar(
+                    sa.select(db.v2["reservations"].c.tokens).where(
+                        db.v2["reservations"].c.reservation_id == "migration-ledger"
+                    )
+                )
+                == 123
+            )
+            assert (
+                c.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(db.review["cases"])
+                    .where(db.review["cases"].c.source == "system")
+                )
+                == 0
+            )
     rollback = tmp_path / "rollback-copy"
     recovery.restore(tmp_path / "pre-migration", rollback)
     import sqlite3

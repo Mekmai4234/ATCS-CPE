@@ -935,6 +935,9 @@ class Repository(Ownership):
                             data=citation,
                         )
                     )
+                from .answer_review import publish
+
+                publish(self, connection, job, message_id)
                 for table in (db.review["events"], db.review["cases"]):
                     if "job_id" in table.c:
                         condition = table.c.job_id == job_id
