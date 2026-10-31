@@ -1,5 +1,20 @@
 # Module 02 P1 verification — 30 October 2026
 
+## Re-review — 31 October 2026
+
+Read the latest #32 review on head `42a7d99`: quota/resume and causal message order
+were accepted within the reviewed scope; the remaining finding belongs to 07's real
+HTTP research browser gate. Merged `origin/develop` before work (still `9f569ea`,
+already up to date). No production change was needed in 02 for this review.
+
+Fresh quota/history regressions: **7 passed**. The corrected 07 gate passes **9/9**
+both on its module checkout and on an isolated combined snapshot of all seven PRs,
+using real API/worker/session routes with synthetic external providers. Combined
+Docker 07 tests: **83 passed**; lint/format: **294 files passed**. The combined source
+fingerprint stayed unchanged during execution. Shared formatter fixes are present in
+their owners' branch snapshots; no 01/03/05 source was edited by this follow-up.
+These local results are separate from each standalone PR's GitHub CI result.
+
 ## Review follow-up
 
 Before editing, switched to `feature/02_api_backend` and merged `origin/develop`
