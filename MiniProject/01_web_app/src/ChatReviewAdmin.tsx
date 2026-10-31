@@ -221,7 +221,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
         </button>
       )}
       <button
-        aria-pressed={mode === 'messages'}
+        aria-pressed={mode === 'messages' && !rating}
         onClick={() => {
           if (mode === 'messages' && !rating) return;
           setRating('');
