@@ -247,8 +247,10 @@ async def test_inventory_detects_missing_vectors(env):
 async def test_short_context_is_complete_scoped_and_never_embeds_query(env, monkeypatch):
     await env.ready()
     query = env.query(VIDEO_A)
+
     async def forbidden(*args, **kwargs):
         raise AssertionError("short context must not call the embedding provider")
+
     monkeypatch.setattr(env.rag.embedder, "embed", forbidden)
     chunks = await env.rag.short_context(query.sources, query.execution)
     assert chunks and all(c.video_id == VIDEO_A for c in chunks)
