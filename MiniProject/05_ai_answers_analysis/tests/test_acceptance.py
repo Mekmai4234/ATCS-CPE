@@ -332,10 +332,9 @@ async def test_real_http_read_budget_allows_slow_response_within_configured_limi
     from contextlib import suppress
 
     tasks = set()
+    writers = set()
 
     async def respond(reader, writer):
-        task = asyncio.current_task()
-        tasks.add(task)
         try:
             # The client can time out before sending headers on a loaded Windows
             # host. Do not leave an accepted test socket waiting forever.
@@ -351,9 +350,14 @@ async def test_real_http_read_budget_allows_slow_response_within_configured_limi
             writer.close()
             with suppress(ConnectionError, TimeoutError):
                 await asyncio.wait_for(writer.wait_closed(), 1)
-            tasks.discard(task)
 
-    server = await asyncio.start_server(respond, "127.0.0.1", 0)
+    def accepted(reader, writer):
+        # Register synchronously: teardown can run before an async callback starts.
+        writers.add(writer)
+        task = asyncio.create_task(respond(reader, writer))
+        tasks.add(task)
+
+    server = await asyncio.start_server(accepted, "127.0.0.1", 0)
     port = server.sockets[0].getsockname()[1]
     try:
         async with httpx.AsyncClient(
@@ -369,11 +373,29 @@ async def test_real_http_read_budget_allows_slow_response_within_configured_limi
     finally:
         server.close()
         await server.wait_closed()
+        # Stop admission first, then let accepted handlers finish their own close.
+        # Cancelling immediately could interrupt writer.wait_closed on Proactor.
+        for writer in writers:
+            writer.close()
         if tasks:
-            pending = list(tasks)
+            _, pending = await asyncio.wait(tasks, timeout=2)
             for task in pending:
                 task.cancel()
-            await asyncio.gather(*pending, return_exceptions=True)
+            outcomes = await asyncio.gather(*tasks, return_exceptions=True)
+            unexpected = [
+                outcome
+                for outcome in outcomes
+                if isinstance(outcome, BaseException)
+                and not isinstance(outcome, asyncio.CancelledError)
+            ]
+            assert not unexpected, unexpected
+        for writer in writers:
+            with suppress(ConnectionError):
+                await asyncio.wait_for(writer.wait_closed(), 1)
+        # Flush scheduled connection_lost callbacks before pytest closes the loop.
+        await asyncio.sleep(0)
+        assert all(task.done() for task in tasks)
+        assert all(writer.is_closing() for writer in writers)
 
 
 @pytest.mark.parametrize(
