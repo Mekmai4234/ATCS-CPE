@@ -25,6 +25,8 @@ def normalize(text):
     text = "".join(
         c for c in unicodedata.normalize("NFKC", text[:12000]) if unicodedata.category(c) != "Cf"
     ).casefold()
+    # NFKC expands Thai SARA AM; keep its spelling equivalent without deleting marks.
+    text = text.replace("\u0e4d\u0e32", "\u0e33")
     text = re.sub(r"\bf\s+u\s+c\s+k\b", "fuck", text)
     return re.sub(r"\s+", " ", text).strip()
 
