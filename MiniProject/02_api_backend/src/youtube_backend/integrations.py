@@ -58,6 +58,12 @@ class ExecutionContext:
         self.check()
         self.repository.add_event(self.job_id, self.lease_token, event.model_dump())
 
+    def review_signals(self, signals):
+        """Trusted adapter hook, kept separate from public job progress events."""
+        from .answer_review import stage
+
+        stage(self.repository, self.job_id, self.lease_token, signals)
+
 
 class Adapters(Protocol):
     """All methods must be async, cancellable, bounded, and idempotent where mutating.
