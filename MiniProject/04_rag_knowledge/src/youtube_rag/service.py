@@ -39,6 +39,11 @@ class RagService:
         execution.check()
         return min(self.settings.rag_operation_timeout_seconds, execution.remaining_seconds)
 
+    def evidence_library(self):
+        from .library import EvidenceLibrary
+
+        return EvidenceLibrary(self)
+
     async def _embed(self, texts, execution, *, purpose="document", titles=None, cache_guard=None):
         timeout = self.timeout(execution)
         try:
