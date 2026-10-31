@@ -569,3 +569,17 @@ def test_ticket_expiring_during_enqueue_rolls_back_job_conversation_and_proof(
     with env.db.read() as c:
         for table in (db.jobs, db.conversations, db.messages, db.review["events"]):
             assert c.scalar(sa.select(sa.func.count()).select_from(table)) == before[table.name]
+
+
+def test_liked_normal_answers_are_filtered_and_audited(identity):
+    client, _ = setup(identity)
+    result = answer(client)
+    mid = result["assistant_message_id"]
+    assert client.put(f"/api/messages/{mid}/feedback", json={"rating": "like"}).status_code == 200
+    reviewer, _ = admin(identity)
+    data = reviewer.get("/api/admin/chat-messages?rating=like").json()
+    assert data["total"] == 1 and data["items"][0]["message_id"] == mid
+    assert data["items"][0]["feedback"]["rating"] == "like"
+    assert data["items"][0]["question_excerpt"] == "What is RAG?"
+    assert reviewer.get("/api/admin/chat-messages?rating=dislike").json()["total"] == 0
+    assert client.get("/api/admin/chat-messages?rating=like").status_code == 403
