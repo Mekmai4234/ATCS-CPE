@@ -41,7 +41,12 @@ const api = new Api('', async (input, init) => {
       answer: { content: 'normal answer' },
       visibility: 'published',
     });
-  if (path === '/api/chat/check') return json({ decision: 'allow' });
+  if (path === '/api/chat/check')
+    return json(
+      document.documentElement.dataset.resumeCount
+        ? { decision: 'warn', message: 'confirm frozen request', acknowledgment_token: 'fresh' }
+        : { decision: 'allow' },
+    );
   if (path === '/api/chat' && init?.method === 'POST')
     return json({ job_id: 'paused', state: 'queued' }, 202);
   if (path === '/api/jobs/paused')
@@ -54,9 +59,11 @@ const api = new Api('', async (input, init) => {
       result: null,
     });
   if (path === '/api/jobs/paused/resume') {
-    document.documentElement.dataset.resumeCount = String(
-      Number(document.documentElement.dataset.resumeCount || 0) + 1,
-    );
+    const count = Number(document.documentElement.dataset.resumeCount || 0) + 1;
+    document.documentElement.dataset.resumeCount = String(count);
+    if (count === 1) return json({ error: { code: 'moderation_confirmation_required' } }, 422);
+    if (JSON.parse(String(init?.body)).moderation_token !== 'fresh')
+      throw new Error('wrong acknowledgement');
     return json({ job_id: 'replacement', state: 'queued' }, 202);
   }
   if (path === '/api/jobs/replacement')
@@ -74,6 +81,15 @@ createRoot(document.getElementById('root')!).render(
   new URLSearchParams(location.search).has('admin') ? (
     <ChatReviewAdmin api={api} />
   ) : (
-    <App api={api} />
+    <App
+      api={api}
+      member={{
+        id: 'fixture',
+        name: 'Fixture',
+        email: 'fixture@example.test',
+        role: 'user',
+        status: 'active',
+      }}
+    />
   ),
 );
