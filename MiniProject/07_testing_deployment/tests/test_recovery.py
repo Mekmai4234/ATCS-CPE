@@ -19,18 +19,25 @@ async def test_cold_restore_reopens_actual_sqlite_chroma_and_identical_evidence(
     image = state / "media" / "generation-1" / "frame.png"
     image.parent.mkdir(parents=True)
     image.write_bytes(b"fixture-private-image-not-real-ocr")
+    canonical = state / "media-assets" / "original-db-namespace" / "frame.png"
+    canonical.parent.mkdir(parents=True)
+    canonical.write_bytes(b"fixture-current-module02-asset")
     (state / ".env").write_text("GEMINI_API_KEY=DO-NOT-COPY", encoding="utf-8")
     manifest = recovery.backup(state, bundle, stopped=True)
     assert "app.db" in manifest["files"] and any(k.startswith("chroma/") for k in manifest["files"])
     assert not (bundle / ".env").exists()
     assert manifest["version"] == 2
     assert "media/generation-1/frame.png" in manifest["files"]
+    assert "media-assets/original-db-namespace/frame.png" in manifest["files"]
     recovery.restore(bundle, restored)
     # Prove restored reads are independent of the source, after all clients were closed.
     shutil.rmtree(state)
     assert (
         restored / "media/generation-1/frame.png"
     ).read_bytes() == b"fixture-private-image-not-real-ocr"
+    assert (
+        restored / "media-assets/original-db-namespace/frame.png"
+    ).read_bytes() == b"fixture-current-module02-asset"
     verified = await evaluate(restored, phase="verify")
     assert verified["restart_verified"]
     assert verified["checks"] == seed["checks"]

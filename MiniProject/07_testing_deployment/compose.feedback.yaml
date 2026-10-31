@@ -1,0 +1,24 @@
+# Compose with compose.yaml (and compose.auth.yaml for the prospective TLS deployment).
+# Defaults stay OFF; UI notice and reviewed exact-source evidence must come first.
+x-review: &review
+  CHAT_REVIEW_ENABLED: "${CHAT_REVIEW_ENABLED:-false}"
+  CHAT_REVIEW_ADMIN_IDS: "${CHAT_REVIEW_ADMIN_IDS:-[]}"
+  MODERATION_RETENTION_DAYS: "${MODERATION_RETENTION_DAYS:-30}"
+
+services:
+  api:
+    environment: *review
+  worker:
+    environment: *review
+  purge-review:
+    profiles: ["maintenance"]
+    image: youtube-knowledge-team07:local
+    init: true
+    network_mode: none
+    environment:
+      MINIPROJECT_ROOT: /app
+      DATABASE_URL: sqlite:////app/runtime/app.db
+    volumes:
+      - team-state:/app/runtime
+    command: ["yk-db", "purge-review"]
+    restart: "no"

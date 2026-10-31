@@ -99,6 +99,11 @@ oversized output is withheld rather than publishing an unchecked suffix. Its sto
 draft is bounded and explicitly marked truncated. This does not truncate published answers.
 
 Module 05 still owns evidence-only semantics and versioned out-of-scope reasons.
+The opt-in receiving boundary is now defined in `ANSWER_REVIEW_SIGNALS.md`:
+`ExecutionContext.review_signals()` accepts the existing producer's draft version,
+stages private attempt-bound metadata, and creates unconfirmed cases atomically with
+the saved answer. It never changes publication disposition. 05 still owns mounting
+the call on all its return paths; the hook is not automatically enabled by this PR.
 This change does **not** infer out-of-scope from insufficient evidence or dislike,
 or add unsupported reason fields to 05's strict answer schema. No new RAG metadata
 is needed from 04, and 06/learning artifacts are outside this MVP.
