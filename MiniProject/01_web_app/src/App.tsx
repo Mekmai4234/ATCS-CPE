@@ -1,3 +1,4 @@
+import { smallTalkReply } from './smallTalk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Api, ApiError, pollJob } from './api';
@@ -524,6 +525,7 @@ export default function App({
       );
       const warning = jobWarning(job);
       if (warning) {
+        if (currentOp.type === 'chat') setQuestion(currentOp.label);
         setTaskError(warning);
         setOperation(null);
         operationRef.current = null;
@@ -560,6 +562,7 @@ export default function App({
                 setTaskError('');
                 await completeTask(currentOp, saved.result, saved, controller.signal);
               } else {
+                if (currentOp.type === 'chat') setQuestion(currentOp.label);
                 setTaskError(jobWarning(saved) || errorText(error));
                 setOperation(null);
                 operationRef.current = null;
@@ -574,6 +577,7 @@ export default function App({
         }
         setCanRetry(!!currentOp.jobId || !(error instanceof ApiError) || error.retryable);
         if (!currentOp.jobId && error instanceof ApiError && !error.retryable) {
+          if (currentOp.type === 'chat') setQuestion(currentOp.label);
           setOperation(null);
           operationRef.current = null;
         }
@@ -591,6 +595,22 @@ export default function App({
     if (archiveLoading || ((forcedType === 'chat' || tab === 'chat') && viewingHistory)) return;
     setTaskError('');
     try {
+      const localReply = forcedType === 'chat' || tab === 'chat' ? smallTalkReply(question) : null;
+      if (localReply) {
+        updateTurns((previous) => [
+          ...previous,
+          {
+            id: crypto.randomUUID(),
+            type: 'chat',
+            label: question.trim(),
+            sources: [],
+            result: { answer: localReply, citations: [] },
+            partial: false,
+          },
+        ]);
+        setQuestion('');
+        return;
+      }
       if (libraryError || loading) throw new Error('กรุณาโหลดคลังคลิปให้สำเร็จก่อนส่งคำถาม');
       const scope = buildScope(selected, videos, channel, from, to);
       const type = forcedType || (tab === 'learn' ? taskType : 'chat');
@@ -671,6 +691,7 @@ export default function App({
       followResults.current = true;
       setNewResults(false);
       setSourcesExpanded(false);
+      if (type === 'chat') setQuestion('');
       void execute({
         key: crypto.randomUUID(),
         path,
@@ -907,6 +928,7 @@ export default function App({
         if (['cancelled', 'failed'].includes(updated.state)) {
           setDeferred((previous) => previous.filter((item) => item.jobId !== id));
           if (!busyRef.current && operationRef.current?.jobId === id) {
+            if (operationRef.current.type === 'chat') setQuestion(operationRef.current.label);
             setOperation(null);
             operationRef.current = null;
             setCanRetry(false);
@@ -1698,7 +1720,7 @@ export default function App({
                       aria-describedby="task-scope-help"
                       disabled={
                         taskLocked ||
-                        !!scopeHelp ||
+                        (!!scopeHelp && !(tab === 'chat' && smallTalkReply(question))) ||
                         (tab === 'chat' && !question.trim()) ||
                         (tab === 'learn' && taskType === 'research' && !question.trim()) ||
                         (tab === 'learn' && taskType === 'compare' && selectedInFilter.length < 2)
@@ -1933,6 +1955,9 @@ export default function App({
             turns={turns.filter((turn) => turn.type === 'chat')}
             locked={taskLocked || loading || !!libraryError || archiveLoading || viewingHistory}
             busy={busy}
+            pending={
+              operation?.type === 'chat' ? { id: operation.key, label: operation.label } : undefined
+            }
             status={
               operation
                 ? `${busy ? 'กำลังทำงาน' : 'รอตรวจสอบผล'}${pendingJob ? ` · ${jobStatus(pendingJob)}` : ''}`

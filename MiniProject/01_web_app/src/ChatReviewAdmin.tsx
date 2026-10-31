@@ -42,6 +42,7 @@ type Detail = {
   scope?: { video_id: string; transcript_version: string }[];
 };
 export default function ChatReviewAdmin({ api }: { api: Api }) {
+  const [hasCases, setHasCases] = useState(true);
   const [mode, setMode] = useState<'cases' | 'messages'>('cases');
   const [items, setItems] = useState<Case[]>([]),
     [detail, setDetail] = useState<Detail | null>(null);
@@ -101,6 +102,19 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
           setItems(data.items);
           setTotal(data.total);
           if (data.stats) setStats(data.stats);
+          if (
+            mode === 'cases' &&
+            !query &&
+            !status &&
+            !rating &&
+            !label &&
+            !after &&
+            !before &&
+            offset === 0
+          ) {
+            setHasCases(data.total > 0);
+            if (data.total === 0) setMode('messages');
+          }
         }
       })
       .catch((e) => {
@@ -191,19 +205,21 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
   return (
     <section className="admin-card" aria-label="ตรวจสอบแชท">
       <h1>ตรวจสอบแชท</h1>
-      <button
-        aria-pressed={mode === 'cases'}
-        onClick={() => {
-          if (mode === 'cases') return;
-          setRating('');
-          setItems([]);
-          setDetail(null);
-          setMode('cases');
-          setOffset(0);
-        }}
-      >
-        คิวตรวจ
-      </button>
+      {(hasCases || mode === 'cases') && (
+        <button
+          aria-pressed={mode === 'cases'}
+          onClick={() => {
+            if (mode === 'cases') return;
+            setRating('');
+            setItems([]);
+            setDetail(null);
+            setMode('cases');
+            setOffset(0);
+          }}
+        >
+          คิวตรวจ
+        </button>
+      )}
       <button
         aria-pressed={mode === 'messages'}
         onClick={() => {
@@ -242,87 +258,89 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
           </article>
         ))}
       </div>
-      <fieldset disabled={mode === 'messages'} style={{ border: 0, padding: 0, margin: 0 }}>
-        <legend>ตัวกรองคิวตรวจ</legend>
-        <label>
-          ค้นคำถาม
-          <input
-            value={query}
-            onChange={(e) => {
-              setOffset(0);
-              setQuery(e.target.value);
-            }}
-          />
-        </label>
-        <label>
-          สถานะ
-          <select
-            aria-label="สถานะ"
-            value={status}
-            onChange={(e) => {
-              setOffset(0);
-              setStatus(e.target.value);
-            }}
-          >
-            <option value="">รอตรวจ</option>
-            <option value="new">ใหม่</option>
-            <option value="in_review">กำลังตรวจ</option>
-            <option value="reviewed">ตรวจแล้ว</option>
-          </select>
-        </label>
-        <label>
-          คะแนน
-          <select
-            aria-label="คะแนน"
-            value={rating}
-            onChange={(e) => {
-              setOffset(0);
-              setRating(e.target.value);
-              if (e.target.value === 'like') {
-                setItems([]);
-                setDetail(null);
-                setMode('messages');
-              }
-            }}
-          >
-            <option value="">ทุกคะแนน</option>
-            <option value="like">ถูกใจ</option>
-            <option value="dislike">ไม่ถูกใจ</option>
-          </select>
-        </label>
-        <label>
-          ประเภทเหตุการณ์
-          <input
-            value={label}
-            onChange={(e) => {
-              setOffset(0);
-              setLabel(e.target.value);
-            }}
-          />
-        </label>
-        <label>
-          ตั้งแต่
-          <input
-            type="date"
-            value={after}
-            onChange={(e) => {
-              setOffset(0);
-              setAfter(e.target.value);
-            }}
-          />
-        </label>
-        <label>
-          ถึง
-          <input
-            type="date"
-            value={before}
-            onChange={(e) => {
-              setOffset(0);
-              setBefore(e.target.value);
-            }}
-          />
-        </label>
-      </fieldset>
+      {mode === 'cases' && (
+        <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend>ตัวกรองคิวตรวจ</legend>
+          <label>
+            ค้นคำถาม
+            <input
+              value={query}
+              onChange={(e) => {
+                setOffset(0);
+                setQuery(e.target.value);
+              }}
+            />
+          </label>
+          <label>
+            สถานะ
+            <select
+              aria-label="สถานะ"
+              value={status}
+              onChange={(e) => {
+                setOffset(0);
+                setStatus(e.target.value);
+              }}
+            >
+              <option value="">รอตรวจ</option>
+              <option value="new">ใหม่</option>
+              <option value="in_review">กำลังตรวจ</option>
+              <option value="reviewed">ตรวจแล้ว</option>
+            </select>
+          </label>
+          <label>
+            คะแนน
+            <select
+              aria-label="คะแนน"
+              value={rating}
+              onChange={(e) => {
+                setOffset(0);
+                setRating(e.target.value);
+                if (e.target.value === 'like') {
+                  setItems([]);
+                  setDetail(null);
+                  setMode('messages');
+                }
+              }}
+            >
+              <option value="">ทุกคะแนน</option>
+              <option value="like">ถูกใจ</option>
+              <option value="dislike">ไม่ถูกใจ</option>
+            </select>
+          </label>
+          <label>
+            ประเภทเหตุการณ์
+            <input
+              value={label}
+              onChange={(e) => {
+                setOffset(0);
+                setLabel(e.target.value);
+              }}
+            />
+          </label>
+          <label>
+            ตั้งแต่
+            <input
+              type="date"
+              value={after}
+              onChange={(e) => {
+                setOffset(0);
+                setAfter(e.target.value);
+              }}
+            />
+          </label>
+          <label>
+            ถึง
+            <input
+              type="date"
+              value={before}
+              onChange={(e) => {
+                setOffset(0);
+                setBefore(e.target.value);
+              }}
+            />
+          </label>
+        </fieldset>
+      )}
       {loading && <p role="status">กำลังโหลด…</p>}
       {error && (
         <p role="alert">

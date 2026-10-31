@@ -92,3 +92,13 @@ test('liked answers have a dedicated admin view', async ({ page }) => {
   await page.getByLabel('คะแนน', { exact: true }).selectOption('like');
   await expect(page.getByText('ผู้ใช้กดถูกใจ', { exact: true })).toBeVisible();
 });
+
+test('an empty review queue is hidden and saved messages remain accessible', async ({ page }) => {
+  await page.goto('/tests/review-regression.html?admin=1&empty=1');
+  await expect(page.getByRole('button', { name: 'คิวตรวจ', exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'แชทที่บันทึกทั้งหมด', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'เปิดดู', exact: true }).click();
+  await expect(page.getByText('normal answer', { exact: true })).toBeVisible();
+});
