@@ -88,4 +88,7 @@ test('liked answers have a dedicated admin view', async ({ page }) => {
   await expect(page.getByText('ผู้ใช้กดถูกใจ', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'คำตอบที่ถูกใจ', exact: true }).click();
   await expect(page.getByRole('button', { name: 'เปิดดู', exact: true })).toHaveCount(1);
+  await page.getByRole('button', { name: 'คิวตรวจ', exact: true }).click();
+  await page.getByLabel('คะแนน', { exact: true }).selectOption('like');
+  await expect(page.getByText('ผู้ใช้กดถูกใจ', { exact: true })).toBeVisible();
 });

@@ -277,7 +277,11 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
             onChange={(e) => {
               setOffset(0);
               setRating(e.target.value);
-              if (e.target.value === 'like') setMode('messages');
+              if (e.target.value === 'like') {
+                setItems([]);
+                setDetail(null);
+                setMode('messages');
+              }
             }}
           >
             <option value="">ทุกคะแนน</option>
