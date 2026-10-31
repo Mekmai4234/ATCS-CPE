@@ -1,3 +1,4 @@
+import { StoredFeedback } from './feedbackSession';
 import { useId, useState } from 'react';
 import { citationUrl, timestamp } from './domain';
 import type { Artifact, Citation, Coverage, TaskResult, TaskType } from './types';
@@ -250,6 +251,12 @@ export function ResultView({
   partial?: boolean;
   kind?: TaskType;
 }) {
+  if (result.visibility === 'withheld')
+    return (
+      <p className="notice" role="status">
+        ระบบระงับคำตอบนี้ กรุณาปรับคำถามแล้วส่งใหม่
+      </p>
+    );
   const illustrated =
     ['summary', 'compare', 'research'].includes(kind) && !result.artifacts?.length;
   const answer = result.answer || (typeof result.content === 'string' ? result.content : '');
@@ -304,6 +311,9 @@ export function ResultView({
         insufficient={result.status === 'insufficient_evidence'}
       />
       <VisualCoverageNotice value={result.visualCoverage} />
+      {kind === 'chat' && result.assistant_message_id && (
+        <StoredFeedback key={result.assistant_message_id} id={result.assistant_message_id} />
+      )}
       {result.artifacts?.map((artifact, i) => (
         <ArtifactView artifact={artifact} key={artifact.artifact_id || i} />
       ))}
