@@ -128,7 +128,12 @@ try {
       fullPage: true,
     });
     await page.keyboard.press("Escape");
-    await page.getByRole("button", { name: "ออกจากระบบ", exact: true }).click();
+    // The mobile sidebar is hidden; use the account menu available at every width.
+    await page.getByLabel("บัญชีผู้ใช้", { exact: true }).click();
+    await page
+      .locator(".v5-account-menu")
+      .getByRole("button", { name: "ออกจากระบบ", exact: true })
+      .click();
     await page
       .getByRole("button", { name: "ทดลองด้วยบัญชี A", exact: true })
       .waitFor();
