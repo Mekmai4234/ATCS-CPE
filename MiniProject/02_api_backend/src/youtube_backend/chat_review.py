@@ -342,6 +342,10 @@ def detail(repo, case_id=None, message_id=None):
             else None
         )
         if event:
+            if event["action"] == "signal":
+                from .answer_review import admin_metadata
+
+                data["review_signal"] = admin_metadata(event)
             # Even if the scheduled purge is late, expired drafts are never returned.
             data["moderation"] = dict(
                 direction=event["direction"],
@@ -349,7 +353,9 @@ def detail(repo, case_id=None, message_id=None):
                 reason=event["reason"],
                 policy_version=event["policy_version"],
                 draft=event["content"] if event["content_expires_at"] > time.time() else None,
-                visible_to_user=False if event["action"] in {"block", "withhold"} else True,
+                visible_to_user=False
+                if event["action"] in {"block", "withhold", "signal"}
+                else True,
             )
         audit(c, admin, owner, "chat_review_open", case_id=case_id, message_id=mid)
         return data
