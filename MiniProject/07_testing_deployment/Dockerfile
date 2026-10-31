@@ -31,6 +31,11 @@ EXPOSE 8000
 CMD ["yk-api"]
 
 FROM runtime AS test
+USER 0:0
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+USER 10001:10001
 COPY --from=build /app/02_api_backend /app/02_api_backend
 COPY --from=build /app/03_video_ingestion /app/03_video_ingestion
 COPY --from=build /app/04_rag_knowledge /app/04_rag_knowledge
@@ -49,5 +54,6 @@ COPY 05_ai_answers_analysis/fixtures /app/05_ai_answers_analysis/fixtures
 # 06 also packages src/youtube_agent/data/ in the installed wheel.
 COPY 06_research_learning_agent/ /app/06_research_learning_agent/
 COPY 07_testing_deployment/tests /app/07_testing_deployment/tests
+COPY 07_testing_deployment/fixtures /app/07_testing_deployment/fixtures
 COPY 07_testing_deployment/pyproject.toml /app/07_testing_deployment/pyproject.toml
 CMD ["python", "07_testing_deployment/scripts/check.py"]
