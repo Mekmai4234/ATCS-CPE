@@ -16,6 +16,7 @@ The older module-01 handoff still describes components without mounted integrati
 | Input check | POST `/api/chat/check` with exact ChatRequest; allow/warn/block |
 | Warning confirmation | `moderation_token`, exact question/scope/conversation, 300-second ticket |
 | New expired/changed confirmation | 422 `moderation_confirmation_required`; request a new ticket |
+| Blocked input | 422 `moderation_blocked`; no new job/provider work |
 | Existing transport replay | identical owned key/hash returns existing job even with expired/missing token |
 | Changed payload under old key | 409 `idempotency_conflict`; never silently replace original work |
 | Resume | POST `/api/jobs/{job_id}/resume`, optional token; existing replacement lookup is read-only |
