@@ -143,7 +143,8 @@ async def vector_count(env):
     return await env.adapters.knowledge.rag.vectors.call("count", 15)
 
 
-async def test_concurrent_accounts_share_source_with_private_jobs(members):
+@pytest.mark.parametrize("attach_first", [False, True])
+async def test_concurrent_accounts_share_source_with_private_jobs(members, attach_first):
     env = members
     a, b = await asyncio.gather(add(env.a), add(env.b))
     assert a != b
@@ -158,8 +159,16 @@ async def test_concurrent_accounts_share_source_with_private_jobs(members):
             )
             == 1
         )
-    for job in (a, b):
-        await env.worker.run_once(job)
+    # asyncio.gather preserves argument order, not which account acquired the
+    # shared import first. Process by dependency, never by account position.
+    jobs = {env.repo.get_job(job, internal=True)["kind"]: job for job in (a, b)}
+    assert set(jobs) == {"import", "attach"}
+    if attach_first:
+        assert not await env.worker.run_once(jobs["attach"])
+        waiting = env.repo.get_job(jobs["attach"], internal=True)
+        assert waiting["state"] == "queued" and waiting["attempt_count"] == 0
+    assert await env.worker.run_once(jobs["import"])
+    assert await env.worker.run_once(jobs["attach"])
     assert (await poll(env.a, a))["stage"] == (await poll(env.b, b))["stage"] == "ready"
     assert env.captions.calls == [VIDEO_A]
     assert await vector_count(env) > 0
