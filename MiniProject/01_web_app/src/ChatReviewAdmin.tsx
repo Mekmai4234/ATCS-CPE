@@ -273,6 +273,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
         <label>
           คะแนน
           <select
+            aria-label="คะแนน"
             value={rating}
             onChange={(e) => {
               setOffset(0);
