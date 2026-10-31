@@ -1,5 +1,8 @@
 # 07 — System verification and deployment
 
+P0/P1 implementation, commands, measured local latency and pending live/human gates:
+[P0_P1_DELIVERY.md](P0_P1_DELIVERY.md).
+
 Free Tier / local visual-media work (25 October):
 [acceptance and release blockers](FREE_TIER_ACCEPTANCE.md),
 [local tool packaging](LOCAL_MEDIA_TOOLS.md), [current report](FREE_TIER_REPORT.md).
