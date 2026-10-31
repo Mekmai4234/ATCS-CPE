@@ -160,12 +160,12 @@ def precheck(repo, request):
 
 
 def admit(repo, request):
-    """Called by Repository.enqueue, including direct non-HTTP callers."""
+    """Validate a ticket for NEW work; do not mutate it or publish an execution proof."""
     decision, reason = classify(request["question"])
     if decision == "allow":
         return None
     if decision == "warn" and request.get("moderation_token"):
-        with repo.db.write() as c:
+        with repo.db.read() as c:
             owner = repo._actor(c)
             table = db.review["events"]
             event = row(
@@ -180,14 +180,10 @@ def admit(repo, request):
                     table.c.token_hash
                     == hashlib.sha256(request["moderation_token"].encode()).hexdigest(),
                     table.c.expires_at > time.time(),
+                    table.c.content_expires_at > time.time(),
                 ),
             )
             if event:
-                c.execute(
-                    table.update()
-                    .where(table.c.event_id == event["event_id"])
-                    .values(acknowledged_at=time.time())
-                )
                 return event["event_id"]
     precheck(repo, request)  # Persist rejected attempts independently of enqueue rollback.
     raise AppError(
@@ -195,6 +191,49 @@ def admit(repo, request):
         BLOCKED if decision == "block" else WARNING,
         422,
     )
+
+
+def bind_admission(repo, c, job, ticket_id):
+    """Create one immutable proof in the SAME serialized transaction as its job.
+
+    Tickets can approve identical new requests within their validity window, but
+    executions never share/relink proof rows. Nothing is committed if binding fails.
+    """
+    ticket = row(c, db.review["events"], db.review["events"].c.event_id == ticket_id)
+    now = time.time()
+    if not ticket or not (
+        ticket["owner_id"] == job["owner_id"]
+        and ticket["direction"] == "input"
+        and ticket["action"] == "warn"
+        and ticket["policy_version"] == POLICY_VERSION
+        and ticket["request_hash"] == request_digest(job["payload"]["request"])
+        and ticket["expires_at"] is not None
+        and now < ticket["expires_at"]
+        and now < ticket["content_expires_at"]
+    ):
+        raise AppError("moderation_confirmation_required", WARNING, 422)
+    proof_id = add_event(
+        repo,
+        c,
+        owner=job["owner_id"],
+        direction="input",
+        action="acknowledge",
+        reason=ticket["reason"],
+        content=None,
+        job_id=job["job_id"],
+        conversation_id=job["conversation_id"],
+        request_hash=ticket["request_hash"],
+        expires_at=ticket["expires_at"],
+    )
+    c.execute(
+        db.review["events"]
+        .update()
+        .where(db.review["events"].c.event_id == proof_id)
+        .values(acknowledged_at=now, content_expires_at=ticket["content_expires_at"])
+    )
+    payload = dict(job["payload"], moderation_event_id=proof_id)
+    c.execute(db.jobs.update().where(db.jobs.c.job_id == job["job_id"]).values(payload=payload))
+    job["payload"] = payload
 
 
 def check_execution(repo, job):
@@ -215,9 +254,15 @@ def check_execution(repo, job):
             and proof["acknowledged_at"]
             and (
                 proof["owner_id"] == job["owner_id"]
+                and proof["job_id"] == job["job_id"]
+                and proof["direction"] == "input"
+                # Retain correctly bound pre-fix admissions, never unclaimed tickets.
+                and proof["action"] in {"acknowledge", "warn"}
                 and proof["request_hash"] == request_digest(request)
                 and proof["policy_version"] == POLICY_VERSION
+                and proof["expires_at"] is not None
                 and proof["acknowledged_at"] <= proof["expires_at"]
+                and proof["content_expires_at"] > time.time()
             )
         ):
             return
