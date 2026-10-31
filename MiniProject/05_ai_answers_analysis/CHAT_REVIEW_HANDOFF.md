@@ -18,3 +18,12 @@ behavior are invented in 05. Never infer out-of-scope solely from no retrieved e
 Pending: agreed offensive/quoted-content policy, full input/output guard integration,
 publication of versioned events via 02, retained published-versus-withheld distinction,
 real member/admin E2E, semantic review and latency measurements.
+
+
+## Remaining-work increment
+
+See REVIEW_SIGNAL_CONTRACT_PROPOSAL.md for the separately versioned v2 envelope,
+quoted-study corpus and operational retrieval/generation/total timings now instrumented
+in existing adapters. The envelope itself remains unmounted: current 02 add_event
+hard-codes chat-local-v1, so owner-02 acceptance is still required before queue integration.
+Do not treat pending sink agreement as completed publication-guard integration.
