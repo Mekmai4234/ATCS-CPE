@@ -27,7 +27,9 @@ type Detail = {
   answer?: { content: string };
   visibility?: string;
   provider_metadata?: { requested_model?: string; returned_model?: string };
+  review_signal?: unknown;
   moderation?: {
+    direction?: 'input' | 'output';
     draft: string | null;
     action: string;
     reason: string;
@@ -191,6 +193,8 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
       <button
         aria-pressed={mode === 'cases'}
         onClick={() => {
+          setItems([]);
+          setDetail(null);
           setMode('cases');
           setOffset(0);
         }}
@@ -200,6 +204,8 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
       <button
         aria-pressed={mode === 'messages'}
         onClick={() => {
+          setItems([]);
+          setDetail(null);
           setMode('messages');
           setOffset(0);
         }}
@@ -302,7 +308,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
       )}
       {!loading && !error && !items.length && <p>ไม่มีรายการที่ตรงกับตัวกรอง</p>}
       {items.map((item) => (
-        <article key={item.message_id || item.case_id}>
+        <article key={mode === 'cases' ? item.case_id : item.message_id}>
           <p>{item.question_excerpt || `คำตอบที่บันทึก ${item.message_id?.slice(0, 8) || ''}`}</p>
           {mode === 'cases' ? (
             <small>
@@ -345,6 +351,14 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
             {detail.visibility === 'withheld' ? 'ข้อความระบบที่ผู้ใช้เห็น' : 'คำตอบที่ผู้ใช้เห็น'}
           </h3>
           <p>{detail.answer?.content || 'ไม่มีคำตอบ'}</p>
+          {detail.moderation?.direction === 'input' &&
+            detail.moderation.action === 'block' &&
+            !detail.moderation.visible_to_user && (
+              <section aria-label="ต้นฉบับข้อความที่ถูกบล็อก">
+                <h3>ข้อความผู้ใช้ที่ถูกบล็อกก่อนส่งให้ AI</h3>
+                <p>{detail.moderation.draft ?? 'เนื้อหาถูกลบตามอายุการเก็บ'}</p>
+              </section>
+            )}
           {detail.moderation?.action === 'withhold' && !detail.moderation.visible_to_user && (
             <details>
               <summary>ร่างที่ถูกระงับ — ผู้ใช้ไม่เห็น</summary>
@@ -357,7 +371,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
               {detail.provider_metadata.returned_model || detail.provider_metadata.requested_model}
             </p>
           )}
-          {detail.moderation?.action === 'review_signal' && (
+          {detail.moderation?.action === 'signal' && (
             <p>สัญญาณระบบเพื่อรอตรวจ — ไม่ใช่ร่างที่ถูกระงับหรือคำตัดสินยืนยัน</p>
           )}
           {detail.moderation && (
