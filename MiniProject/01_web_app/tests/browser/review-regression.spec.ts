@@ -6,6 +6,9 @@ test('notes survive reopen and outcome updates; signal metadata is not a withhel
   await page.getByRole('button', { name: 'เปิดดู', exact: true }).click();
   await expect(page.getByLabel('หมายเหตุ')).toHaveValue('existing review note');
   await expect(page.getByText('PRIVATE_SIGNAL_METADATA')).toHaveCount(0);
+  await expect(
+    page.getByText('สัญญาณระบบเพื่อรอตรวจ — ไม่ใช่ร่างที่ถูกระงับหรือคำตัดสินยืนยัน'),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'เริ่มตรวจ', exact: true }).click();
   await page.getByRole('button', { name: 'เปิดดู', exact: true }).click();
   await expect(page.getByLabel('หมายเหตุ')).toHaveValue('existing review note');
@@ -34,4 +37,28 @@ test('deferred paused chat exposes resume and follows the replacement', async ({
   await expect(page.locator('html')).toHaveAttribute('data-resume-count', '2');
   await expect(page.getByText('RESUMED ANSWER', { exact: true }).first()).toBeVisible();
   await expect(deferred).toHaveCount(0);
+});
+
+test('authorized blocked input is visible as escaped original text, distinct from withheld output', async ({
+  page,
+}) => {
+  await page.goto('/tests/review-regression.html?admin=1&blocked=1');
+  await page.getByRole('button', { name: 'เปิดดู', exact: true }).click();
+  const original = page.getByRole('region', { name: 'ต้นฉบับข้อความที่ถูกบล็อก' });
+  await expect(original).toContainText('ORIGINAL BLOCKED QUESTION <script>alert(1)</script>');
+  await expect(original.locator('script')).toHaveCount(0);
+  await expect(page.getByText('ร่างที่ถูกระงับ — ผู้ใช้ไม่เห็น')).toHaveCount(0);
+});
+
+test('distinct cases sharing one message keep separate rows and details', async ({ page }) => {
+  const duplicateKeys: string[] = [];
+  page.on('console', (m) => {
+    if (/same key|unique.*key/i.test(m.text())) duplicateKeys.push(m.text());
+  });
+  await page.goto('/tests/review-regression.html?admin=1&shared=1');
+  await expect(page.getByRole('button', { name: 'เปิดดู', exact: true })).toHaveCount(2);
+  await page.getByRole('button', { name: 'เปิดดู', exact: true }).nth(1).click();
+  await expect(page.getByText('second case question', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('หมายเหตุ', { exact: true })).toHaveValue('second notes');
+  expect(duplicateKeys).toEqual([]);
 });
