@@ -16,6 +16,7 @@ from youtube_backend.urls import canonical_url
 from .authorization import MemberContext, guard_context
 from .models import GeneratedAnswer, error
 from .prompts import input_size, json_text, payload
+from .timing import timed_stage
 from .transcript import has_performer_cues, wants_performer_attribution, wants_transcript
 
 
@@ -87,6 +88,7 @@ class AnswerService:
             "citation_ids": [record.chunk_id],
         }
 
+    @timed_stage("generation")
     async def _generate(self, run, data):
         if input_size(data) > self.settings.max_context_tokens:
             raise error("context_budget_exceeded", "Input exceeds conservative context guard")
