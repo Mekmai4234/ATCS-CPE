@@ -12,12 +12,13 @@ test('rating is confirmed once, toggles off and edits optional dislike details',
   await like.click();
   await expect(like).toHaveAttribute('aria-pressed', 'false');
   await page.getByRole('button', { name: 'ไม่ถูกใจ', exact: true }).click();
-  await expect(page.getByRole('status')).toHaveText('รับความคิดเห็นแล้ว');
+  await expect(page.locator('.answer-feedback [role="status"]')).toHaveText('รับความคิดเห็นแล้ว');
   await page.getByRole('textbox').fill('<script>untrusted</script>');
   await page.getByRole('button', { name: 'บันทึก', exact: true }).click();
-  await expect(page.getByRole('status')).toHaveText('รับความคิดเห็นแล้ว');
+  await expect(page.locator('.answer-feedback [role="status"]')).toHaveText('รับความคิดเห็นแล้ว');
   await expect(page.getByRole('textbox')).toHaveValue('<script>untrusted</script>');
   await expect(page.locator('output')).toHaveText('4');
+  await page.screenshot({ path: 'runtime/feedback-preview.png', fullPage: true });
 });
 test('failure preserves server state and explicit retry uses the same change', async ({ page }) => {
   await page.getByRole('button', { name: 'Toggle failure' }).click();
@@ -25,7 +26,9 @@ test('failure preserves server state and explicit retry uses the same change', a
   await like.click();
   await expect(page.getByRole('alert')).toBeVisible();
   await expect(like).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByRole('status')).not.toHaveText('รับความคิดเห็นแล้ว');
+  await expect(page.locator('.answer-feedback [role="status"]')).not.toHaveText(
+    'รับความคิดเห็นแล้ว',
+  );
   await page.getByRole('button', { name: 'Toggle failure' }).click();
   await page.getByRole('button', { name: 'ลองใหม่', exact: true }).click();
   await expect(like).toHaveAttribute('aria-pressed', 'true');
