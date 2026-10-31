@@ -261,23 +261,39 @@ class Repository(Ownership):
             ):
                 raise AppError("source_changed", "Selected sources changed; submit a new task", 409)
 
+    def _replay_job(self, connection, key, request_hash):
+        previous = row(connection, db.jobs, db.jobs.c.idempotency_key == key) if key else None
+        if previous:
+            self._private(connection, previous)
+            if previous["request_hash"] != request_hash:
+                raise AppError("idempotency_conflict", "Key already used with different input", 409)
+        return previous
+
     def enqueue(self, kind, request, idempotency_key=None):
+        admission_request = request
+        if kind == "chat":
+            request = {k: v for k, v in request.items() if k != "moderation_token"}
         request_hash = digest(request)
         from .auth import actor_id
 
         namespace = actor_id.get() if self.settings.auth_enabled else "legacy"
         key = digest([namespace, kind, idempotency_key]) if idempotency_key else None
+        if key:
+            with self.db.read() as connection:
+                self._actor(connection)
+                previous = self._replay_job(connection, key, request_hash)
+                if previous:
+                    return previous
+        ticket_id = None
+        if kind == "chat":
+            from .moderation import admit
+
+            ticket_id = admit(self, admission_request)
         with self.db.write() as connection:
             owner = self._actor(connection)
-            if key:
-                previous = row(connection, db.jobs, db.jobs.c.idempotency_key == key)
-                if previous:
-                    if previous["request_hash"] != request_hash:
-                        raise AppError(
-                            "idempotency_conflict", "Key already used with different input", 409
-                        )
-                    self._private(connection, previous)
-                    return previous
+            previous = self._replay_job(connection, key, request_hash)
+            if previous:
+                return previous
             sources = self._sources(connection, request["scope"])
             if kind == "analysis" and request["type"] == "compare" and len(sources) < 2:
                 raise AppError("comparison_scope", "Comparison requires at least two videos", 422)
@@ -348,6 +364,10 @@ class Repository(Ownership):
                 request_hash=request_hash,
             )
             if kind == "chat":
+                if ticket_id:
+                    from .moderation import bind_admission
+
+                    bind_admission(self, connection, job, ticket_id)
                 connection.execute(
                     db.messages.insert().values(
                         message_id=uid(),
@@ -404,6 +424,21 @@ class Repository(Ownership):
             except AppError:
                 return False
 
+    def chat_result(self, job):
+        from .chat_review import feedback_for
+
+        result = dict(job["result"])
+        with self.db.read() as c:
+            mid = c.scalar(
+                sa.select(db.messages.c.message_id).where(
+                    db.messages.c.job_id == job["job_id"], db.messages.c.role == "assistant"
+                )
+            )
+            if mid:
+                result["assistant_message_id"] = mid
+                result["feedback"] = feedback_for(c, job["owner_id"], mid)
+        return result
+
     def public_job(self, job):
         keys = (
             "job_id",
@@ -421,6 +456,8 @@ class Repository(Ownership):
             "result",
         )
         result = {k: job[k] for k in keys}
+        if job["kind"] == "chat" and job["result"]:
+            result["result"] = self.chat_result(job)
         with self.db.read() as connection:
             wait = row(connection, db.v2["pauses"], db.v2["pauses"].c.job_id == job["job_id"])
         if wait:
@@ -874,7 +911,10 @@ class Repository(Ownership):
                     )
                 )
             elif kind == "chat":
+                from .moderation import inspect_output
+
                 message_id = uid()
+                result = inspect_output(self, connection, job, result, None)
                 connection.execute(
                     db.messages.insert().values(
                         message_id=message_id,
@@ -895,10 +935,25 @@ class Repository(Ownership):
                             data=citation,
                         )
                     )
+                for table in (db.review["events"], db.review["cases"]):
+                    if "job_id" in table.c:
+                        condition = table.c.job_id == job_id
+                    else:
+                        condition = table.c.event_id.in_(
+                            sa.select(db.review["events"].c.event_id).where(
+                                db.review["events"].c.job_id == job_id
+                            )
+                        )
+                    connection.execute(
+                        table.update()
+                        .where(condition, table.c.message_id.is_(None))
+                        .values(message_id=message_id)
+                    )
                 result = dict(
                     result,
                     conversation_id=job["conversation_id"],
                     job_id=job_id,
+                    assistant_message_id=message_id,
                     mode=self.settings.adapter_mode,
                 )
             if kind in {"artifact", "research"}:
@@ -1296,6 +1351,12 @@ class Repository(Ownership):
                 item["state"] = row(connection, db.jobs, db.jobs.c.job_id == item["job_id"])[
                     "state"
                 ]
+                if item["role"] == "assistant":
+                    from .chat_review import feedback_for
+
+                    job = row(connection, db.jobs, db.jobs.c.job_id == item["job_id"])
+                    item["visibility"] = (job["result"] or {}).get("visibility", "published")
+                    item["feedback"] = feedback_for(connection, job["owner_id"], item["message_id"])
                 items.append(item)
             latest_job = connection.execute(
                 sa.select(db.jobs.c.payload)

@@ -98,6 +98,9 @@ class Worker:
         request = payload["request"]
         state = "completed"
         if kind == "chat":
+            from .moderation import check_execution
+
+            check_execution(self.repo, job)
             result = AnswerResult.model_validate(
                 await self.adapters.answer(request, sources, payload["history"], context)
             )
@@ -215,6 +218,12 @@ class Worker:
             )
 
     async def run_forever(self):
+        from .moderation import purge_expired
+
+        last_cleanup = 0.0
         while True:
+            if time.monotonic() - last_cleanup >= 60:
+                purge_expired(self.repo)
+                last_cleanup = time.monotonic()
             if not await self.run_once():
                 await asyncio.sleep(self.settings.worker_poll_seconds)
