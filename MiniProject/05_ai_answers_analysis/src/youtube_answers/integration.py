@@ -16,6 +16,7 @@ from .models import error
 from .quota import ExecutionBroker
 from .reuse import reuse_configuration
 from .service import AnswerService
+from .timing import timed_stage
 
 
 class RagKnowledge:
@@ -25,12 +26,15 @@ class RagKnowledge:
     async def inventory(self, sources, context):
         return await self.rag.inventory(sources, BackendExecution(context))
 
+    @timed_stage("retrieval")
     async def short_context(self, sources, context):
         return await self.rag.short_context(sources, BackendExecution(context))
 
+    @timed_stage("retrieval")
     async def search(self, query, sources, context, **kwargs):
         return await self.rag.search(query, sources, BackendExecution(context), **kwargs)
 
+    @timed_stage("retrieval")
     async def read(self, sources, context, **kwargs):
         return await self.rag.read_video_chunks(sources, BackendExecution(context), **kwargs)
 
@@ -96,6 +100,7 @@ class AnswerAdapters(RagAdapters):
         self.answers = AnswerService(config, gateway, RagKnowledge(self.rag))
         self.answer_reuse = OrderedDict()
 
+    @timed_stage("total")
     async def answer(self, request, sources, history, context):
         from youtube_backend.repository import digest
 
