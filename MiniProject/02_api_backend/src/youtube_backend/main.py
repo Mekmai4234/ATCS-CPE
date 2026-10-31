@@ -347,8 +347,8 @@ def create_app(settings=None, database=None, adapters=None):
         rating: Annotated[str | None, Query(pattern="^(like|dislike)$")] = None,
         label: Annotated[str | None, Query(max_length=40)] = None,
         q: Annotated[str, Query(max_length=200)] = "",
-        after: float | None = None,
-        before: float | None = None,
+        after: Annotated[float | None, Query(ge=0, le=253402300799)] = None,
+        before: Annotated[float | None, Query(ge=0, le=253402300799)] = None,
     ):
         from .chat_review import review_list
 
