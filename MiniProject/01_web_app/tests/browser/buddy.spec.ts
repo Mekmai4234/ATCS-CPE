@@ -134,7 +134,7 @@ test('scope changes start a new conversation and suggestions never submit automa
   await expect(dialog(page).locator('.buddy-message')).toHaveCount(0);
   await dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true }).press('Enter');
   await expect(dialog(page).locator('.buddy-message')).toHaveCount(1);
-  await dialog(page).getByRole('checkbox').nth(1).check();
+  await choose(page, 1);
   await dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true }).fill('ถามด้วยชุดใหม่');
   await dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true }).press('Enter');
   await expect(
@@ -407,7 +407,8 @@ test('sending moves the question right and shows mascot typing before the answer
   const bubble = dialog(page).locator('.buddy-question').last();
   await expect(bubble).toHaveText('รอผล แล้วอธิบาย RAG');
   await expect(dialog(page).getByText('Buddy กำลังพิมพ์คำตอบ…', { exact: true })).toBeVisible();
-  await expect(dialog(page).locator('.buddy-reply-heading').last()).toBeVisible();
+  await expect(dialog(page).locator('.buddy-reply-heading .buddy-rig').last()).toBeVisible();
+  await expect(dialog(page).locator('.buddy-scope')).not.toHaveAttribute('open', '');
   const box = await bubble.boundingBox();
   const area = await dialog(page).locator('.buddy-messages').boundingBox();
   expect(box!.x + box!.width).toBeGreaterThan(area!.x + area!.width * 0.8);
