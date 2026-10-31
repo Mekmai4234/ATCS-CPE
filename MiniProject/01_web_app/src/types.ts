@@ -64,6 +64,8 @@ export interface Coverage {
   notes: string[];
 }
 export interface Answer {
+  assistant_message_id?: string;
+  visibility?: 'published' | 'withheld';
   job_id?: string;
   status: 'answered' | 'insufficient_evidence';
   answer: string;
@@ -217,6 +219,7 @@ export interface ConversationPage {
   offset: number;
   messages: {
     message_id: string;
+    visibility?: 'published' | 'withheld';
     job_id: string;
     role: string;
     content: string;

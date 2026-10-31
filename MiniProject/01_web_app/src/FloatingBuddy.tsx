@@ -34,12 +34,19 @@ interface Props {
   busy: boolean;
   status: string;
   error: string;
-  waiting?: { id: string; label: string; status: string; follow: () => void }[];
+  waiting?: {
+    id: string;
+    label: string;
+    status: string;
+    follow: () => void;
+    resume?: () => void;
+  }[];
   scopeNotice: string;
   scopeHelp?: string;
   newConversation: () => void;
   cancel?: () => void;
   retry?: () => void;
+  resume?: () => void;
   fullChat: () => void;
   history: () => void;
   historyAvailable: boolean;
@@ -512,6 +519,11 @@ export default function FloatingBuddy(props: Props) {
               {props.waiting?.map((item) => (
                 <article className="deferred-jobs" key={item.id}>
                   <strong>{item.label}</strong>
+                  {item.resume && (
+                    <button disabled={props.locked} onClick={item.resume}>
+                      ให้งานที่พักทำต่อ
+                    </button>
+                  )}
                   <p role="status">{item.status}</p>
                   <button disabled={props.locked} onClick={item.follow}>
                     ติดตามงานเดิมอีกครั้ง
@@ -524,6 +536,7 @@ export default function FloatingBuddy(props: Props) {
                 </p>
               )}
               {props.cancel && <button onClick={props.cancel}>ขอยกเลิกงานแชต</button>}
+              {props.resume && <button onClick={props.resume}>ให้งานที่พักทำต่อ</button>}
               {props.retry && (
                 <button onClick={props.retry}>ลองติดตามหรือส่งคำขอเดิมอีกครั้ง</button>
               )}
