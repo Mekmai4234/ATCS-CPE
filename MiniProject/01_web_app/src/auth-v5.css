@@ -359,7 +359,9 @@ body .buddy-v5 .buddy-reply-heading {
   color: #00866e;
 }
 body .buddy-v5 .buddy-reply-heading .buddy-rig {
-  display: none;
+  display: block;
+  width: 36px;
+  height: 36px;
 }
 body .buddy-v5 .buddy-message .answer-text {
   font-size: 16px;
