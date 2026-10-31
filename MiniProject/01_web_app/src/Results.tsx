@@ -170,7 +170,19 @@ function QuizContent({ artifact }: { artifact: Artifact }) {
           <ArtifactReferences artifact={artifact} ids={question.citations} />
         </details>
       </article>
-      <ArtifactPager index={current} count={questions.length} change={setIndex} noun="ข้อ" />
+      {current < questions.length - 1 ? (
+        <ArtifactPager index={current} count={questions.length} change={setIndex} noun="ข้อ" />
+      ) : (
+        <nav className="v5r-pager" aria-label="จบแบบทดสอบ">
+          <button type="button" disabled={current === 0} onClick={() => setIndex(current - 1)}>
+            ← ข้อก่อนหน้า
+          </button>
+          <span role="status">ครบ {questions.length} ข้อแล้ว</span>
+          <button type="button" onClick={() => setIndex(0)}>
+            ทบทวนตั้งแต่ข้อแรก ↺
+          </button>
+        </nav>
+      )}
     </div>
   );
 }

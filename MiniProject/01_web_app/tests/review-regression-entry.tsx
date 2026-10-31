@@ -37,6 +37,11 @@ const api = new Api('', async (input, init) => {
       question: { content: 'second case question' },
       answer: { content: 'answer' },
     });
+  if (
+    path.startsWith('/api/admin/chat-reviews?') &&
+    new URLSearchParams(location.search).has('empty')
+  )
+    return json({ items: [], total: 0, stats: {} });
   if (path.startsWith('/api/admin/chat-reviews?'))
     return json({
       items: [{ case_id: 'case', question_excerpt: 'question', status }],
