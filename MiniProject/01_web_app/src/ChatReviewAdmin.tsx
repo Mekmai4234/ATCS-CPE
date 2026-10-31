@@ -146,18 +146,38 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
     const c = new AbortController();
     request.current = c;
     try {
-      await api.request(`/api/admin/chat-reviews/${encodeURIComponent(detail.case.case_id)}`, {
-        signal: c.signal,
-        method: 'PATCH',
-        body: JSON.stringify({
-          status: outcome ? 'reviewed' : 'in_review',
-          outcome: outcome || null,
-          notes,
-        }),
-      });
+      const { data: updated } = await api.request<Case>(
+        `/api/admin/chat-reviews/${encodeURIComponent(detail.case.case_id)}`,
+        {
+          signal: c.signal,
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: outcome ? 'reviewed' : 'in_review',
+            outcome: outcome || null,
+            notes,
+          }),
+        },
+      );
       if (!c.signal.aborted) {
-        setDetail(null);
-        setRevision((n) => n + 1);
+        setDetail((previous) =>
+          previous && previous.case && previous.case.case_id === detail.case?.case_id
+            ? { ...previous, case: { ...previous.case, ...updated } }
+            : previous,
+        );
+        setItems((previous) =>
+          outcome && (!status || status === 'new' || status === 'in_review')
+            ? previous.filter((item) => item.case_id !== detail.case?.case_id)
+            : previous.map((item) =>
+                item.case_id === detail.case?.case_id ? { ...item, ...updated } : item,
+              ),
+        );
+        if (outcome && (!status || status === 'new' || status === 'in_review'))
+          setTotal((n) => Math.max(0, n - 1));
+        if (outcome)
+          setStats((previous) => ({
+            ...previous,
+            pending: Math.max(0, (previous.pending || 0) - 1),
+          }));
       }
     } catch (e) {
       if (!c.signal.aborted) failure(e);
@@ -284,11 +304,15 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
       {items.map((item) => (
         <article key={item.message_id || item.case_id}>
           <p>{item.question_excerpt || `คำตอบที่บันทึก ${item.message_id?.slice(0, 8) || ''}`}</p>
-          <small>
-            สมาชิก {item.member_ref} ·{' '}
-            {['user', 'user_report'].includes(item.source) ? 'ผู้ใช้รายงาน' : 'ระบบสงสัย'} ·{' '}
-            {labelNames[item.label] || item.label} · {statusNames[item.status] || item.status}
-          </small>
+          {mode === 'cases' ? (
+            <small>
+              สมาชิก {item.member_ref} ·{' '}
+              {['user', 'user_report'].includes(item.source) ? 'ผู้ใช้รายงาน' : 'ระบบสงสัย'} ·{' '}
+              {labelNames[item.label] || item.label} · {statusNames[item.status] || item.status}
+            </small>
+          ) : (
+            <small>คำตอบที่บันทึกไว้ — ไม่ได้ระบุว่าเป็นปัญหา</small>
+          )}
           <button
             disabled={loading}
             onClick={() =>
@@ -363,7 +387,12 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
           </ul>
           <label>
             หมายเหตุ
-            <textarea maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <textarea
+              aria-label="หมายเหตุ"
+              maxLength={1000}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
           </label>
           {detail.case?.status === 'new' ? (
             <button disabled={loading} onClick={() => void save()}>
