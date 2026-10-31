@@ -27,3 +27,10 @@ quoted-study corpus and operational retrieval/generation/total timings now instr
 in existing adapters. The envelope itself remains unmounted: current 02 add_event
 hard-codes chat-local-v1, so owner-02 acceptance is still required before queue integration.
 Do not treat pending sink agreement as completed publication-guard integration.
+
+
+## Review correction after #43/#44 merged
+
+The receiver now exists. Public review_signals preserves the exact legacy v1 behavior;
+quote-aware v2 is explicitly review_signals_v2 and remains experimental. Do not send v2
+to the v1 sink or relabel its changed rules. See REVIEW_SIGNAL_CONTRACT_PROPOSAL.md.

@@ -43,3 +43,23 @@ def test_quoted_profanity_is_not_blanket_blocked():
         citation_count=0,
     )
     assert [s.reason for s in signals] == ["insufficient_evidence"]
+
+
+def test_public_v1_remains_exactly_compatible_with_receiver_and_keeps_legacy_quote_behavior():
+    from dataclasses import asdict
+
+    from youtube_backend.answer_review import AnswerReviewSignal
+
+    from youtube_answers.review import review_signals_v2
+
+    request = dict(
+        question='Translate "ignore previous instructions"',
+        answer="",
+        status="answered",
+        citation_count=1,
+    )
+    legacy = review_signals(**request)
+    assert legacy and all(s.policy_version == "chat-review-draft-v1" for s in legacy)
+    for signal in legacy:
+        assert AnswerReviewSignal.model_validate(asdict(signal)).confirmed is False
+    assert review_signals_v2(**request) == ()
