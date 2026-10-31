@@ -52,7 +52,7 @@ def backup(source, target, *, stopped=False):
         for p in source.rglob("*")
         if p.is_file()
         and (
-            p.relative_to(source).parts[0] in {"chroma", "media"}
+            p.relative_to(source).parts[0] in {"chroma", "media", "media-assets"}
             or p.name in {"app.db", "app.db-wal", "app.db-shm", "seed-result.json"}
             and p.parent == source
         )
