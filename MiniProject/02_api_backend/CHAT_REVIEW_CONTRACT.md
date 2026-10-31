@@ -78,6 +78,9 @@ Paired quoted material in a meaning/translation question is treated as study
 context, while abuse outside the quotes still applies. Sarcasm, dialect, unquoted
 study text and unseen obfuscations need human review and more corpus coverage.
 No additional model call, automatic ban or training occurs.
+The entire accepted output is checked up to a 128,000-character policy bound;
+oversized output is withheld rather than publishing an unchecked suffix. Its stored
+draft is bounded and explicitly marked truncated. This does not truncate published answers.
 
 Module 05 still owns evidence-only semantics and versioned out-of-scope reasons.
 This change does **not** infer out-of-scope from insufficient evidence or dislike,
