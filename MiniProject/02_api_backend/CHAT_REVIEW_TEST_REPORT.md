@@ -1,5 +1,39 @@
 # Feedback / chat review verification — 31 October 2026
 
+## Review follow-up — PR review 5721534730
+
+Merged current `origin/develop` (`3d7b77b`, already present in this branch via
+`35c15a7`) before editing. Fixed all three reported behaviors:
+
+- Existing owner/key/hash match returns the original job before admission, including
+  expired/missing token replay; changed payload conflicts and a new key still guards.
+  Resume applies the same order to an existing replacement before quota/admission.
+- Warning tickets are read-only admission inputs. Each job/replacement atomically
+  creates a distinct, job-bound proof with its original owner/request/version/time
+  checks. Replay cannot relink a proof; deleting another conversation cannot erase
+  it. Worker rejects a proof belonging to another job even with matching owner/text.
+- Expired moderation cases are unavailable for detail and PATCH (404), and excluded
+  from queue pages/totals/pending counts. Copied notes are inaccessible before purge;
+  audit rows retain only IDs/actions. The existing draft-only assertion was updated
+  to the stricter whole-case retention contract, without skipping coverage.
+
+Module 07's six independent review regressions all failed against the old backend,
+then all passed with this fix. Backend focused chat-review/quota coverage: **35
+passed** (29 chat-review, 6 quota), including atomic rollback if a ticket expires
+between admission and job/proof commit. Final full backend on Windows host and
+Linux Docker: **187 passed each**, both with `-W error`. Combined 07 host/Docker:
+**126 passed each**; current real-HTTP browser runner: **10 passed**, cleanup passed.
+Combined Ruff lint/format: **307 Python files**. GitHub CI on the pushed combined
+branch is linked in the PR; its status is reported separately. Historical results below describe
+the original increment, not coverage of these newly discovered defects.
+
+No schema revision change is needed: separate execution proofs use existing 0004
+event columns; no real database/ledger is rewritten. Review access remains off by
+default. 01's components are now in develop but unmounted, so new UI screenshots,
+full/floating/history/admin feedback controls and stale-response UI acceptance
+remain pending the 01 owner. 05 signal integration/Windows test cleanup remains
+outside this change. 04/06 still need no MVP changes.
+
 Worked on `feature/02_api_backend` after fetching and merging `origin/develop`
 (`b4f97be`, already up to date). Scope: module 02 only. No real user state migration,
 provider request or shared quota reset was performed. Contract/rollout details:
