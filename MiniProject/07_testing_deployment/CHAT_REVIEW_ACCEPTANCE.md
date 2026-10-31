@@ -46,10 +46,10 @@ develop first; retarget 07 to develop afterward. No PR is auto-merged by this ta
   `runtime/browser-identity-d1af24e873/{report.json,browser.log}`.
 - Module 02 integration/full consumer tests: **47 passed**; 04 evidence-library
   regressions **12 passed**; 06 video-learning regressions **23 passed**.
-- Ruff lint/format: **304 Python files** pass; changed browser test passes Prettier.
+- Ruff lint/format: **305 Python files** pass; changed browser test passes Prettier.
 - Backend guard suite: **24 passed**, including legacy completed-message ID lookup,
-  guarded resume and an abusive suffix beyond 12,000 characters. Full final backend
-  Docker result is recorded in the module 02 test report/PR.
+  guarded resume and an abusive suffix beyond 12,000 characters. Final full backend
+  Docker run: **182 passed**, using the final source/tests mounted read-only.
 
 Docker runs use non-root image users, `--network none`, CPU/memory/PID caps and no
 real credentials, account database, application data volume or quota reset. Initial
