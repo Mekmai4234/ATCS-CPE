@@ -379,10 +379,12 @@ def create_app(settings=None, database=None, adapters=None):
         return update_case(repository, case_id, body)
 
     @app.get("/api/admin/chat-messages")
-    def admin_messages(limit: Limit = 50, offset: Offset = 0):
+    def admin_messages(limit: Limit = 50, offset: Offset = 0, rating: str | None = None):
         from .chat_review import normal_messages
 
-        return normal_messages(repository, limit, offset)
+        if rating not in {None, "like", "dislike"}:
+            raise AppError("invalid_rating", "Invalid feedback rating", 422)
+        return normal_messages(repository, limit, offset, rating)
 
     @app.get("/api/admin/chat-messages/{message_id}")
     def admin_message_detail(message_id: str):

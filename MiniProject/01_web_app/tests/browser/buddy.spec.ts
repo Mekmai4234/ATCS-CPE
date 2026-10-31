@@ -14,8 +14,9 @@ async function open(page: Page) {
   await expect(dialog(page)).toBeVisible();
 }
 async function choose(page: Page, index = 0) {
-  await dialog(page).getByText('คลิปที่เลือก', { exact: false }).first().click();
-  await dialog(page).getByRole('checkbox').nth(index).check();
+  const checkbox = dialog(page).getByRole('checkbox').nth(index);
+  if (!(await checkbox.isVisible())) await dialog(page).locator('.buddy-scope summary').click();
+  await checkbox.check();
 }
 test('login is private and policy/help links have real readable destinations', async ({ page }) => {
   await page.goto(`${base}/login?demo=1`);
@@ -68,7 +69,7 @@ test('Buddy is the only launcher and pointercancel, arrow keys and Home work', a
   await launcher(page).dispatchEvent('pointercancel', { pointerId: 1, clientX: 30, clientY: 30 });
   await page.mouse.up();
   expect((await launcher(page).boundingBox())!.x).toBeCloseTo(origin.x, 0);
-  await expect(page.getByRole('button', { name: 'ตำแหน่งและการแสดงแชต' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'ตำแหน่งและการแสดงแชต' })).toHaveCount(0);
   await expect(page.locator('.buddy-widget > button')).toHaveCount(1);
   await launcher(page).focus();
   await page.keyboard.press('ArrowLeft');
@@ -361,8 +362,7 @@ test('position reset remains usable when localStorage is unavailable', async ({ 
   const origin = (await launcher(page).boundingBox())!;
   await launcher(page).focus();
   await page.keyboard.press('ArrowLeft');
-  await page.getByRole('button', { name: 'ตำแหน่งและการแสดงแชต', exact: true }).click();
-  await page.getByRole('button', { name: 'คืนตำแหน่ง', exact: true }).click();
+  await page.keyboard.press('Home');
   await expect(launcher(page)).toBeFocused();
   expect((await launcher(page).boundingBox())!.x).toBeCloseTo(origin.x, 0);
   await page.keyboard.press('Enter');
