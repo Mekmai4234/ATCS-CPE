@@ -14,6 +14,7 @@ from .configuration import resolved_service
 from .gemini import GeminiModel
 from .models import error
 from .quota import ExecutionBroker
+from .reuse import reuse_configuration
 from .service import AnswerService
 
 
@@ -112,6 +113,7 @@ class AnswerAdapters(RagAdapters):
                 grant = self.answers.model.grant(self.answers.settings.llm_model, "chat")
             key = digest(
                 [
+                    reuse_configuration(self.answers.settings, self.rag.settings),
                     job["owner_id"],
                     [s.model_dump() for s in sources],
                     {k: v for k, v in request.items() if k != "conversation_id"},
