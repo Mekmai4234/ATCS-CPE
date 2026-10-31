@@ -1,5 +1,8 @@
 # Module 02: API / Backend
 
+P1 quota/status and explicit resume APIs: [QUOTA_API.md](QUOTA_API.md).
+Current verification: [P1_TEST_REPORT.md](P1_TEST_REPORT.md).
+
 Free-only outbound policy, shared quota broker and media evidence v2 are documented
 in [FREE_TIER_MEDIA.md](FREE_TIER_MEDIA.md). Schema head is 0003. The default denies
 unverified Gemini and undeclared legacy provider calls; consumer broker/enrich wiring
