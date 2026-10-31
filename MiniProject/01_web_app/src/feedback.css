@@ -1,0 +1,48 @@
+.answer-feedback {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--cream, #fffdf5);
+  border-radius: 16px;
+  color: #16463c;
+}
+.feedback-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.answer-feedback button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid #6b968b;
+  border-radius: 12px;
+  background: #fffdf5;
+  color: #16463c;
+  padding: 0.5rem;
+  cursor: pointer;
+}
+.answer-feedback button[aria-pressed='true'] {
+  background: #c7eddd;
+  border-width: 2px;
+}
+.answer-feedback button:focus-visible,
+.answer-feedback select:focus-visible,
+.answer-feedback textarea:focus-visible {
+  outline: 3px solid #285f95;
+  outline-offset: 2px;
+}
+.feedback-details {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 100%;
+  margin-top: 0.75rem;
+}
+.feedback-details textarea,
+.feedback-details select {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  font: inherit;
+}
+.feedback-details textarea {
+  resize: vertical;
+}
