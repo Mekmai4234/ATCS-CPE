@@ -52,7 +52,8 @@ def main():
                API_HOST="127.0.0.1", API_PORT=str(port), WEB_ORIGIN="http://127.0.0.1:3004",
                AUTH_TRUSTED_ORIGINS='["http://127.0.0.1:3004"]',
                WORKER_POLL_SECONDS="0.05", JOB_RETRY_BASE_SECONDS="0.01", PYTHONDONTWRITEBYTECODE="1",
-               WEB_IDENTITY_TEST="true", WEB_IDENTITY_API_URL=api_url)
+               WEB_IDENTITY_TEST="true", WEB_IDENTITY_API_URL=api_url,
+               CHAT_REVIEW_ENABLED="true", CHAT_REVIEW_ADMIN_IDS='["fixture-admin"]')
     handles, processes = [], []
     outcome = {"backend_commit": commit, "source_mode": "actual_checkout" if args.checkout else "git_archive", "auth_enabled": True, "adapter_mode": "fixture", "external_verifier": "fixture", "real_google_tested": False, "paid_providers_called": False}
     try:
@@ -77,7 +78,7 @@ def main():
         node = shutil.which("node")
         if not node:
             raise RuntimeError("Node.js must be on PATH")
-        result = subprocess.run([node, str(web / "node_modules" / "@playwright" / "test" / "cli.js"), "test", "identity.spec.ts", "--workers=1"], cwd=web, env=env)
+        result = subprocess.run([node, str(web / "node_modules" / "@playwright" / "test" / "cli.js"), "test", "identity.spec.ts", "--workers=1", *(["--grep", os.environ["WEB_IDENTITY_GREP"]] if os.environ.get("WEB_IDENTITY_GREP") else [])], cwd=web, env=env)
         outcome["browser_exit_code"] = result.returncode
         return result.returncode
     finally:

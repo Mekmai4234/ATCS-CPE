@@ -33,6 +33,7 @@ export interface ApiSecurity {
   onSessionExpired: () => void;
 }
 export class Api {
+  chatPolicyAvailable = false;
   onMode?: (mode: string) => void;
   private controllers = new Set<AbortController>();
   private disposed = false;
@@ -210,6 +211,30 @@ export class Api {
       this.controllers.delete(controller);
       init.signal?.removeEventListener('abort', cancel);
     }
+  }
+  async feedback(id: string, signal?: AbortSignal) {
+    return (
+      await this.request<{
+        message_id: string;
+        feedback: import('./feedbackSession').WireFeedback | null;
+      }>(`/api/messages/${encodeURIComponent(id)}/feedback`, { signal, cache: 'no-store' })
+    ).data;
+  }
+  async saveFeedback(
+    id: string,
+    value: import('./feedbackSession').WireFeedback | null,
+    signal?: AbortSignal,
+  ) {
+    return (
+      await this.request<{
+        message_id: string;
+        feedback: import('./feedbackSession').WireFeedback | null;
+      }>(`/api/messages/${encodeURIComponent(id)}/feedback`, {
+        method: value ? 'PUT' : 'DELETE',
+        body: value ? JSON.stringify(value) : undefined,
+        signal,
+      })
+    ).data;
   }
   async videos(offset = 0, signal?: AbortSignal) {
     const { data } = await this.request<Page<Video>>(`/api/videos?limit=50&offset=${offset}`, {
