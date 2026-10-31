@@ -214,6 +214,8 @@ export default function App({
   const [learningFocus, setLearningFocus] = useState(false);
   const [days, setDays] = useState(7);
   const [level, setLevel] = useState('beginner');
+  const prechecking = useRef(false);
+  const draftIdentity = useRef('');
   const [conversation, setConversation] = useState<string | null>(null);
   const conversationId = useRef<string | null>(null);
   const conversationScope = useRef('');
@@ -582,7 +584,8 @@ export default function App({
       if (alive.current) setBusy(false);
     }
   }
-  function submitTask(event: FormEvent, forcedType?: TaskType) {
+  draftIdentity.current = JSON.stringify([question, selected, channel, from, to, conversation]);
+  async function submitTask(event: FormEvent, forcedType?: TaskType) {
     event.preventDefault();
     if (busyRef.current || operationRef.current) return;
     if (archiveLoading || ((forcedType === 'chat' || tab === 'chat') && viewingHistory)) return;
@@ -631,6 +634,39 @@ export default function App({
             : type === 'research'
               ? '/api/research'
               : '/api/learning-artifacts';
+      if (
+        type === 'chat' &&
+        api.authenticated &&
+        !api.chatPolicyAvailable &&
+        !api.chatPolicyUnsupported
+      )
+        throw new Error('กรุณารอโหลดนโยบายแชท หรือรีเฟรชก่อนส่งคำถาม');
+      if (type === 'chat' && api.chatPolicyAvailable) {
+        if (prechecking.current) return;
+        prechecking.current = true;
+        const identity = draftIdentity.current;
+        try {
+          const { data } = await api.request<{
+            decision: 'allow' | 'warn' | 'block';
+            message: string;
+            acknowledgment_token?: string;
+          }>('/api/chat/check', { method: 'POST', body: JSON.stringify(payload) });
+          if (!alive.current || identity !== draftIdentity.current) return;
+          if (data.decision === 'block')
+            throw new Error(data.message || 'กรุณาปรับข้อความให้เหมาะสมก่อนส่งอีกครั้ง');
+          if (data.decision === 'warn') {
+            if (
+              !data.acknowledgment_token ||
+              !window.confirm(`${data.message}\nยืนยันส่งข้อความเดิมหรือไม่?`)
+            )
+              return;
+            Object.assign(payload, { moderation_token: data.acknowledgment_token });
+          } else if (data.decision !== 'allow')
+            throw new Error('ตรวจข้อความไม่สำเร็จ กรุณาลองใหม่');
+        } finally {
+          prechecking.current = false;
+        }
+      }
       setEvents([]);
       followResults.current = true;
       setNewResults(false);
@@ -664,6 +700,32 @@ export default function App({
     loadedArchive.current = null;
     onNavigate?.('/chat');
     updateTurns((previous) => previous.filter((turn) => turn.type !== 'chat'));
+  }
+  async function resumeChat(deferredOp?: Operation) {
+    const op = deferredOp || operationRef.current;
+    if (!op?.jobId || op.type !== 'chat' || busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setTaskError('');
+    let replacement: import('./types').Accepted | null = null;
+    try {
+      replacement = await api.resumeChat(op.jobId, op.payload, (message) =>
+        window.confirm(`${message}\nยืนยันให้งานเดิมทำต่อหรือไม่?`),
+      );
+    } catch (error) {
+      if (alive.current) setTaskError(errorText(error));
+    } finally {
+      busyRef.current = false;
+      if (alive.current) setBusy(false);
+    }
+    if (
+      replacement &&
+      alive.current &&
+      (!operationRef.current || operationRef.current.jobId === op.jobId)
+    ) {
+      setDeferred((previous) => previous.filter((item) => item.jobId !== op.jobId));
+      void execute({ ...op, jobId: replacement.job_id }, true);
+    }
   }
   async function loadHistory() {
     if (!conversation || historyPending) return;
@@ -706,7 +768,12 @@ export default function App({
               sources,
               partial: message.state === 'partial',
               result: reconcileSources(
-                { answer: message.content, citations: message.citations },
+                {
+                  answer: message.content,
+                  citations: message.citations,
+                  assistant_message_id: message.message_id,
+                  visibility: message.visibility,
+                },
                 sources,
                 { ...inventory.current, retired: retiredSources.current },
               ),
@@ -779,7 +846,12 @@ export default function App({
               ? undefined
               : statusLabels[message.state] || 'ยังไม่มีคำตอบที่บันทึกไว้',
             result: reconcileSources(
-              { answer: reply?.content, citations: reply?.citations || [] },
+              {
+                answer: reply?.content,
+                citations: reply?.citations || [],
+                assistant_message_id: reply?.message_id,
+                visibility: reply?.visibility,
+              },
               sources,
               { ...inventory.current, retired: retiredSources.current },
             ),
@@ -1674,6 +1746,14 @@ export default function App({
                       {operation.jobId ? 'ติดตามผลอีกครั้ง' : 'ส่งคำขอเดิมซ้ำ'}
                     </button>
                   )}
+                  {!busy &&
+                    operation?.type === 'chat' &&
+                    pendingJob?.state === 'paused' &&
+                    api.chatPolicyAvailable && (
+                      <button className="secondary" onClick={() => void resumeChat()}>
+                        ให้งานที่พักทำต่อ
+                      </button>
+                    )}
                   {events.length > 0 && (
                     <details className="progress-events" open>
                       <summary>ความคืบหน้าการค้นคว้า</summary>
@@ -1783,6 +1863,11 @@ export default function App({
                     >
                       ติดตามงานเดิมอีกครั้ง
                     </button>
+                    {item.type === 'chat' && jobs[item.jobId!]?.state === 'paused' && (
+                      <button disabled={taskLocked} onClick={() => void resumeChat(item)}>
+                        ให้งานที่พักทำต่อ
+                      </button>
+                    )}
                     <button onClick={() => void jobAction(item.jobId!, 'cancel')}>
                       ขอยกเลิกงานที่พัก
                     </button>
@@ -1858,6 +1943,10 @@ export default function App({
               id: item.jobId!,
               label: item.label,
               status: jobs[item.jobId!] ? jobStatus(jobs[item.jobId!]) : 'กำลังตรวจสอบสถานะคำขอ',
+              resume:
+                item.type === 'chat' && jobs[item.jobId!]?.state === 'paused'
+                  ? () => void resumeChat(item)
+                  : undefined,
               follow: () => {
                 setDeferred((previous) => previous.filter((value) => value.jobId !== item.jobId));
                 void execute(item, true);
@@ -1874,6 +1963,14 @@ export default function App({
             retry={
               !busy && operation && canRetry
                 ? () => void execute(operation, !!operation.jobId)
+                : undefined
+            }
+            resume={
+              !busy &&
+              operation?.type === 'chat' &&
+              pendingJob?.state === 'paused' &&
+              api.chatPolicyAvailable
+                ? () => void resumeChat()
                 : undefined
             }
             fullChat={() => navigateTab('chat')}

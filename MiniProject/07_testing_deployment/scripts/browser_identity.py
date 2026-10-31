@@ -18,13 +18,8 @@ MODULE = Path(__file__).resolve().parents[1]
 ROOT = MODULE.parent
 
 
-def main():
+def run_project(project, provenance, output):
     web = ROOT / "01_web_app"
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--checkout", action="store_true")
-    args = parser.parse_args()
-    provenance = context(args.checkout)
-    output = MODULE / "runtime" / f"browser-identity-{uuid4().hex[:10]}"
     output.mkdir(parents=True)
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -45,6 +40,7 @@ def main():
         WORKER_POLL_SECONDS="0.05",
         JOB_RETRY_BASE_SECONDS="0.01",
         WEB_IDENTITY_TEST="true",
+        WEB_IDENTITY_PROJECT=project,
         WEB_IDENTITY_API_URL=f"http://127.0.0.1:{port}",
         CHAT_REVIEW_ENABLED="true",
         CHAT_REVIEW_ADMIN_IDS='["fixture-admin"]',
@@ -59,6 +55,7 @@ def main():
         api_routes_mocked=False,
         paid_providers_called=False,
         source=provenance,
+        project=project,
     )
     if not (web / "tests/identity_server.py").is_file():
         report.update(
@@ -103,6 +100,7 @@ def main():
                 "--config",
                 str(MODULE / "playwright.identity.config.ts"),
                 "identity.spec.ts",
+                f"--project={project}",
                 "--workers=1",
             ],
             env,
@@ -125,6 +123,36 @@ def main():
             handle.close()
         report["cleanup_passed"] = all(p.poll() is not None for p in processes)
         (output / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(output / "report.json")
+    return int(not report["passed"] or not report["cleanup_passed"])
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--checkout", action="store_true")
+    args = parser.parse_args()
+    provenance = context(args.checkout)
+    output = MODULE / "runtime" / f"browser-identity-{uuid4().hex[:10]}"
+    output.mkdir(parents=True)
+    projects = []
+    # Each owner suite gets its own real API/worker/database. Unrelated suites
+    # must not consume one another's IP-scoped login challenge budget.
+    for project in ("web-identity", "deployment-identity"):
+        project_output = output.with_name(f"{output.name}-{project}")
+        code = run_project(project, provenance, project_output)
+        result = json.loads((project_output / "report.json").read_text(encoding="utf-8"))
+        projects.append(dict(result, exit_code=code, report=str(project_output / "report.json")))
+    report = dict(
+        passed=all(item["passed"] is True for item in projects),
+        cleanup_passed=all(item["cleanup_passed"] for item in projects),
+        source=provenance,
+        projects=projects,
+        api_routes_mocked=False,
+        paid_providers_called=False,
+        real_google_verified=False,
+        production_tls_verified=False,
+    )
+    (output / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(output / "report.json")
     return int(not report["passed"] or not report["cleanup_passed"])
 

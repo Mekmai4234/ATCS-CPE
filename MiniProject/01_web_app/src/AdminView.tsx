@@ -3,7 +3,8 @@ import type { AdminSection, AdminSnapshot, MemberSession, SessionPort } from './
 import { BuddyLogo } from './Forest';
 import { BuddyArt } from './BuddyArt';
 import { UiIcon } from './Visuals';
-import { ApiError } from './api';
+import { Api, ApiError } from './api';
+import ChatReviewAdmin from './ChatReviewAdmin';
 import './secondary-v5.css';
 
 const names: Record<AdminSection, string> = {
@@ -15,17 +16,20 @@ const names: Record<AdminSection, string> = {
 };
 export default function AdminView({
   session,
+  api,
   port,
   onHome,
   onLogout,
   onSessionExpired,
 }: {
   session: MemberSession;
+  api?: Api;
   port: SessionPort;
   onHome: () => void;
   onLogout: () => void;
   onSessionExpired: () => void;
 }) {
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [section, setSection] = useState<AdminSection>(session.adminSections[0] || 'overview');
   const [data, setData] = useState<AdminSnapshot | null>(null);
   const [error, setError] = useState('');
@@ -125,18 +129,27 @@ export default function AdminView({
           <div className="demo-banner">DEMO · ข้อมูลสมาชิกและการจัดการจำลอง ไม่เชื่อมระบบจริง</div>
         )}
         <nav className="vb-admin-tabs" aria-label="เมนูผู้ดูแล">
+          {api && !port.demo && (
+            <button onClick={() => setReviewOpen((v) => !v)} aria-pressed={reviewOpen}>
+              ตรวจสอบแชท
+            </button>
+          )}
           {session.adminSections.map((key) => (
             <button
               key={key}
-              aria-current={section === key ? 'page' : undefined}
-              className={section === key ? 'active' : ''}
-              onClick={() => setSection(key)}
+              aria-current={!reviewOpen && section === key ? 'page' : undefined}
+              className={!reviewOpen && section === key ? 'active' : ''}
+              onClick={() => {
+                setReviewOpen(false);
+                setSection(key);
+              }}
             >
               {names[key]}
             </button>
           ))}
         </nav>
-        <section className="admin-card">
+        {reviewOpen && api && <ChatReviewAdmin api={api} />}
+        <section className="admin-card" hidden={reviewOpen}>
           <div className={`vb-admin-hero vb-admin-hero-${section}`}>
             <div className="vb-admin-hero-copy">
               <h1>{names[section]}</h1>
