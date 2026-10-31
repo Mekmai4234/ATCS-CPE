@@ -89,6 +89,7 @@ export default function FloatingBuddy(props: Props) {
   const launcher = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const scopePanel = useRef<HTMLDetailsElement>(null);
   const atBottom = useRef(true);
   const savedScroll = useRef(0);
   const observedCount = useRef(0);
@@ -390,7 +391,7 @@ export default function FloatingBuddy(props: Props) {
                 เริ่มบทสนทนาใหม่
               </button>
             </div>
-            <details className="buddy-scope">
+            <details className="buddy-scope" ref={scopePanel}>
               <summary>คลิปที่เลือก {props.selected.length} คลิป</summary>
               <fieldset disabled={props.locked}>
                 <legend>ใช้เฉพาะคลิปที่พร้อมถามตอบ</legend>
@@ -535,7 +536,13 @@ export default function FloatingBuddy(props: Props) {
                 </button>
               ))}
             </div>
-            <form className="buddy-composer" onSubmit={props.submit}>
+            <form
+              className="buddy-composer"
+              onSubmit={(event) => {
+                if (scopePanel.current) scopePanel.current.open = false;
+                props.submit(event);
+              }}
+            >
               <label className="visually-hidden" htmlFor="buddy-question">
                 ข้อความถึง Buddy
               </label>
