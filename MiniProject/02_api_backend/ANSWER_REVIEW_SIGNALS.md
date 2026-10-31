@@ -55,7 +55,9 @@ an otherwise valid answer. Fresh/cache/retry/resume all share this boundary.
 Capability/audit-protected admin detail adds `review_signal` with the table fields
 and `publication_effect=none`. Its `confirmed=false` describes the original rule;
 the human review outcome is stored separately in `case.outcome`. No signal draft
-text is stored. Notes/event metadata use existing expiry gates and conversation
+text is stored. `detail.visibility` describes the answer seen by the user;
+`moderation.visible_to_user=false` describes the private signal, not a suppression
+of that answer. Notes/event metadata use existing expiry gates and conversation
 erasure. Review access stays off until the 01 notice and authorized ID list are deployed.
 
 Producer-side mounting, interpretation of the draft policy, semantic evaluation and
