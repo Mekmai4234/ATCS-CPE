@@ -37,6 +37,10 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     auth_enabled: bool = True
+    # Enable only after module 01 deploys the user-facing review notice.
+    chat_review_enabled: bool = False
+    chat_review_admin_ids: list[str] = []
+    moderation_retention_days: int = Field(default=30, ge=1, le=30)
     gemini_free_policy_file: str | None = None
     gemini_max_concurrent: int = Field(default=1, ge=1, le=20)
     gemini_user_concurrent: int = Field(default=1, ge=1, le=10)
