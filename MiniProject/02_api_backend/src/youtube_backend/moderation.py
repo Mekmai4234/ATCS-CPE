@@ -244,7 +244,9 @@ def inspect_output(repo, c, job, result, message_id):
             owner=job["owner_id"],
             direction="output",
             action="withhold",
-            reason="policy_length_limit" if reason == "policy_length_limit" else "answer_inappropriate",
+            reason="policy_length_limit"
+            if reason == "policy_length_limit"
+            else "answer_inappropriate",
             content=(
                 result["answer"]
                 if len(result["answer"]) <= MAX_POLICY_CHARACTERS
