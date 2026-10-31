@@ -186,6 +186,11 @@ def test_local_policy_corpus(text, expected):
     assert normalize("ป่า ป้า ป๊า ป๋า") == "ป่า ป้า ป๊า ป๋า"
 
 
+def test_output_guard_cannot_ignore_an_abusive_suffix_or_unbounded_output():
+    assert classify("Safe evidence. " * 1500 + "You are an idiot")[0] == "block"
+    assert classify("x" * 128001) == ("block", "policy_length_limit")
+
+
 def test_block_before_enqueue_and_warning_bound_to_owner_text_scope_and_expiry(identity):
     env = identity
     client, _ = setup(env)

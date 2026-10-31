@@ -16,6 +16,7 @@ from .errors import AppError
 from .repository import digest, row, uid
 
 POLICY_VERSION = "chat-local-v1"
+MAX_POLICY_CHARACTERS = 128000
 NEUTRAL_ANSWER = "คำตอบนี้ถูกระงับ กรุณาปรับคำถามหรือลองถามจากหลักฐานในคลิปอีกครั้ง"
 WARNING = "ข้อความนี้อาจไม่เหมาะสม ลองปรับคำก่อนส่ง"
 BLOCKED = "กรุณาปรับข้อความให้เหมาะสมก่อนส่งอีกครั้ง"
@@ -23,7 +24,9 @@ BLOCKED = "กรุณาปรับข้อความให้เหมา
 
 def normalize(text):
     text = "".join(
-        c for c in unicodedata.normalize("NFKC", text[:12000]) if unicodedata.category(c) != "Cf"
+        c
+        for c in unicodedata.normalize("NFKC", text[:MAX_POLICY_CHARACTERS])
+        if unicodedata.category(c) != "Cf"
     ).casefold()
     # NFKC expands Thai SARA AM; keep its spelling equivalent without deleting marks.
     text = text.replace("\u0e4d\u0e32", "\u0e33")
@@ -32,6 +35,8 @@ def normalize(text):
 
 
 def classify(text):
+    if len(text) > MAX_POLICY_CHARACTERS:
+        return "block", "policy_length_limit"
     value = normalize(text)
     # Quoted study material is exempt only inside actual paired quotes; abuse
     # outside those quotes still runs through the same rules.
@@ -239,8 +244,13 @@ def inspect_output(repo, c, job, result, message_id):
             owner=job["owner_id"],
             direction="output",
             action="withhold",
-            reason="answer_inappropriate",
-            content=result["answer"],
+            reason="policy_length_limit" if reason == "policy_length_limit" else "answer_inappropriate",
+            content=(
+                result["answer"]
+                if len(result["answer"]) <= MAX_POLICY_CHARACTERS
+                else result["answer"][:MAX_POLICY_CHARACTERS]
+                + "\n[Draft truncated at policy storage limit]"
+            ),
             job_id=job["job_id"],
             message_id=message_id,
         )
