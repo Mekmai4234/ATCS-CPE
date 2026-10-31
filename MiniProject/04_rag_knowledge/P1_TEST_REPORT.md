@@ -1,5 +1,18 @@
 # Module 04 P1 verification — 30 October 2026
 
+## Re-review — 31 October 2026
+
+Read the latest #33 review on head `87babfc`: effective vision model reuse and its
+ownership/version/expiry safeguards were accepted within the reviewed scope. The
+remaining new blocker is in 07's real HTTP research browser test. Merged
+`origin/develop` before work (`9f569ea`, already up to date); no new production change
+was needed in 04. Fresh catalogue regressions: **12 passed**.
+
+With the corrected 07 test, the isolated combined snapshot passes **9/9** real-HTTP
+browser cases, **83** Docker 07 cases, and lint/format for **294** Python files. Source
+fingerprinting was verified unchanged before/after the run. No 01/03/05 source was
+edited by this follow-up; GitHub CI on the separate PR heads remains a distinct gate.
+
 ## Review follow-up
 
 Merged `origin/develop` (`9f569ea`, already up to date) on the module branch before
