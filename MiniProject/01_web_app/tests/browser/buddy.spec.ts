@@ -393,6 +393,8 @@ test('greetings need no clip, the picker stays collapsed, and no chat API is cal
   await input.fill('คุณทำงานเกี่ยวกับอะไร');
   await dialog(page).getByRole('button', { name: 'ส่งข้อความถึง Buddy' }).click();
   await expect(dialog(page).getByText(/ผมชื่อ Buddy ช่วยถามตอบจากคลิป YouTube/)).toBeVisible();
+  await expect(dialog(page).locator('.buddy-v5-sources')).toHaveCount(0);
+  await dialog(page).screenshot({ path: 'runtime/screenshots/buddy-greetings-20261101.png' });
   expect(calls).toBe(0);
   await input.fill('คลิปนี้เกี่ยวกับอะไร');
   await expect(dialog(page).getByRole('button', { name: 'ส่งข้อความถึง Buddy' })).toBeDisabled();
