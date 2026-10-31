@@ -49,6 +49,8 @@ def clean_environment():
                 "FREE_",
                 "QUOTA_",
                 "MEDIA_",
+                "CHAT_REVIEW_",
+                "MODERATION_",
             )
         ) or key.upper() in {
             "DATABASE_URL",
