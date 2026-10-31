@@ -393,10 +393,21 @@ def update_case(repo, case_id, body):
         return dict(case_id=case_id, **body.model_dump(), reviewed_at=now)
 
 
-def normal_messages(repo, limit, offset):
-    with repo.db.read() as c:
-        require_review(repo, c)
+def normal_messages(repo, limit, offset, rating=None):
+    with repo.db.write() as c:
+        admin = require_review(repo, c)
         condition = db.messages.c.role == "assistant"
+        if rating:
+            feedback = db.review["feedback"]
+            condition = sa.and_(
+                condition,
+                sa.exists(
+                    sa.select(feedback.c.message_id).where(
+                        feedback.c.message_id == db.messages.c.message_id,
+                        feedback.c.rating == rating,
+                    )
+                ),
+            )
         ids = list(
             c.execute(
                 sa.select(db.messages.c.message_id)
@@ -406,8 +417,19 @@ def normal_messages(repo, limit, offset):
                 .offset(offset)
             ).scalars()
         )
+        items = []
+        for mid in ids:
+            data, owner = message_detail(c, mid)
+            items.append(
+                dict(
+                    message_id=mid,
+                    question_excerpt=(data["question"] or {}).get("content", "")[:120],
+                    feedback=data["feedback"],
+                )
+            )
+            audit(c, admin, owner, "chat_review_list", message_id=mid)
         return dict(
-            items=[dict(message_id=mid) for mid in ids],
+            items=items,
             limit=limit,
             offset=offset,
             total=c.scalar(sa.select(sa.func.count()).select_from(db.messages).where(condition)),
