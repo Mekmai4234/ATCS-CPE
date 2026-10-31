@@ -26,8 +26,9 @@ Remaining acceptance: expired warn-token/resume end-to-end, cross-session delaye
 withheld end-to-end corpus, explicit admin access-revocation/expiry UI regression, full
 merged-source CI, final human copy/privacy review and deployment. Existing moderation
 and retention are backend-owned; no actual user DB migration/capability toggle/deploy.
-05 signal ingestion still needs a separately versioned owner-02 sink; do not assume
-chat-local-v1 accepts new answer-signal metadata. No live AI quality/latency/SLA claim.
+02 now provides the private, attempt-bound v1 answer-signal sink; 05's producer
+remains unmounted. Its policy is separate from chat-local-v1, and experimental v2
+is not accepted by the v1 sink. No live AI quality/latency/SLA claim.
 
 ## Final local verification
 
@@ -38,3 +39,14 @@ final source passed, including real mobile font-size/overflow assertions. Typech
 production build and Prettier passed. Images in docs/screenshots/chat-review-*-2026-10-31.png
 use only fixture members and synthetic provider content over real HTTP/SQLite/worker.
 CI for this new PR and integrated release acceptance remain pending.
+
+## Integrated acceptance fixes
+
+The module 03 regression now verifies both shared-import dependency scheduling
+orders without assuming which concurrent account won the import. Module 07 runs
+web/deployment identity projects against separate real API/worker/databases so
+unrelated test sign-ins do not exhaust the shared IP challenge budget. Production
+authentication limits, lease fencing and real HTTP/CSRF checks are unchanged.
+All 11 integrated identity scenarios pass locally (web 9, deployment 2), with
+separate diagnostics and verified process cleanup. The exact combined source must
+still pass all CI jobs before merge; no live provider/deployment claim is made.
