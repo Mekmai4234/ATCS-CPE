@@ -6,6 +6,7 @@ import time
 import pytest
 import sqlalchemy as sa
 from alembic import command
+from test_free_tier import budget
 from test_identity import VIDEO, identity, login, ready
 
 from youtube_backend import database as db
@@ -14,8 +15,9 @@ from youtube_backend.database import Database
 from youtube_backend.migration import alembic_config, upgrade_database
 from youtube_backend.moderation import NEUTRAL_ANSWER, classify, normalize, purge_expired
 from youtube_backend.repository import Repository
+from youtube_backend.schemas import ChatRequest
 
-__all__ = ["identity"]
+__all__ = ["identity", "budget"]
 
 
 def setup(env):
@@ -333,3 +335,65 @@ def test_worker_rechecks_legacy_queued_input_without_calling_provider(identity):
     env.app.state.adapters.adapter.answer = forbidden
     asyncio.run(env.worker.run_once(job["job_id"]))
     assert client.get(f"/api/jobs/{job['job_id']}").json()["error_code"] == "moderation_blocked"
+
+
+def test_legacy_completed_result_resolves_id_without_rewriting_answer(identity):
+    env = identity
+    client, _ = setup(env)
+    response = client.post("/api/chat", json=body(), headers={"Idempotency-Key": "legacy-id"})
+    result = response.json()
+    mid = result["assistant_message_id"]
+    old = {
+        k: v
+        for k, v in result.items()
+        if k not in {"assistant_message_id", "visibility", "moderation_policy_version", "feedback"}
+    }
+    with env.db.write() as c:
+        c.execute(db.jobs.update().where(db.jobs.c.job_id == result["job_id"]).values(result=old))
+    assert (
+        client.get(f"/api/jobs/{result['job_id']}").json()["result"]["assistant_message_id"] == mid
+    )
+    replay = client.post("/api/chat", json=body(), headers={"Idempotency-Key": "legacy-id"})
+    assert replay.status_code == 200 and replay.json()["assistant_message_id"] == mid
+    assert replay.json()["answer"] == old["answer"]
+    with env.db.read() as c:
+        assert c.scalar(sa.select(sa.func.count()).select_from(db.messages)) == 2
+
+
+def test_resume_requires_fresh_bound_ack_and_cannot_bypass_block(budget):
+    env = budget
+    job = env.repo.get_job(env.context.job_id, internal=True)
+    request = ChatRequest.model_validate(body("damn this is confusing")).model_dump(mode="json")
+    with env.db.write() as c:
+        c.execute(
+            db.jobs.update()
+            .where(db.jobs.c.job_id == job["job_id"])
+            .values(
+                payload=dict(job["payload"], request=request),
+                state="failed",
+                retryable=True,
+                lease_token=None,
+                lease_until=None,
+            )
+        )
+    path = f"/api/jobs/{job['job_id']}/resume"
+    assert env.client.post(path).status_code == 422
+    check = env.client.post("/api/chat/check", json=request).json()
+    response = env.client.post(path, json={"moderation_token": check["acknowledgment_token"]})
+    assert response.status_code == 202, response.text
+    assert (
+        env.client.post(path, json={"moderation_token": check["acknowledgment_token"]}).json()
+        == response.json()
+    )
+    with env.db.write() as c:
+        c.execute(
+            db.jobs.update()
+            .where(db.jobs.c.job_id == job["job_id"])
+            .values(
+                payload=dict(job["payload"], request=dict(request, question="You are an idiot"))
+            )
+        )
+    assert (
+        env.client.post(path, json={"moderation_token": check["acknowledgment_token"]}).status_code
+        == 422
+    )
