@@ -1,5 +1,8 @@
 # Module 04 — Gemini RAG Knowledge
 
+P1 local cross-question evidence catalogue: [EVIDENCE_LIBRARY.md](EVIDENCE_LIBRARY.md).
+Current verification: [P1_TEST_REPORT.md](P1_TEST_REPORT.md).
+
 Latest (2026-10-24): [media/Free Tier contract](FREE_TIER_MEDIA.md) and
 [current verification report](FREE_TIER_TEST_REPORT.md). OCR and visual text use
 separate versioned indexes, local SQLite fallback and execution-brokered embeddings.
