@@ -1,5 +1,7 @@
 import base from "./playwright.config";
 
+const artifacts = process.env.WEB_IDENTITY_PROJECT || "all";
+
 export default {
   ...base,
   testDir: "./tests/browser",
@@ -15,12 +17,15 @@ export default {
       testMatch: "identity.spec.ts",
     },
   ],
-  outputDir: "./runtime/browser-identity-results",
+  outputDir: `./runtime/browser-identity-results/${artifacts}`,
   reporter: [
     ["list"],
     [
       "html",
-      { outputFolder: "./runtime/browser-identity-report", open: "never" },
+      {
+        outputFolder: `./runtime/browser-identity-report/${artifacts}`,
+        open: "never",
+      },
     ],
   ],
 };

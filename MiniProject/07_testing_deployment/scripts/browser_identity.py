@@ -40,6 +40,7 @@ def run_project(project, provenance, output):
         WORKER_POLL_SECONDS="0.05",
         JOB_RETRY_BASE_SECONDS="0.01",
         WEB_IDENTITY_TEST="true",
+        WEB_IDENTITY_PROJECT=project,
         WEB_IDENTITY_API_URL=f"http://127.0.0.1:{port}",
         CHAT_REVIEW_ENABLED="true",
         CHAT_REVIEW_ADMIN_IDS='["fixture-admin"]',
