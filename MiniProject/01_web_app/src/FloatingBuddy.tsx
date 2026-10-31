@@ -440,18 +440,20 @@ export default function FloatingBuddy(props: Props) {
               {props.turns.map((turn) => (
                 <article className="buddy-message" key={turn.id}>
                   <div className="buddy-question">{turn.label}</div>
-                  <details className="buddy-v5-sources">
-                    <summary>แหล่งข้อมูล · {turn.sources.length} คลิป</summary>
-                    <p>
-                      {turn.sources
-                        .map(
-                          (source) =>
-                            props.videos.find((video) => video.video_id === source.video_id)
-                              ?.title || source.video_id,
-                        )
-                        .join(' · ')}
-                    </p>
-                  </details>
+                  {turn.sources.length > 0 && (
+                    <details className="buddy-v5-sources">
+                      <summary>แหล่งข้อมูล · {turn.sources.length} คลิป</summary>
+                      <p>
+                        {turn.sources
+                          .map(
+                            (source) =>
+                              props.videos.find((video) => video.video_id === source.video_id)
+                                ?.title || source.video_id,
+                          )
+                          .join(' · ')}
+                      </p>
+                    </details>
+                  )}
                   <div className="buddy-reply-heading">
                     <InteractiveBuddy headOnly active={false} decorative />
                     <strong>Buddy AI</strong>
