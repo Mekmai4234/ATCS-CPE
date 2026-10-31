@@ -13,6 +13,8 @@ const statusNames: Record<string, string> = {
 };
 type Case = {
   case_id: string;
+  message_id?: string;
+  notes?: string;
   question_excerpt: string;
   member_ref: string;
   source: string;
@@ -20,7 +22,7 @@ type Case = {
   status: string;
 };
 type Detail = {
-  case: Case;
+  case: Case | null;
   question?: { content: string };
   answer?: { content: string };
   visibility?: string;
@@ -37,6 +39,7 @@ type Detail = {
   scope?: { video_id: string; transcript_version: string }[];
 };
 export default function ChatReviewAdmin({ api }: { api: Api }) {
+  const [mode, setMode] = useState<'cases' | 'messages'>('cases');
   const [items, setItems] = useState<Case[]>([]),
     [detail, setDetail] = useState<Detail | null>(null);
   const [stats, setStats] = useState<Record<string, number>>({});
@@ -85,14 +88,16 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
       if (v) p.set(k, v);
     void api
       .request<{ items: Case[]; total: number; stats: Record<string, number> }>(
-        `/api/admin/chat-reviews?${p}`,
+        mode === 'cases'
+          ? `/api/admin/chat-reviews?${p}`
+          : `/api/admin/chat-messages?limit=20&offset=${offset}`,
         { signal: c.signal, cache: 'no-store' },
       )
       .then(({ data }) => {
         if (!c.signal.aborted) {
           setItems(data.items);
           setTotal(data.total);
-          setStats(data.stats);
+          if (data.stats) setStats(data.stats);
         }
       })
       .catch((e) => {
@@ -102,7 +107,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
         if (!c.signal.aborted) setLoading(false);
       });
     return () => c.abort();
-  }, [api, offset, query, status, rating, label, after, before, revision]);
+  }, [api, offset, query, status, rating, label, after, before, revision, mode]);
   useEffect(
     () => () => {
       request.current?.abort();
@@ -120,10 +125,13 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
     setNotes('');
     try {
       const { data } = await api.request<Detail>(
-        `/api/admin/chat-reviews/${encodeURIComponent(id)}`,
+        `/api/admin/${mode === 'cases' ? 'chat-reviews' : 'chat-messages'}/${encodeURIComponent(id)}`,
         { signal: c.signal, cache: 'no-store' },
       );
-      if (!c.signal.aborted) setDetail(data);
+      if (!c.signal.aborted) {
+        setDetail(data);
+        setNotes(data.case?.notes || '');
+      }
     } catch (e) {
       if (!c.signal.aborted) failure(e);
     } finally {
@@ -131,7 +139,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
     }
   }
   async function save(outcome?: string) {
-    if (!detail || loading) return;
+    if (!detail?.case || loading) return;
     setLoading(true);
     setError('');
     request.current?.abort();
@@ -160,6 +168,24 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
   return (
     <section className="admin-card" aria-label="ตรวจสอบแชท">
       <h1>ตรวจสอบแชท</h1>
+      <button
+        aria-pressed={mode === 'cases'}
+        onClick={() => {
+          setMode('cases');
+          setOffset(0);
+        }}
+      >
+        คิวตรวจ
+      </button>
+      <button
+        aria-pressed={mode === 'messages'}
+        onClick={() => {
+          setMode('messages');
+          setOffset(0);
+        }}
+      >
+        แชทที่บันทึกทั้งหมด
+      </button>
       <div className="admin-stats">
         {Object.entries({
           like: 'ถูกใจ',
@@ -172,78 +198,81 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
           </article>
         ))}
       </div>
-      <label>
-        ค้นคำถาม
-        <input
-          value={query}
-          onChange={(e) => {
-            setOffset(0);
-            setQuery(e.target.value);
-          }}
-        />
-      </label>
-      <label>
-        สถานะ
-        <select
-          aria-label="สถานะ"
-          value={status}
-          onChange={(e) => {
-            setOffset(0);
-            setStatus(e.target.value);
-          }}
-        >
-          <option value="">รอตรวจ</option>
-          <option value="new">ใหม่</option>
-          <option value="in_review">กำลังตรวจ</option>
-          <option value="reviewed">ตรวจแล้ว</option>
-        </select>
-      </label>
-      <label>
-        คะแนน
-        <select
-          value={rating}
-          onChange={(e) => {
-            setOffset(0);
-            setRating(e.target.value);
-          }}
-        >
-          <option value="">ทุกคะแนน</option>
-          <option value="like">ถูกใจ</option>
-          <option value="dislike">ไม่ถูกใจ</option>
-        </select>
-      </label>
-      <label>
-        ประเภทเหตุการณ์
-        <input
-          value={label}
-          onChange={(e) => {
-            setOffset(0);
-            setLabel(e.target.value);
-          }}
-        />
-      </label>
-      <label>
-        ตั้งแต่
-        <input
-          type="date"
-          value={after}
-          onChange={(e) => {
-            setOffset(0);
-            setAfter(e.target.value);
-          }}
-        />
-      </label>
-      <label>
-        ถึง
-        <input
-          type="date"
-          value={before}
-          onChange={(e) => {
-            setOffset(0);
-            setBefore(e.target.value);
-          }}
-        />
-      </label>
+      <fieldset disabled={mode === 'messages'} style={{ border: 0, padding: 0, margin: 0 }}>
+        <legend>ตัวกรองคิวตรวจ</legend>
+        <label>
+          ค้นคำถาม
+          <input
+            value={query}
+            onChange={(e) => {
+              setOffset(0);
+              setQuery(e.target.value);
+            }}
+          />
+        </label>
+        <label>
+          สถานะ
+          <select
+            aria-label="สถานะ"
+            value={status}
+            onChange={(e) => {
+              setOffset(0);
+              setStatus(e.target.value);
+            }}
+          >
+            <option value="">รอตรวจ</option>
+            <option value="new">ใหม่</option>
+            <option value="in_review">กำลังตรวจ</option>
+            <option value="reviewed">ตรวจแล้ว</option>
+          </select>
+        </label>
+        <label>
+          คะแนน
+          <select
+            value={rating}
+            onChange={(e) => {
+              setOffset(0);
+              setRating(e.target.value);
+            }}
+          >
+            <option value="">ทุกคะแนน</option>
+            <option value="like">ถูกใจ</option>
+            <option value="dislike">ไม่ถูกใจ</option>
+          </select>
+        </label>
+        <label>
+          ประเภทเหตุการณ์
+          <input
+            value={label}
+            onChange={(e) => {
+              setOffset(0);
+              setLabel(e.target.value);
+            }}
+          />
+        </label>
+        <label>
+          ตั้งแต่
+          <input
+            type="date"
+            value={after}
+            onChange={(e) => {
+              setOffset(0);
+              setAfter(e.target.value);
+            }}
+          />
+        </label>
+        <label>
+          ถึง
+          <input
+            type="date"
+            value={before}
+            onChange={(e) => {
+              setOffset(0);
+              setBefore(e.target.value);
+            }}
+          />
+        </label>
+      </fieldset>
       {loading && <p role="status">กำลังโหลด…</p>}
       {error && (
         <p role="alert">
@@ -253,14 +282,19 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
       )}
       {!loading && !error && !items.length && <p>ไม่มีรายการที่ตรงกับตัวกรอง</p>}
       {items.map((item) => (
-        <article key={item.case_id}>
-          <p>{item.question_excerpt}</p>
+        <article key={item.message_id || item.case_id}>
+          <p>{item.question_excerpt || `คำตอบที่บันทึก ${item.message_id?.slice(0, 8) || ''}`}</p>
           <small>
             สมาชิก {item.member_ref} ·{' '}
             {['user', 'user_report'].includes(item.source) ? 'ผู้ใช้รายงาน' : 'ระบบสงสัย'} ·{' '}
             {labelNames[item.label] || item.label} · {statusNames[item.status] || item.status}
           </small>
-          <button disabled={loading} onClick={() => void open(item.case_id)}>
+          <button
+            disabled={loading}
+            onClick={() =>
+              void open(item.message_id && mode === 'messages' ? item.message_id : item.case_id)
+            }
+          >
             เปิดดู
           </button>
         </article>
@@ -287,7 +321,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
             {detail.visibility === 'withheld' ? 'ข้อความระบบที่ผู้ใช้เห็น' : 'คำตอบที่ผู้ใช้เห็น'}
           </h3>
           <p>{detail.answer?.content || 'ไม่มีคำตอบ'}</p>
-          {detail.moderation && !detail.moderation.visible_to_user && (
+          {detail.moderation?.action === 'withhold' && !detail.moderation.visible_to_user && (
             <details>
               <summary>ร่างที่ถูกระงับ — ผู้ใช้ไม่เห็น</summary>
               <p>{detail.moderation.draft || 'เนื้อหาถูกลบตามอายุการเก็บ'}</p>
@@ -298,6 +332,9 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
               โมเดล:{' '}
               {detail.provider_metadata.returned_model || detail.provider_metadata.requested_model}
             </p>
+          )}
+          {detail.moderation?.action === 'review_signal' && (
+            <p>สัญญาณระบบเพื่อรอตรวจ — ไม่ใช่ร่างที่ถูกระงับหรือคำตัดสินยืนยัน</p>
           )}
           {detail.moderation && (
             <p>
@@ -328,18 +365,18 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
             หมายเหตุ
             <textarea maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </label>
-          {detail.case.status === 'new' ? (
+          {detail.case?.status === 'new' ? (
             <button disabled={loading} onClick={() => void save()}>
               เริ่มตรวจ
             </button>
-          ) : detail.case.status === 'in_review' ? (
+          ) : detail.case?.status === 'in_review' ? (
             ['confirmed', 'false_positive', 'inconclusive'].map((v, i) => (
               <button key={v} disabled={loading} onClick={() => void save(v)}>
                 {['ยืนยันปัญหา', 'แจ้งเตือนผิด', 'ยังสรุปไม่ได้'][i]}
               </button>
             ))
           ) : (
-            <p>ตรวจแล้ว</p>
+            <p>{detail.case ? 'ตรวจแล้ว' : 'คำตอบปกติ — ยังไม่มีเคสตรวจ'}</p>
           )}
         </article>
       )}
