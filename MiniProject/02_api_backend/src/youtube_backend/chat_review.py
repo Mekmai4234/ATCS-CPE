@@ -181,16 +181,27 @@ def review_list(
         if q:
             answer = db.messages.alias("answer")
             question = db.messages.alias("question")
+            event = db.review["events"]
             # SQL EXISTS, escaped wildcard input, bounded page; no Python scan of chats.
             conditions.append(
-                sa.exists(
-                    sa.select(question.c.message_id)
-                    .join(answer, answer.c.job_id == question.c.job_id)
-                    .where(
-                        answer.c.message_id == cases.c.message_id,
-                        question.c.role == "user",
-                        question.c.content.contains(q, autoescape=True),
-                    )
+                sa.or_(
+                    sa.exists(
+                        sa.select(question.c.message_id)
+                        .join(answer, answer.c.job_id == question.c.job_id)
+                        .where(
+                            answer.c.message_id == cases.c.message_id,
+                            question.c.role == "user",
+                            question.c.content.contains(q, autoescape=True),
+                        )
+                    ),
+                    sa.exists(
+                        sa.select(event.c.event_id).where(
+                            event.c.event_id == cases.c.event_id,
+                            event.c.direction == "input",
+                            event.c.content_expires_at > time.time(),
+                            event.c.content.contains(q, autoescape=True),
+                        )
+                    ),
                 )
             )
         statement = sa.select(cases).where(*conditions)
@@ -221,6 +232,21 @@ def review_list(
                 items[-1]["question_excerpt"] = (detail["question"] or {}).get("content", "")[:120]
                 items[-1]["member_ref"] = (owner or "")[:8]
                 audit(c, admin, owner, "chat_review_list", case_id=case["case_id"])
+            elif case["event_id"]:
+                event = row(
+                    c, db.review["events"], db.review["events"].c.event_id == case["event_id"]
+                )
+                items[-1]["question_excerpt"] = (
+                    (event["content"] or "")[:120]
+                    if (
+                        event
+                        and event["direction"] == "input"
+                        and event["content_expires_at"] > time.time()
+                    )
+                    else ""
+                )
+                items[-1]["member_ref"] = (case["owner_id"] or "")[:8]
+                audit(c, admin, case["owner_id"], "chat_review_list", case_id=case["case_id"])
         counts = dict(
             c.execute(
                 sa.select(feedback.c.rating, sa.func.count()).group_by(feedback.c.rating)
