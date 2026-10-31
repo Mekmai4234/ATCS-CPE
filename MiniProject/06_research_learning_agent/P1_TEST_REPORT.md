@@ -1,5 +1,19 @@
 # Module 06 P0/P1 verification — 30 October 2026
 
+## Re-review — 31 October 2026
+
+Read the latest #34 review on head `7add7ca`: shared VideoPlan validation, exact-window
+lookup, full citation containment and early rejection of invalid/reversed ranges were
+accepted within the reviewed scope. Merged `origin/develop` before work (`9f569ea`,
+already up to date). No new production change was needed in 06. Fresh focused
+video-learning regressions: **23 passed**.
+
+The remaining new finding was 07's outdated research browser flow. Its corrected
+real-HTTP suite now passes **9/9** on both the module checkout and the isolated combined
+snapshot. Combined Docker 07 tests pass **83**; lint/format passes **294** Python files,
+with the captured source fingerprint unchanged during execution. External providers
+remain fixtures, not live AI acceptance; no quota ledger or 01/03/05 source was changed.
+
 ## Review follow-up
 
 Merged `origin/develop` (`9f569ea`, already up to date) on the module branch before
