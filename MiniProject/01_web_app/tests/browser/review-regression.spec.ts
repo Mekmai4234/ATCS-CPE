@@ -10,9 +10,11 @@ test('notes survive reopen and outcome updates; signal metadata is not a withhel
   await page.getByRole('button', { name: 'เปิดดู', exact: true }).click();
   await expect(page.getByLabel('หมายเหตุ')).toHaveValue('existing review note');
   await page.getByRole('button', { name: 'ยังสรุปไม่ได้', exact: true }).click();
+  await page.getByLabel('สถานะ', { exact: true }).selectOption('reviewed');
   await page.getByRole('button', { name: 'เปิดดู', exact: true }).click();
   await expect(page.getByLabel('หมายเหตุ')).toHaveValue('existing review note');
   await page.getByRole('button', { name: 'แชทที่บันทึกทั้งหมด' }).click();
+  await expect(page.getByText('คำตอบที่บันทึกไว้ — ไม่ได้ระบุว่าเป็นปัญหา')).toBeVisible();
   await page.getByRole('button', { name: 'เปิดดู', exact: true }).click();
   await expect(page.getByText('normal question', { exact: true })).toBeVisible();
   await expect(page.getByText('normal answer', { exact: true })).toBeVisible();
@@ -25,8 +27,11 @@ test('deferred paused chat exposes resume and follows the replacement', async ({
   await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
   const deferred = page.getByRole('region', { name: 'งานที่พักติดตาม' });
   await expect(deferred).toBeVisible();
-  await deferred.getByRole('button', { name: 'ให้งานที่พักทำต่อ' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-resume-count', '1');
-  await expect(page.getByText('RESUMED ANSWER', { exact: true })).toBeVisible();
+  await expect(deferred.getByRole('button', { name: 'ให้งานที่พักทำต่อ' })).toBeVisible();
+  await page.locator('.buddy-launcher').click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('dialog').getByRole('button', { name: 'ให้งานที่พักทำต่อ' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-resume-count', '2');
+  await expect(page.getByText('RESUMED ANSWER', { exact: true }).first()).toBeVisible();
   await expect(deferred).toHaveCount(0);
 });

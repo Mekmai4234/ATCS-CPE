@@ -497,8 +497,12 @@ test('real HTTP feedback, moderation confirmation and audited admin review', asy
       true,
     );
     await admin.screenshot({ path: 'runtime/chat-review-mobile.png', fullPage: true });
+    await reviews.getByLabel('หมายเหตุ', { exact: true }).fill('preserved reviewer note');
     await reviews.getByRole('button', { name: 'เริ่มตรวจ', exact: true }).click();
     await reviews.getByRole('button', { name: 'เปิดดู', exact: true }).first().click();
+    await expect(reviews.getByLabel('หมายเหตุ', { exact: true })).toHaveValue(
+      'preserved reviewer note',
+    );
     await reviews.getByRole('button', { name: 'ยังสรุปไม่ได้', exact: true }).click();
     await reviews.getByLabel('สถานะ', { exact: true }).selectOption('reviewed');
     await expect(reviews.getByRole('button', { name: 'เปิดดู', exact: true })).toHaveCount(1);
