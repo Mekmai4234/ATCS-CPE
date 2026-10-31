@@ -20,6 +20,7 @@ type Case = {
   source: string;
   label: string;
   status: string;
+  feedback?: { rating: string };
 };
 type Detail = {
   case: Case | null;
@@ -92,7 +93,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
       .request<{ items: Case[]; total: number; stats: Record<string, number> }>(
         mode === 'cases'
           ? `/api/admin/chat-reviews?${p}`
-          : `/api/admin/chat-messages?limit=20&offset=${offset}`,
+          : `/api/admin/chat-messages?limit=20&offset=${offset}${rating ? `&rating=${rating}` : ''}`,
         { signal: c.signal, cache: 'no-store' },
       )
       .then(({ data }) => {
@@ -194,6 +195,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
         aria-pressed={mode === 'cases'}
         onClick={() => {
           if (mode === 'cases') return;
+          setRating('');
           setItems([]);
           setDetail(null);
           setMode('cases');
@@ -205,7 +207,8 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
       <button
         aria-pressed={mode === 'messages'}
         onClick={() => {
-          if (mode === 'messages') return;
+          if (mode === 'messages' && !rating) return;
+          setRating('');
           setItems([]);
           setDetail(null);
           setMode('messages');
@@ -213,6 +216,19 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
         }}
       >
         แชทที่บันทึกทั้งหมด
+      </button>
+      <button
+        aria-pressed={mode === 'messages' && rating === 'like'}
+        onClick={() => {
+          if (mode === 'messages' && rating === 'like') return;
+          setItems([]);
+          setDetail(null);
+          setMode('messages');
+          setRating('like');
+          setOffset(0);
+        }}
+      >
+        คำตอบที่ถูกใจ
       </button>
       <div className="admin-stats">
         {Object.entries({
@@ -261,6 +277,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
             onChange={(e) => {
               setOffset(0);
               setRating(e.target.value);
+              if (e.target.value === 'like') setMode('messages');
             }}
           >
             <option value="">ทุกคะแนน</option>
@@ -319,7 +336,13 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
               {labelNames[item.label] || item.label} · {statusNames[item.status] || item.status}
             </small>
           ) : (
-            <small>คำตอบที่บันทึกไว้ — ไม่ได้ระบุว่าเป็นปัญหา</small>
+            <small>
+              {item.feedback
+                ? item.feedback.rating === 'like'
+                  ? 'ผู้ใช้กดถูกใจ'
+                  : 'ผู้ใช้กดไม่ถูกใจ'
+                : 'คำตอบที่บันทึกไว้ — ไม่ได้ระบุว่าเป็นปัญหา'}
+            </small>
           )}
           <button
             disabled={loading}
