@@ -13,6 +13,7 @@ from starlette.exceptions import HTTPException
 
 from .admin import MemberUpdate, change_member, require_admin
 from .auth import AuthService, GoogleLogin, actor_id, public_user
+from .chat_review import Feedback, ReviewUpdate
 from .config import Settings
 from .database import SCHEMA_REVISION, Database
 from .errors import AppError
@@ -32,6 +33,7 @@ from .schemas import (
     ImportResponse,
     JobResponse,
     ResearchRequest,
+    ResumeRequest,
     TranscriptResponse,
     VideoList,
 )
@@ -148,7 +150,7 @@ def create_app(settings=None, database=None, adapters=None):
         CORSMiddleware,
         allow_origins=settings.auth_trusted_origins or [settings.web_origin],
         allow_credentials=True,
-        allow_methods=["GET", "POST", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Content-Type", "Idempotency-Key", "X-CSRF-Token"],
         expose_headers=["X-Request-ID", "X-Adapter-Mode", "Location"],
     )
@@ -260,7 +262,9 @@ def create_app(settings=None, database=None, adapters=None):
             await worker.run_once(job["job_id"])
         job = repository.get_job(job["job_id"])
         if job["state"] == "completed":
-            return dict(job["result"], sources_available=repository.sources_available(job))
+            return dict(
+                repository.chat_result(job), sources_available=repository.sources_available(job)
+            )
         if job["state"] in {"queued", "running"}:
             return accepted(job)
         code = job["error_code"] or "task_failed"
@@ -297,6 +301,132 @@ def create_app(settings=None, database=None, adapters=None):
             job["retryable"],
             job["job_id"],
         )
+
+    @app.post("/api/chat/check")
+    def chat_check(body: ChatRequest):
+        from .moderation import precheck
+
+        return precheck(repository, body.model_dump(mode="json"))
+
+    @app.get("/api/chat/policy")
+    def chat_policy():
+        from .moderation import POLICY_VERSION
+
+        return dict(
+            policy_version=POLICY_VERSION,
+            review_enabled=settings.chat_review_enabled,
+            review_notice="บทสนทนาอาจได้รับการตรวจโดยผู้ดูแลเพื่อปรับปรุงบริการ",
+            moderation_retention_days=settings.moderation_retention_days,
+        )
+
+    @app.put("/api/messages/{message_id}/feedback")
+    def put_feedback(message_id: str, body: Feedback):
+        from .chat_review import set_feedback
+
+        return set_feedback(repository, message_id, body)
+
+    @app.delete("/api/messages/{message_id}/feedback")
+    def remove_feedback(message_id: str):
+        from .chat_review import set_feedback
+
+        return set_feedback(repository, message_id)
+
+    @app.get("/api/messages/{message_id}/feedback")
+    def get_feedback(message_id: str):
+        from .chat_review import feedback_for, owned_message
+
+        with database.read() as c:
+            owner = owned_message(repository, c, message_id)
+            return dict(message_id=message_id, feedback=feedback_for(c, owner, message_id))
+
+    @app.get("/api/admin/chat-reviews")
+    def chat_reviews(
+        limit: Limit = 50,
+        offset: Offset = 0,
+        status: Annotated[str, Query(pattern="^(pending|all|new|in_review|reviewed)$")] = "pending",
+        rating: Annotated[str | None, Query(pattern="^(like|dislike)$")] = None,
+        label: Annotated[str | None, Query(max_length=40)] = None,
+        q: Annotated[str, Query(max_length=200)] = "",
+        after: float | None = None,
+        before: float | None = None,
+    ):
+        from .chat_review import review_list
+
+        if after is not None and before is not None and after > before:
+            raise AppError("invalid_date_range", "after must be on or before before", 422)
+        return review_list(
+            repository,
+            limit=limit,
+            offset=offset,
+            status=status,
+            rating=rating,
+            label=label,
+            q=q,
+            after=after,
+            before=before,
+        )
+
+    @app.get("/api/admin/chat-reviews/{case_id}")
+    def review_detail(case_id: str):
+        from .chat_review import detail
+
+        return detail(repository, case_id=case_id)
+
+    @app.patch("/api/admin/chat-reviews/{case_id}")
+    def review_update(case_id: str, body: ReviewUpdate):
+        from .chat_review import update_case
+
+        return update_case(repository, case_id, body)
+
+    @app.get("/api/admin/chat-messages")
+    def admin_messages(limit: Limit = 50, offset: Offset = 0):
+        from .chat_review import normal_messages
+
+        return normal_messages(repository, limit, offset)
+
+    @app.get("/api/admin/chat-messages/{message_id}")
+    def admin_message_detail(message_id: str):
+        from .chat_review import detail
+
+        return detail(repository, message_id=message_id)
+
+    @app.get("/api/admin/chat-messages/{message_id}/context")
+    def admin_message_context(message_id: str, limit: Limit = 20, offset: Offset = 0):
+        import sqlalchemy as sa
+
+        from . import database as db
+        from .chat_review import audit, message_detail, require_review
+
+        with database.write() as c:
+            admin = require_review(repository, c)
+            data, owner = message_detail(c, message_id)
+            items = (
+                c.execute(
+                    sa.select(db.messages)
+                    .where(db.messages.c.conversation_id == data["conversation_id"])
+                    .order_by(db.messages.c.created_at, db.messages.c.message_id)
+                    .limit(limit)
+                    .offset(offset)
+                )
+                .mappings()
+                .all()
+            )
+            audit(
+                c,
+                admin,
+                owner,
+                "chat_context_open",
+                message_id=message_id,
+                limit=limit,
+                offset=offset,
+            )
+            return dict(items=[dict(item) for item in items], limit=limit, offset=offset)
+
+    @app.delete("/api/conversations/{conversation_id}")
+    def erase_conversation(conversation_id: str):
+        from .chat_review import delete_conversation
+
+        return delete_conversation(repository, conversation_id)
 
     @app.post("/api/analysis", response_model=Accepted, status_code=202)
     async def analysis(body: AnalysisRequest, idempotency_key: IdempotencyKey = None):
@@ -419,10 +549,10 @@ def create_app(settings=None, database=None, adapters=None):
         return quota_status(repository, admin=True)
 
     @app.post("/api/jobs/{job_id}/resume", response_model=Accepted, status_code=202)
-    def resume_job(job_id: str):
+    def resume_job(job_id: str, body: ResumeRequest | None = None):
         from .job_resume import resume
 
-        return accepted(resume(repository, job_id))
+        return accepted(resume(repository, job_id, body.moderation_token if body else None))
 
     @app.post("/api/auth/google")
     def google_login(body: GoogleLogin, request: Request, response: Response):
