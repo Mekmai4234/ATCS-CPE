@@ -23,7 +23,7 @@ COPY 02_api_backend/tests/ ./tests/
 RUN groupadd --gid 10001 backend && useradd --uid 10001 --gid backend --no-create-home backend
 ENV PATH="/app/02_api_backend/.venv/bin:$PATH" \
     APP_ENV=test \
-    ADAPTER_MODE=fixture \
+    ADAPTER_MODE=unavailable \
     RUFF_CACHE_DIR=/tmp/ruff-cache
 USER 10001:10001
 CMD ["pytest", "tests", "-q", "-o", "cache_dir=/tmp/pytest-cache"]
