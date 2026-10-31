@@ -6,6 +6,9 @@
 !02_api_backend/tests/
 !02_api_backend/tests/test_identity.py
 !02_api_backend/tests/test_free_tier.py
+!03_video_ingestion/
+!03_video_ingestion/src/
+!03_video_ingestion/src/**
 !04_rag_knowledge/
 !04_rag_knowledge/pyproject.toml
 !04_rag_knowledge/src/

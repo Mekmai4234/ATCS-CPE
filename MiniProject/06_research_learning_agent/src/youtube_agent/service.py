@@ -343,6 +343,9 @@ class AgentService:
                 {"study_plan": "days", "quiz": "questions", "flashcards": "cards"}[request["type"]],
             )
             ids = {cid for item in items for cid in item.citations}
+            from .quality import validate_learning_items
+
+            validate_learning_items(request["type"], items)
             if not ids.issubset(records):
                 raise error(
                     "invalid_citation", "Artifact cites evidence not supplied to generation"

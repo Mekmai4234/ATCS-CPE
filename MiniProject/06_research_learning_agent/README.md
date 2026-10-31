@@ -1,5 +1,8 @@
 # Module 06 — Research and Learning Agent
 
+P1 private evidence reuse and learning quality checks: [P1_LEARNING.md](P1_LEARNING.md).
+Current verification and pending live gate: [P1_TEST_REPORT.md](P1_TEST_REPORT.md).
+
 Python package `youtube_agent` implements a bounded Gemini function-calling loop and
 grounded study plans, quizzes, and flashcards. Changes and configuration stay in this
 folder. Module 02 owns HTTP endpoints, durable jobs, events, cancellation and storage;
