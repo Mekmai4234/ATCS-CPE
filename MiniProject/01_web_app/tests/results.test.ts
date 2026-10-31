@@ -57,3 +57,20 @@ it('labels native video observations separately from transcript citations', () =
   expect(html).toContain('ภาพและเสียง · AI วิเคราะห์');
   expect(html).not.toContain('>บทถอดเสียง<');
 });
+
+it('withheld results never render draft text, citations or feedback', () => {
+  const markup = renderToStaticMarkup(
+    createElement(ResultView, {
+      result: {
+        ...result,
+        visibility: 'withheld',
+        assistant_message_id: 'saved',
+        answer: 'PRIVATE_DRAFT_TEXT',
+      },
+    }),
+  );
+  expect(markup).not.toContain('PRIVATE_DRAFT_TEXT');
+  expect(markup).not.toContain('youtube.com');
+  expect(markup).not.toContain('ความคิดเห็นต่อคำตอบ');
+  expect(markup).toContain('ระบบระงับคำตอบนี้');
+});

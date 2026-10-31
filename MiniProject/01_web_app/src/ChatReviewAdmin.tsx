@@ -1,0 +1,337 @@
+import { useEffect, useRef, useState } from 'react';
+import { Api, ApiError } from './api';
+type Case = {
+  case_id: string;
+  question_excerpt: string;
+  member_ref: string;
+  source: string;
+  label: string;
+  status: string;
+};
+type Detail = {
+  case: Case;
+  question?: { content: string };
+  answer?: { content: string };
+  visibility?: string;
+  provider_metadata?: { requested_model?: string; returned_model?: string };
+  moderation?: {
+    draft: string | null;
+    action: string;
+    reason: string;
+    policy_version: string;
+    visible_to_user: boolean;
+  };
+  feedback?: { rating: string; reason: string; comment: string };
+  citations?: { title: string; start_seconds: number }[];
+  scope?: { video_id: string; transcript_version: string }[];
+};
+export default function ChatReviewAdmin({ api }: { api: Api }) {
+  const [items, setItems] = useState<Case[]>([]),
+    [detail, setDetail] = useState<Detail | null>(null);
+  const [stats, setStats] = useState<Record<string, number>>({});
+  const [offset, setOffset] = useState(0),
+    [total, setTotal] = useState(0),
+    [query, setQuery] = useState('');
+  const [status, setStatus] = useState(''),
+    [rating, setRating] = useState(''),
+    [label, setLabel] = useState('');
+  const [after, setAfter] = useState(''),
+    [before, setBefore] = useState('');
+  const [error, setError] = useState(''),
+    [loading, setLoading] = useState(false),
+    [revision, setRevision] = useState(0);
+  const [notes, setNotes] = useState('');
+  const failure = (e: unknown) => {
+    if (e instanceof ApiError && [401, 403, 404].includes(e.status || 0)) {
+      setItems([]);
+      setDetail(null);
+      setStats({});
+    }
+    setError(
+      e instanceof ApiError && e.status === 403
+        ? 'ไม่มีสิทธิ์ตรวจเนื้อหาแชท หรือยังไม่เปิดใช้งาน'
+        : e instanceof ApiError && e.status === 404
+          ? 'เคสนี้หมดอายุหรือใช้ไม่ได้แล้ว'
+          : 'โหลดหรือบันทึกไม่สำเร็จ กรุณาลองใหม่',
+    );
+  };
+  useEffect(() => {
+    const c = new AbortController();
+    request.current?.abort();
+    setLoading(true);
+    setError('');
+    setDetail(null);
+    setItems([]);
+    const p = new URLSearchParams({ limit: '20', offset: String(offset) });
+    for (const [k, v] of Object.entries({
+      q: query,
+      status,
+      rating,
+      label,
+      after: after ? String(Date.parse(after) / 1000) : '',
+      before: before ? String(Date.parse(before) / 1000 + 86399) : '',
+    }))
+      if (v) p.set(k, v);
+    void api
+      .request<{ items: Case[]; total: number; stats: Record<string, number> }>(
+        `/api/admin/chat-reviews?${p}`,
+        { signal: c.signal, cache: 'no-store' },
+      )
+      .then(({ data }) => {
+        if (!c.signal.aborted) {
+          setItems(data.items);
+          setTotal(data.total);
+          setStats(data.stats);
+        }
+      })
+      .catch((e) => {
+        if (!c.signal.aborted) failure(e);
+      })
+      .finally(() => {
+        if (!c.signal.aborted) setLoading(false);
+      });
+    return () => c.abort();
+  }, [api, offset, query, status, rating, label, after, before, revision]);
+  useEffect(
+    () => () => {
+      request.current?.abort();
+    },
+    [],
+  );
+  const request = useRef<AbortController | null>(null);
+  async function open(id: string) {
+    request.current?.abort();
+    const c = new AbortController();
+    request.current = c;
+    setDetail(null);
+    setLoading(true);
+    setError('');
+    setNotes('');
+    try {
+      const { data } = await api.request<Detail>(
+        `/api/admin/chat-reviews/${encodeURIComponent(id)}`,
+        { signal: c.signal, cache: 'no-store' },
+      );
+      if (!c.signal.aborted) setDetail(data);
+    } catch (e) {
+      if (!c.signal.aborted) failure(e);
+    } finally {
+      if (!c.signal.aborted) setLoading(false);
+    }
+  }
+  async function save(outcome?: string) {
+    if (!detail || loading) return;
+    setLoading(true);
+    setError('');
+    request.current?.abort();
+    const c = new AbortController();
+    request.current = c;
+    try {
+      await api.request(`/api/admin/chat-reviews/${encodeURIComponent(detail.case.case_id)}`, {
+        signal: c.signal,
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: outcome ? 'reviewed' : 'in_review',
+          outcome: outcome || null,
+          notes,
+        }),
+      });
+      if (!c.signal.aborted) {
+        setDetail(null);
+        setRevision((n) => n + 1);
+      }
+    } catch (e) {
+      if (!c.signal.aborted) failure(e);
+    } finally {
+      if (!c.signal.aborted) setLoading(false);
+    }
+  }
+  return (
+    <section className="admin-card" aria-label="ตรวจสอบแชท">
+      <h1>ตรวจสอบแชท</h1>
+      <div className="admin-stats">
+        {Object.entries({
+          like: 'ถูกใจ',
+          dislike: 'ไม่ถูกใจ',
+          pending: 'รอตรวจ',
+          withheld: 'ระบบระงับ',
+        }).map(([k, v]) => (
+          <article key={k}>
+            {v}: {stats[k] ?? '—'}
+          </article>
+        ))}
+      </div>
+      <label>
+        ค้นคำถาม
+        <input
+          value={query}
+          onChange={(e) => {
+            setOffset(0);
+            setQuery(e.target.value);
+          }}
+        />
+      </label>
+      <label>
+        สถานะ
+        <select
+          aria-label="สถานะ"
+          value={status}
+          onChange={(e) => {
+            setOffset(0);
+            setStatus(e.target.value);
+          }}
+        >
+          <option value="">รอตรวจ</option>
+          <option value="new">ใหม่</option>
+          <option value="in_review">กำลังตรวจ</option>
+          <option value="reviewed">ตรวจแล้ว</option>
+        </select>
+      </label>
+      <label>
+        คะแนน
+        <select
+          value={rating}
+          onChange={(e) => {
+            setOffset(0);
+            setRating(e.target.value);
+          }}
+        >
+          <option value="">ทุกคะแนน</option>
+          <option value="like">ถูกใจ</option>
+          <option value="dislike">ไม่ถูกใจ</option>
+        </select>
+      </label>
+      <label>
+        ประเภทเหตุการณ์
+        <input
+          value={label}
+          onChange={(e) => {
+            setOffset(0);
+            setLabel(e.target.value);
+          }}
+        />
+      </label>
+      <label>
+        ตั้งแต่
+        <input
+          type="date"
+          value={after}
+          onChange={(e) => {
+            setOffset(0);
+            setAfter(e.target.value);
+          }}
+        />
+      </label>
+      <label>
+        ถึง
+        <input
+          type="date"
+          value={before}
+          onChange={(e) => {
+            setOffset(0);
+            setBefore(e.target.value);
+          }}
+        />
+      </label>
+      {loading && <p role="status">กำลังโหลด…</p>}
+      {error && (
+        <p role="alert">
+          {error}
+          <button onClick={() => setRevision((n) => n + 1)}>ลองใหม่</button>
+        </p>
+      )}
+      {!loading && !error && !items.length && <p>ไม่มีรายการที่ตรงกับตัวกรอง</p>}
+      {items.map((item) => (
+        <article key={item.case_id}>
+          <p>{item.question_excerpt}</p>
+          <small>
+            สมาชิก {item.member_ref} ·{' '}
+            {['user', 'user_report'].includes(item.source) ? 'ผู้ใช้รายงาน' : 'ระบบสงสัย'} ·{' '}
+            {item.label} · {item.status}
+          </small>
+          <button disabled={loading} onClick={() => void open(item.case_id)}>
+            เปิดดู
+          </button>
+        </article>
+      ))}
+      <nav>
+        <button
+          disabled={loading || offset === 0}
+          onClick={() => setOffset((n) => Math.max(0, n - 20))}
+        >
+          หน้าก่อนหน้า
+        </button>
+        <button
+          disabled={loading || offset + items.length >= total}
+          onClick={() => setOffset((n) => n + 20)}
+        >
+          หน้าถัดไป
+        </button>
+      </nav>
+      {detail && (
+        <article>
+          <h2>คำถามและคำตอบคู่เดียวกัน</h2>
+          <p>{detail.question?.content || 'ข้อความถูกบล็อกก่อนสร้างงาน'}</p>
+          <h3>
+            {detail.visibility === 'withheld' ? 'ข้อความระบบที่ผู้ใช้เห็น' : 'คำตอบที่ผู้ใช้เห็น'}
+          </h3>
+          <p>{detail.answer?.content || 'ไม่มีคำตอบ'}</p>
+          {detail.moderation && !detail.moderation.visible_to_user && (
+            <details>
+              <summary>ร่างที่ถูกระงับ — ผู้ใช้ไม่เห็น</summary>
+              <p>{detail.moderation.draft || 'เนื้อหาถูกลบตามอายุการเก็บ'}</p>
+            </details>
+          )}
+          {detail.provider_metadata && (
+            <p>
+              โมเดล:{' '}
+              {detail.provider_metadata.returned_model || detail.provider_metadata.requested_model}
+            </p>
+          )}
+          {detail.moderation && (
+            <p>
+              นโยบายตรวจ: {detail.moderation.policy_version} · เหตุผล: {detail.moderation.reason}
+            </p>
+          )}
+          {detail.feedback && (
+            <p>
+              ผู้ใช้รายงาน: {detail.feedback.rating} · {detail.feedback.reason} ·{' '}
+              {detail.feedback.comment}
+            </p>
+          )}
+          <ul>
+            {detail.scope?.map((s) => (
+              <li key={s.video_id}>
+                {s.video_id} · เวอร์ชัน {s.transcript_version}
+              </li>
+            ))}
+          </ul>
+          <ul>
+            {detail.citations?.map((c, i) => (
+              <li key={i}>
+                {c.title} · {c.start_seconds} วินาที
+              </li>
+            ))}
+          </ul>
+          <label>
+            หมายเหตุ
+            <textarea maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </label>
+          {detail.case.status === 'new' ? (
+            <button disabled={loading} onClick={() => void save()}>
+              เริ่มตรวจ
+            </button>
+          ) : detail.case.status === 'in_review' ? (
+            ['confirmed', 'false_positive', 'inconclusive'].map((v, i) => (
+              <button key={v} disabled={loading} onClick={() => void save(v)}>
+                {['ยืนยันปัญหา', 'แจ้งเตือนผิด', 'ยังสรุปไม่ได้'][i]}
+              </button>
+            ))
+          ) : (
+            <p>ตรวจแล้ว</p>
+          )}
+        </article>
+      )}
+    </section>
+  );
+}

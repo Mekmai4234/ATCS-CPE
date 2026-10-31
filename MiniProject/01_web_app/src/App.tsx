@@ -214,6 +214,8 @@ export default function App({
   const [learningFocus, setLearningFocus] = useState(false);
   const [days, setDays] = useState(7);
   const [level, setLevel] = useState('beginner');
+  const prechecking = useRef(false);
+  const draftIdentity = useRef('');
   const [conversation, setConversation] = useState<string | null>(null);
   const conversationId = useRef<string | null>(null);
   const conversationScope = useRef('');
@@ -582,7 +584,8 @@ export default function App({
       if (alive.current) setBusy(false);
     }
   }
-  function submitTask(event: FormEvent, forcedType?: TaskType) {
+  draftIdentity.current = JSON.stringify([question, selected, channel, from, to, conversation]);
+  async function submitTask(event: FormEvent, forcedType?: TaskType) {
     event.preventDefault();
     if (busyRef.current || operationRef.current) return;
     if (archiveLoading || ((forcedType === 'chat' || tab === 'chat') && viewingHistory)) return;
@@ -631,6 +634,32 @@ export default function App({
             : type === 'research'
               ? '/api/research'
               : '/api/learning-artifacts';
+      if (type === 'chat' && api.chatPolicyAvailable) {
+        if (prechecking.current) return;
+        prechecking.current = true;
+        const identity = draftIdentity.current;
+        try {
+          const { data } = await api.request<{
+            decision: 'allow' | 'warn' | 'block';
+            message: string;
+            acknowledgment_token?: string;
+          }>('/api/chat/check', { method: 'POST', body: JSON.stringify(payload) });
+          if (!alive.current || identity !== draftIdentity.current) return;
+          if (data.decision === 'block')
+            throw new Error(data.message || 'กรุณาปรับข้อความให้เหมาะสมก่อนส่งอีกครั้ง');
+          if (data.decision === 'warn') {
+            if (
+              !data.acknowledgment_token ||
+              !window.confirm(`${data.message}\nยืนยันส่งข้อความเดิมหรือไม่?`)
+            )
+              return;
+            Object.assign(payload, { moderation_token: data.acknowledgment_token });
+          } else if (data.decision !== 'allow')
+            throw new Error('ตรวจข้อความไม่สำเร็จ กรุณาลองใหม่');
+        } finally {
+          prechecking.current = false;
+        }
+      }
       setEvents([]);
       followResults.current = true;
       setNewResults(false);
@@ -706,7 +735,12 @@ export default function App({
               sources,
               partial: message.state === 'partial',
               result: reconcileSources(
-                { answer: message.content, citations: message.citations },
+                {
+                  answer: message.content,
+                  citations: message.citations,
+                  assistant_message_id: message.message_id,
+                  visibility: message.visibility,
+                },
                 sources,
                 { ...inventory.current, retired: retiredSources.current },
               ),
@@ -779,7 +813,12 @@ export default function App({
               ? undefined
               : statusLabels[message.state] || 'ยังไม่มีคำตอบที่บันทึกไว้',
             result: reconcileSources(
-              { answer: reply?.content, citations: reply?.citations || [] },
+              {
+                answer: reply?.content,
+                citations: reply?.citations || [],
+                assistant_message_id: reply?.message_id,
+                visibility: reply?.visibility,
+              },
               sources,
               { ...inventory.current, retired: retiredSources.current },
             ),
