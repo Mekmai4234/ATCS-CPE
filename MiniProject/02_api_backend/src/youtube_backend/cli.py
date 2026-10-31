@@ -18,11 +18,19 @@ def configure_logging(settings):
 
 def migrate():
     parser = argparse.ArgumentParser(description="Apply the module 02 database migrations")
-    parser.add_argument("command", choices=["upgrade"])
+    parser.add_argument("command", choices=["upgrade", "purge-review"])
     parser.add_argument("revision", nargs="?", default="head", choices=["head"])
-    parser.parse_args()
-    database = Database(Settings().database_url)
+    args = parser.parse_args()
+    settings = Settings()
+    database = Database(settings.database_url)
     try:
+        if args.command == "purge-review":
+            from .moderation import purge_expired
+
+            database.check_schema()
+            count = purge_expired(Repository(database, settings))
+            print(f"Expired moderation rows anonymized: {count}")
+            return
         upgrade_database(database)
         print(f"Database upgraded to head ({SCHEMA_REVISION}).")
     finally:
