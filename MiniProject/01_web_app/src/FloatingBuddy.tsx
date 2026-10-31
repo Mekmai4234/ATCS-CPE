@@ -40,6 +40,7 @@ interface Props {
   newConversation: () => void;
   cancel?: () => void;
   retry?: () => void;
+  resume?: () => void;
   fullChat: () => void;
   history: () => void;
   historyAvailable: boolean;
@@ -524,6 +525,7 @@ export default function FloatingBuddy(props: Props) {
                 </p>
               )}
               {props.cancel && <button onClick={props.cancel}>ขอยกเลิกงานแชต</button>}
+              {props.resume && <button onClick={props.resume}>ให้งานที่พักทำต่อ</button>}
               {props.retry && (
                 <button onClick={props.retry}>ลองติดตามหรือส่งคำขอเดิมอีกครั้ง</button>
               )}

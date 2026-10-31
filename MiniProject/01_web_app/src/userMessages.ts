@@ -25,6 +25,9 @@ export function serviceMessage(code: string | null | undefined, status?: number)
     status === 503
   )
     return userMessages.unavailable;
+  if (code === 'moderation_confirmation_required')
+    return 'กรุณาตรวจและยืนยันข้อความใหม่ก่อนส่งอีกครั้ง';
+  if (code === 'moderation_blocked') return 'กรุณาปรับข้อความให้เหมาะสมก่อนส่งอีกครั้ง';
   if (code === 'invalid_video_time') return 'เวลาไม่ถูกต้อง ใช้รูปแบบ 01:20 หรือ 01:20:30';
   if (code === 'invalid_video_time_range') return 'เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น';
   if (code === 'video_time_out_of_bounds') return 'รองรับเวลาวิดีโอไม่เกิน 02:00:00';

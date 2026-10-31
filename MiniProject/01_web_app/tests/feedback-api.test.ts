@@ -27,3 +27,39 @@ it('uses encoded stable IDs and negotiated CSRF for PUT and DELETE', async () =>
   expect(sent[0].credentials).toBe('include');
   api.dispose();
 });
+
+it('replays existing resume before checking admission or requesting confirmation', async () => {
+  const api = new Api('', async (url) => {
+    expect(String(url)).toBe('/api/jobs/job/resume');
+    return new Response(JSON.stringify({ job_id: 'replacement', state: 'queued' }));
+  });
+  expect(
+    (
+      await api.resumeChat('job', {}, () => {
+        throw new Error('must not prompt');
+      })
+    )?.job_id,
+  ).toBe('replacement');
+  api.dispose();
+});
+it('new resume prechecks the original request and uses the fresh server token', async () => {
+  const calls: string[] = [];
+  const api = new Api('', async (url, init) => {
+    calls.push(String(url));
+    if (calls.length === 1)
+      return new Response(JSON.stringify({ error: { code: 'moderation_confirmation_required' } }), {
+        status: 422,
+      });
+    if (calls.length === 2) {
+      expect(JSON.parse(String(init?.body))).toEqual({ question: 'same' });
+      return new Response(
+        JSON.stringify({ decision: 'warn', message: 'warning', acknowledgment_token: 'fresh' }),
+      );
+    }
+    expect(JSON.parse(String(init?.body))).toEqual({ moderation_token: 'fresh' });
+    return new Response(JSON.stringify({ job_id: 'replacement', state: 'queued' }));
+  });
+  await api.resumeChat('job', { question: 'same', moderation_token: 'expired' }, () => true);
+  expect(calls).toEqual(['/api/jobs/job/resume', '/api/chat/check', '/api/jobs/job/resume']);
+  api.dispose();
+});

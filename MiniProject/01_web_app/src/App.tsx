@@ -634,6 +634,13 @@ export default function App({
             : type === 'research'
               ? '/api/research'
               : '/api/learning-artifacts';
+      if (
+        type === 'chat' &&
+        api.authenticated &&
+        !api.chatPolicyAvailable &&
+        !api.chatPolicyUnsupported
+      )
+        throw new Error('กรุณารอโหลดนโยบายแชท หรือรีเฟรชก่อนส่งคำถาม');
       if (type === 'chat' && api.chatPolicyAvailable) {
         if (prechecking.current) return;
         prechecking.current = true;
@@ -693,6 +700,27 @@ export default function App({
     loadedArchive.current = null;
     onNavigate?.('/chat');
     updateTurns((previous) => previous.filter((turn) => turn.type !== 'chat'));
+  }
+  async function resumeChat() {
+    const op = operationRef.current;
+    if (!op?.jobId || op.type !== 'chat' || busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setTaskError('');
+    let replacement: import('./types').Accepted | null = null;
+    try {
+      replacement = await api.resumeChat(op.jobId, op.payload, (message) =>
+        window.confirm(`${message}\nยืนยันให้งานเดิมทำต่อหรือไม่?`),
+      );
+    } catch (error) {
+      if (alive.current) setTaskError(errorText(error));
+    } finally {
+      busyRef.current = false;
+      if (alive.current) setBusy(false);
+    }
+    if (replacement && alive.current && operationRef.current?.jobId === op.jobId) {
+      void execute({ ...op, jobId: replacement.job_id }, true);
+    }
   }
   async function loadHistory() {
     if (!conversation || historyPending) return;
@@ -1713,6 +1741,14 @@ export default function App({
                       {operation.jobId ? 'ติดตามผลอีกครั้ง' : 'ส่งคำขอเดิมซ้ำ'}
                     </button>
                   )}
+                  {!busy &&
+                    operation?.type === 'chat' &&
+                    pendingJob?.state === 'paused' &&
+                    api.chatPolicyAvailable && (
+                      <button className="secondary" onClick={() => void resumeChat()}>
+                        ให้งานที่พักทำต่อ
+                      </button>
+                    )}
                   {events.length > 0 && (
                     <details className="progress-events" open>
                       <summary>ความคืบหน้าการค้นคว้า</summary>
@@ -1913,6 +1949,14 @@ export default function App({
             retry={
               !busy && operation && canRetry
                 ? () => void execute(operation, !!operation.jobId)
+                : undefined
+            }
+            resume={
+              !busy &&
+              operation?.type === 'chat' &&
+              pendingJob?.state === 'paused' &&
+              api.chatPolicyAvailable
+                ? () => void resumeChat()
                 : undefined
             }
             fullChat={() => navigateTab('chat')}

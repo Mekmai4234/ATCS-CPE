@@ -5,9 +5,11 @@ test.beforeEach(async ({ page }) => {
 test('rating is confirmed once, toggles off and edits optional dislike details', async ({
   page,
 }) => {
+  await page.goto('/tests/feedback.html?hold=1');
   const like = page.getByRole('button', { name: 'ถูกใจ', exact: true });
   await like.click();
   await expect(like).toBeDisabled();
+  await page.evaluate(() => window.dispatchEvent(new Event('release-feedback')));
   await expect(like).toHaveAttribute('aria-pressed', 'true');
   await like.click();
   await expect(like).toHaveAttribute('aria-pressed', 'false');

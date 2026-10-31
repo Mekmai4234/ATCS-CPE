@@ -34,6 +34,10 @@ export interface ApiSecurity {
 }
 export class Api {
   chatPolicyAvailable = false;
+  chatPolicyUnsupported = false;
+  get authenticated() {
+    return !!this.security;
+  }
   onMode?: (mode: string) => void;
   private controllers = new Set<AbortController>();
   private disposed = false;
@@ -351,6 +355,33 @@ export class Api {
     )
       return { status: 200, data: this.mapResult(response.data as Answer) as Answer };
     throw new ApiError('ผลคำขอไม่ตรง API', 'invalid_response', false);
+  }
+  async resumeChat(id: string, original: object, confirm: (message: string) => boolean) {
+    const path = `/api/jobs/${encodeURIComponent(id)}/resume`;
+    const post = (body: object) =>
+      this.request<Accepted>(path, { method: 'POST', body: JSON.stringify(body) });
+    try {
+      return (await post({})).data;
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.code !== 'moderation_confirmation_required')
+        throw error;
+    }
+    const { data } = await this.request<{
+      decision: 'allow' | 'warn' | 'block';
+      message: string;
+      acknowledgment_token?: string;
+    }>('/api/chat/check', {
+      method: 'POST',
+      body: JSON.stringify({ ...original, moderation_token: undefined }),
+    });
+    if (data.decision === 'block') throw new ApiError(data.message, 'moderation_blocked', false);
+    if (data.decision === 'warn') {
+      if (!data.acknowledgment_token || !confirm(data.message)) return null;
+      return (await post({ moderation_token: data.acknowledgment_token })).data;
+    }
+    if (data.decision !== 'allow')
+      throw new ApiError('ตรวจข้อความไม่สำเร็จ', 'invalid_response', false);
+    return (await post({})).data;
   }
   async cancel(id: string) {
     return (
