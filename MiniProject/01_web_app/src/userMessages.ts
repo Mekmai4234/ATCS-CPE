@@ -1,6 +1,9 @@
 // Presentation only. API errors and durable jobs retain their diagnostic codes.
 export const userMessages = {
   aiUnavailable: 'ขณะนี้ผู้ช่วย AI ยังไม่พร้อมให้บริการ กรุณาลองใหม่ภายหลัง',
+  quotaWait: 'งบการใช้งานภายในระบบเต็ม งานเดิมยังถูกเก็บไว้ กรุณารอเวลาที่ระบบแจ้ง',
+  providerLimited: 'ผู้ให้บริการจำกัดการใช้งานชั่วคราว กรุณาติดตามงานเดิมก่อนส่งซ้ำ',
+  workerUnavailable: 'ตัวประมวลผลยังไม่พร้อม งานเดิมยังถูกเก็บไว้ กรุณารอก่อนส่งซ้ำ',
   busy: 'ขณะนี้มีคำขอจำนวนมาก กรุณารอสักครู่แล้วลองอีกครั้ง',
   unavailable: 'ระบบไม่พร้อมให้บริการชั่วคราว กรุณาลองใหม่ภายหลัง',
   failed: 'ทำรายการไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
@@ -11,11 +14,10 @@ export const userMessages = {
 export function serviceMessage(code: string | null | undefined, status?: number): string | null {
   if (['free_tier_unverified', 'free_model_unverified', 'quota_pending'].includes(code || ''))
     return userMessages.aiUnavailable;
-  if (
-    ['generation_rate_limited', 'provider_rate_limited', 'quota_wait'].includes(code || '') ||
-    status === 429
-  )
-    return userMessages.busy;
+  if (code === 'quota_wait') return userMessages.quotaWait;
+  if (code === 'provider_rate_limited') return userMessages.providerLimited;
+  if (code === 'worker_unavailable') return userMessages.workerUnavailable;
+  if (['generation_rate_limited'].includes(code || '') || status === 429) return userMessages.busy;
   if (
     ['generation_provider_busy', 'provider_unavailable', 'generation_provider_error'].includes(
       code || '',
