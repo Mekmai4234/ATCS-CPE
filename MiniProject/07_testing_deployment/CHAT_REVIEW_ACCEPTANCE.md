@@ -1,5 +1,41 @@
 # Feedback / chat review acceptance — 31 October 2026
 
+## Review follow-up — PR review 5721535004
+
+Merged current `origin/develop` (`3d7b77b`, includes 01's unmounted feedback component)
+before editing, then merged the 02 fixes as the existing explicit PR dependency.
+`tests/auth/test_chat_review_regressions.py` adds six independent regressions:
+
+1. Completed warning-request replay with expired/missing ticket returns the original
+   result; changed payload conflicts, new work/other accounts cannot bypass admission,
+   and replay does not add jobs/events/reservations/provider calls.
+2. One still-valid ticket creates separate per-job proofs. Replaying adds no proof;
+   deleting the second conversation leaves the first queued job's proof and eventual
+   completion intact, even after the original ticket expires.
+3. A worker rejects a different job's proof with the same owner/request before the
+   adapter is invoked.
+4. Expired blocked-input case notes cannot be read, listed or edited before purge.
+5. The same retention gate covers withheld-output notes; ordinary message/context
+   routes do not expose the private copy. Cases/notes are removed after purge and
+   content-free audit remains.
+6. A stopped job's existing replacement replays after ticket expiry with no new
+   proof/job/provider work; the admitted replacement still completes exactly once.
+
+All **six failed on the pre-fix backend**, then **six passed** with the updated 02.
+Run with `-W error`; no skip/xfail, warning filters, mock API or real provider calls.
+Existing ownership/CSRF/capability/audit/ledger, migration/restore and browser gates
+remain. Full current 07 host/Linux Docker: **126 passed each**, `-W error`.
+Backend host/Linux Docker: **187 passed each**, `-W error`. Browser: **10 passed**,
+cleanup passed; ignored `runtime/browser-identity-df89553ef7/{report.json,browser.log}`.
+Combined Ruff lint/format: **307 Python files**. Final pushed-branch CI is linked
+in the PR and reported separately from these local results.
+
+The stacked base remains `feature/02_api_backend` until #39 is merged; then retarget
+#40 to develop and recheck its diff. No PR is merged or capability enabled here.
+The remaining integrated UI/semantic/05 Windows work in the new TODO belongs to
+01/05 and is not silently counted as done by these API/worker regressions. The
+original validation/baseline below is retained as historical evidence.
+
 Implements module 07's portion of the supplied feedback/chat-review plan. Changes
 stay in 07. Its branch first merged `origin/develop` (`b4f97be`), then takes module
 02's feedback/0004 contract as an explicit dependency. The 07 PR is stacked on
