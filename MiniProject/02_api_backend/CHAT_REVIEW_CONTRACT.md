@@ -56,11 +56,27 @@ accepted. Preserve the original text; do not normalize or silently edit the payl
 The token is not stored in the job or returned in history. The repository enforces
 the guard even for direct callers. A rejected request has no chat job/provider call.
 
+Idempotency replay is a read: owner and request hash are checked before admission.
+The same existing key/request returns its original job/result even without a token
+or after ticket expiry. Changed payload with that key returns 409
+`idempotency_conflict`; a NEW key/job still requires valid admission.
+
+For new work, each acknowledged job receives its own execution-proof event, created
+atomically with the job. A still-valid ticket may approve identical new requests,
+but is never relinked to a job: each job's `moderation_event_id` points to a distinct
+`action=acknowledge` proof, not the original warning ticket. The proof contains no
+raw token or duplicate input text and retains its admission time/expiry and policy.
+Deleting one conversation cannot delete another job's proof. Worker checks include
+job binding, owner, request hash, policy and admission validity. Correctly bound
+legacy proofs remain readable; mismatched legacy proofs fail closed.
+
 The worker rechecks input before its answer adapter, including old queued jobs.
-A valid acknowledged admission persists a bounded server proof for queued execution.
-Explicit resume re-runs admission: precheck the original request again and submit
+Explicit resume checks for an existing replacement before requiring a new admission
+or quota check. Replaying that replacement does not create proof/job/provider work.
+For a NEW replacement, precheck the original request and submit
 `{"moderation_token":"..."}` to `POST /api/jobs/{job_id}/resume` when needed.
-Blocked or expired acknowledgement cannot be bypassed by retry/resume.
+Its proof is independent of the stopped job. Changed original payload/frozen sources
+conflict with an existing replacement; expired tickets cannot approve new work.
 
 The final serialized publication transaction applies the output guard to chat
 answers. Direct abuse is retained only as a restricted, expiring moderation draft;
@@ -99,7 +115,9 @@ is needed from 04, and 06/learning artifacts are outside this MVP.
   frozen source versions, citations, provider metadata, current feedback, label
   source and review state. Blocked input has an attempt case, no invented answer.
   Withheld draft is explicitly separate and marked unseen by the user. All content
-  opens are audited; expired text is never returned even before the cleanup sweep.
+  opens are audited. A case linked to an expired moderation event returns 404,
+  including its copied notes, even before the cleanup sweep. Expired cases are
+  excluded from list results/totals/pending counts and cannot be PATCHed.
 - `PATCH /api/admin/chat-reviews/{case_id}`: new → in_review → reviewed;
   reviewed requires `confirmed|false_positive|inconclusive` outcome. Notes <=1000
   chars. Reviewer/time recorded; state/outcome audit contains no note/chat text.
@@ -121,8 +139,9 @@ and actions only, not duplicate chat text.
 Rejected inputs/withheld drafts expire after configurable
 `MODERATION_RETENTION_DAYS` (1..30, default 30). The long-running worker anonymizes
 expired events every 60 seconds and deletes their review cases/notes. When no worker
-is running, schedule `yk-db purge-review` externally. Detail reads independently
-hide expired content. Ordinary published-message feedback follows original-message
+is running, schedule `yk-db purge-review` externally. Read/update gates independently
+deny expired moderation cases, including notes, without waiting for the sweep.
+Ordinary published-message feedback follows original-message
 deletion. Backups retain their existing separately controlled lifecycle.
 
 ## Validation and remaining integration
