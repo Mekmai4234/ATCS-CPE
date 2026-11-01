@@ -270,6 +270,8 @@ class Repository(Ownership):
         return previous
 
     def enqueue(self, kind, request, idempotency_key=None):
+        if kind == "chat" and request.get("mode") == "video":
+            request = {key: value for key, value in request.items() if key != "mode"}
         admission_request = request
         if kind == "chat":
             request = {k: v for k, v in request.items() if k != "moderation_token"}
@@ -294,7 +296,8 @@ class Repository(Ownership):
             previous = self._replay_job(connection, key, request_hash)
             if previous:
                 return previous
-            sources = self._sources(connection, request["scope"])
+            general = kind == "chat" and request.get("mode") == "general"
+            sources = [] if general else self._sources(connection, request["scope"])
             if kind == "analysis" and request["type"] == "compare" and len(sources) < 2:
                 raise AppError("comparison_scope", "Comparison requires at least two videos", 422)
             payload = dict(request=request, sources=sources)
@@ -772,7 +775,10 @@ class Repository(Ownership):
                 and time.time() + delay < job["deadline_at"]
             )
             missing = not cancelled and error.code == "no_transcript" and job["kind"] == "import"
-            paused = not cancelled and job["kind"] == "enrich" and error.pause
+            paused = not cancelled and (
+                (job["kind"] == "enrich" and error.pause)
+                or (error.code == "quota_wait" and not retry)
+            )
             state = (
                 "cancelled"
                 if cancelled
@@ -838,7 +844,7 @@ class Repository(Ownership):
                 else "no_transcript"
                 if missing
                 else "queued"
-                if retry
+                if retry or paused
                 else "failed",
             )
             if job["kind"] == "enrich":
@@ -1080,7 +1086,7 @@ class Repository(Ownership):
             self._private(connection, job)
             if not job:
                 raise AppError("job_not_found", "Job not found", 404)
-            if job["kind"] not in {"import", "delete"} or job["state"] != "failed":
+            if job["kind"] not in {"import", "delete"} or job["state"] not in {"failed", "paused"}:
                 raise AppError(
                     "retry_not_allowed", "Only failed import/deletion jobs can be retried", 409
                 )
@@ -1114,13 +1120,25 @@ class Repository(Ownership):
                     .where(db.videos.c.video_id == job["video_id"])
                     .values(status="queued", updated_at=time.time())
                 )
-            return self._new_job(
+            replacement = self._new_job(
                 connection,
                 job["kind"],
-                job["payload"],
+                dict(job["payload"], resumes=job_id),
                 video_id=job["video_id"],
                 generation=job["generation"],
             )
+            if job["state"] == "paused":
+                connection.execute(
+                    db.jobs.update()
+                    .where(db.jobs.c.job_id == job_id)
+                    .values(
+                        state="cancelled",
+                        stage="cancelled",
+                        error_code="resumed",
+                        updated_at=time.time(),
+                    )
+                )
+            return replacement
 
     def add_event(self, job_id, token, data):
         with self.db.write() as connection:
@@ -1184,6 +1202,50 @@ class Repository(Ownership):
                     .limit(limit)
                 ).mappings()
             ]
+        failed_ids = [
+            item["video_id"]
+            for item in items
+            if item["status"] in {"failed", "queued", "fetching_transcript", "indexing"}
+        ]
+        if failed_ids:
+            with self.db.read() as connection:
+                owner = self._actor(connection)
+                columns = [
+                    db.jobs.c.video_id,
+                    db.jobs.c.job_id,
+                    db.jobs.c.state,
+                    db.jobs.c.error_code,
+                    db.jobs.c.retryable,
+                ]
+                conditions_jobs = [
+                    db.jobs.c.video_id.in_(failed_ids),
+                    db.jobs.c.kind.in_(["import", "attach"]),
+                ]
+                if self.settings.auth_enabled:
+                    conditions_jobs.append(db.jobs.c.owner_id == owner)
+                latest = (
+                    sa.select(
+                        *columns,
+                        sa.func.row_number()
+                        .over(
+                            partition_by=db.jobs.c.video_id,
+                            order_by=[db.jobs.c.created_at.desc(), db.jobs.c.job_id.desc()],
+                        )
+                        .label("position"),
+                    )
+                    .where(*conditions_jobs)
+                    .subquery()
+                )
+                statuses = {
+                    record["video_id"]: {
+                        key: record[key] for key in ("job_id", "state", "error_code", "retryable")
+                    }
+                    for record in connection.execute(
+                        sa.select(latest).where(latest.c.position == 1)
+                    ).mappings()
+                }
+                for item in items:
+                    item["import_job"] = statuses.get(item["video_id"])
         for item in items:
             item["created_at"], item["updated_at"] = (
                 iso(item["created_at"]),
@@ -1397,3 +1459,73 @@ class Repository(Ownership):
             created_at=iso(artifact["created_at"]),
             mode=self.settings.adapter_mode,
         )
+
+    def enqueue_quiz(self, artifact_id, answers, idempotency_key=None):
+        quiz = self.artifact(artifact_id)
+        if quiz["type"] != "quiz" or not quiz["sources_available"]:
+            raise AppError("quiz_unavailable", "An available owned quiz is required", 409)
+        questions = quiz["content"]["questions"]
+        if len(answers) != len(questions):
+            raise AppError("invalid_quiz_answers", "Submit one answer per question", 422)
+        return self.enqueue(
+            "quiz_grade",
+            dict(
+                artifact_id=artifact_id,
+                questions=questions,
+                answers=answers,
+                scope={"video_ids": [source["video_id"] for source in quiz["scope"]]},
+            ),
+            idempotency_key,
+        )
+
+    def import_checkpoint(self, job_id, token):
+        """Resume indexing a fetched transcript under the same durable generation/owner."""
+        with self.db.read() as connection:
+            job = self._owned(connection, job_id, token)
+            if job["kind"] != "import":
+                raise AppError("invalid_job", "Import checkpoint requires an import job", 409)
+            video = row(connection, db.videos, db.videos.c.video_id == job["video_id"])
+            version = video["transcript_version"]
+            if not version:
+                return None
+            metadata = row(
+                connection,
+                db.transcripts,
+                sa.and_(
+                    db.transcripts.c.video_id == job["video_id"],
+                    db.transcripts.c.version == version,
+                ),
+            )
+            if not metadata:
+                return None
+            segments = [
+                dict(record)
+                for record in connection.execute(
+                    sa.select(
+                        db.segments.c.segment_id,
+                        db.segments.c.text,
+                        db.segments.c.start_seconds,
+                        db.segments.c.duration_seconds,
+                    )
+                    .where(
+                        db.segments.c.video_id == job["video_id"], db.segments.c.version == version
+                    )
+                    .order_by(db.segments.c.position)
+                ).mappings()
+            ]
+            if not segments:
+                return None
+            transcript = TranscriptResult(
+                video_id=job["video_id"],
+                title=video["title"],
+                channel_id=video["channel_id"],
+                channel_title=video["channel_title"],
+                thumbnail_url=video["thumbnail_url"],
+                published_at=video["published_at"],
+                language=metadata["language"],
+                source=metadata["source"],
+                segments=segments,
+            )
+            return Source(
+                video_id=job["video_id"], generation=job["generation"], transcript_version=version
+            ), transcript

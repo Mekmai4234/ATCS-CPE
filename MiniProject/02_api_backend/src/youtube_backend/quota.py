@@ -192,7 +192,7 @@ class QuotaBroker:
             else "vision"
             if binding["kind"] == "enrich"
             else "agent"
-            if binding["kind"] in {"research", "artifact"}
+            if binding["kind"] in {"research", "artifact", "quiz_grade"}
             else "chat"
         )
         role = role or default_role
@@ -202,7 +202,7 @@ class QuotaBroker:
             else {"embedding"}
             if binding["kind"] == "import"
             else {default_role, "vision", "embedding"}
-            if binding["kind"] in {"chat", "analysis", "research", "artifact"}
+            if binding["kind"] in {"chat", "analysis", "research", "artifact", "quiz_grade"}
             else set()
         )
         if (
@@ -334,6 +334,11 @@ class QuotaBroker:
                 .mappings()
                 .first()
             )
+            if not counting and len(pool) >= limits.rpd:
+                # A rolling daily window cannot recover after a one-minute retry.
+                blocked = max(
+                    blocked, sorted(r["created_at"] for r in pool)[len(pool) - limits.rpd] + 86400
+                )
             # Per-member caps plus FIFO within priority classes prevent repeated reacquisition
             # by one hot worker while another member is waiting. Interactive beats background.
             if (
@@ -352,11 +357,11 @@ class QuotaBroker:
                     "Local project budget is unavailable",
                     429,
                     True,
-                    retry_after_seconds=max(1, min(60, blocked - now)) if blocked > now else 60,
+                    retry_after_seconds=min(86400, max(1, blocked - now)) if blocked > now else 60,
                     retry_time_source="estimate",
                     pause=background,
                 )
-                if blocked > now:
+                if circuit_row and circuit_row["blocked_until"] > now:
                     reason = circuit_row["reason"]
                     denied = AppError(
                         reason,

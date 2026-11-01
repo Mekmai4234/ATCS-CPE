@@ -513,3 +513,63 @@ test('real HTTP feedback, moderation confirmation and audited admin review', asy
     await adminContext.close();
   }
 });
+
+test('general conversation uses real HTTP without clips and keeps its conversation after reload', async ({
+  page,
+}) => {
+  await signIn(page, 'fixture-general');
+  const bodies: { mode?: string; scope?: unknown; conversation_id?: string }[] = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/chat' && request.method() === 'POST')
+      bodies.push(request.postDataJSON());
+  });
+  await page.getByRole('button', { name: 'เปิดแชทกับ Buddy', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Buddy AI แชตจากคลิป' });
+  await dialog.getByLabel('ข้อความถึง Buddy', { exact: true }).fill('อยากคุยเรื่องต้นไม้');
+  await dialog.getByRole('button', { name: 'ส่งข้อความถึง Buddy' }).click();
+  await expect(
+    dialog.getByText('[FIXTURE] Buddy กำลังคุยกับคุณ: อยากคุยเรื่องต้นไม้', { exact: true }),
+  ).toBeVisible();
+  expect(bodies[0].mode).toBe('general');
+  expect(bodies[0].scope).toBeNull();
+  await page.reload();
+  await page.getByRole('button', { name: 'ประวัติแชท', exact: true }).click();
+  await page.getByRole('button', { name: 'เปิดบทสนทนา อยากคุยเรื่องต้นไม้', exact: true }).click();
+  await page.getByRole('button', { name: 'ถามต่อในบทสนทนานี้', exact: true }).click();
+  await page.getByLabel('คำถามของคุณ', { exact: true }).fill('ช่วยแนะนำการดูแลต้นไม้สั้น ๆ');
+  await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
+  await expect(
+    page.getByText('[FIXTURE] Buddy กำลังคุยกับคุณ: ช่วยแนะนำการดูแลต้นไม้สั้น ๆ', { exact: true }),
+  ).toBeVisible();
+  expect(bodies[1].conversation_id).toBeTruthy();
+  expect(bodies[1].mode).toBe('general');
+});
+
+test('saved quiz is graded through real API and its score reopens without another submission', async ({
+  page,
+}) => {
+  await signIn(page, 'fixture-quiz-grade');
+  await importOne(page);
+  await page.getByRole('checkbox').first().check();
+  await page.getByRole('button', { name: 'สรุปและแบบฝึกหัด', exact: true }).click();
+  await page.getByRole('button', { name: 'แบบทดสอบ', exact: true }).click();
+  await page.getByRole('button', { name: 'เริ่มงาน', exact: true }).click();
+  await page.getByLabel('คำตอบของคุณ', { exact: true }).fill('หลักฐาน');
+  let submissions = 0;
+  page.on('request', (request) => {
+    if (
+      /\/learning-artifacts\/[^/]+\/submit$/.test(new URL(request.url()).pathname) &&
+      request.method() === 'POST'
+    )
+      submissions++;
+  });
+  await page.getByRole('button', { name: 'ส่งคำตอบ', exact: true }).click();
+  await expect(page.getByText('ถูก 1 ข้อ · ผิด 0 ข้อ', { exact: true })).toBeVisible();
+  await page.getByText('เฉลยข้อ 1', { exact: true }).click();
+  await expect(page.getByText('ค้นจากเอกสารก่อนสร้างคำตอบ', { exact: true })).toBeVisible();
+  expect(submissions).toBe(1);
+  await page.reload();
+  await page.getByRole('button', { name: 'ดูงานล่าสุด', exact: true }).click();
+  await expect(page.getByText('ถูก 1 ข้อ · ผิด 0 ข้อ', { exact: true })).toBeVisible();
+  expect(submissions).toBe(1);
+});

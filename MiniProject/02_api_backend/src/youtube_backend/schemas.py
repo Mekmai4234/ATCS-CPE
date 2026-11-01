@@ -36,7 +36,15 @@ class ImportRequest(Schema):
 class ChatRequest(Schema):
     question: str = Field(min_length=1, max_length=12000)
     conversation_id: str | None = Field(default=None, max_length=100)
-    scope: Scope
+    scope: Scope | None = None
+    mode: Literal["video", "general"] = "video"
+
+    @model_validator(mode="after")
+    def chat_scope(self):
+        if (self.mode == "video") != (self.scope is not None):
+            raise ValueError("Video chat needs a scope; general chat must not supply one")
+        return self
+
     moderation_token: str | None = Field(default=None, min_length=32, max_length=128)
 
 
@@ -316,6 +324,7 @@ class JobResponse(Schema):
 
 
 class VideoRecord(Schema):
+    import_job: dict[str, Any] | None = None
     video_id: str
     canonical_url: str
     title: str | None
@@ -373,3 +382,23 @@ class ConversationList(Schema):
     total: int
     limit: int
     offset: int
+
+
+class QuizSubmission(Schema):
+    answers: list[str] = Field(min_length=1, max_length=100)
+
+    @field_validator("answers")
+    @classmethod
+    def bounded_answers(cls, values):
+        if any(len(value) > 2000 for value in values):
+            raise ValueError("Each answer is limited to 2000 characters")
+        return values
+
+
+class QuizMark(Schema):
+    correct: bool = Field(strict=True)
+    feedback: str = Field(min_length=1, max_length=2000)
+
+
+class QuizGradeContent(Schema):
+    marks: list[QuizMark] = Field(min_length=1, max_length=100)
