@@ -103,11 +103,34 @@ class BackendExecution:
 
     def authorize_index(self, source, *, allow_reindex=False):
         job = self.context.repository.check_execution(self.context.job_id, self.context.lease_token)
+        if job["kind"] == "reindex" and allow_reindex:
+            self.authorize([source])
+            with self.context.repository.db.read() as connection:
+                self._trial_reindex(connection, job)
+            return
         if job["kind"] != "import" or allow_reindex:
             raise error(
                 "invalid_operation",
                 "Index/reindex requires an import worker or stopped operator",
                 status=403,
+            )
+
+    def _trial_reindex(self, connection, job):
+        settings = self.context.settings
+        if (
+            not settings.auth_enabled
+            or not settings.trial_reindex_enabled
+            or settings.app_env not in {"test", "development"}
+            or connection.scalar(
+                sa.select(backend_db.users.c.role).where(
+                    backend_db.users.c.user_id == job["owner_id"],
+                    backend_db.users.c.status == "active",
+                )
+            )
+            != "admin"
+        ):
+            raise error(
+                "trial_reindex_disabled", "Authenticated trial administrator required", status=403
             )
 
     def authorize_cleanup(self, *, source=None, include_staging=False):
@@ -218,10 +241,11 @@ class BackendExecution:
                 raise error("source_in_use", "Source still has library references or active jobs")
         else:
             valid = (
-                job["kind"] == "import"
-                and video["status"] == "indexing"
-                and video["transcript_version"] == source.transcript_version
-            )
+                (job["kind"] == "import" and video["status"] == "indexing")
+                or (job["kind"] == "reindex" and video["status"] == "ready")
+            ) and video["transcript_version"] == source.transcript_version
+            if job["kind"] == "reindex":
+                self._trial_reindex(connection, job)
         if not valid:
             raise error("source_changed", "Video lifecycle no longer authorizes this operation")
 
