@@ -4,6 +4,7 @@ import { jobStatus, retryTime, terminal } from './domain';
 import type { Job, RecoverableJob } from './types';
 import { UiIcon } from './Visuals';
 import QuotaNotice from './QuotaNotice';
+import ProviderStatus, { type ProviderState } from './ProviderStatus';
 
 function WorkIcon({ name }: { name: 'list' | 'pause' | 'close' | 'check' | 'clock' }) {
   const paths = {
@@ -107,6 +108,9 @@ export default function JobRecovery({
   const [loading, setLoading] = useState(true);
   const [worker, setWorker] = useState<boolean>();
   const [resuming, setResuming] = useState<string | null>(null);
+  const [provider, setProvider] = useState<ProviderState | null>(null);
+  const regenerationKeys = useRef(new Map<string, string>());
+  const regenerating = useRef(false);
   const incomingIds = liveJobs?.map((job) => job.job_id).join(',') || '';
   useEffect(() => {
     if (incomingIds) setRevision((n) => n + 1);
@@ -280,6 +284,34 @@ export default function JobRecovery({
           : 'ยังทำงานต่อไม่ได้ กรุณาลองใหม่ภายหลัง',
       );
     } finally {
+      setResuming(null);
+    }
+  }
+  async function regenerate(job: RecoverableJob) {
+    if (regenerating.current || !provider?.regenerate.includes(job.kind)) return;
+    regenerating.current = true;
+    setResuming(job.job_id);
+    setResumeError('');
+    const key = regenerationKeys.current.get(job.job_id) || crypto.randomUUID();
+    regenerationKeys.current.set(job.job_id, key);
+    try {
+      const { data } = await api.request<{ job_id: string }>(
+        `/api/jobs/${encodeURIComponent(job.job_id)}/regenerate`,
+        {
+          method: 'POST',
+          body: '{}',
+          headers: { 'Idempotency-Key': key },
+        },
+      );
+      const fresh = await api.job(data.job_id);
+      regenerationKeys.current.delete(job.job_id);
+      closeDrawer();
+      restore({ ...job, ...fresh });
+      setRevision((n) => n + 1);
+    } catch {
+      setResumeError('ยังสร้างใหม่ไม่ได้ ผลเดิมยังอยู่ กรุณาตรวจสถานะแล้วลองอีกครั้ง');
+    } finally {
+      regenerating.current = false;
       setResuming(null);
     }
   }
@@ -477,6 +509,7 @@ export default function JobRecovery({
               </div>
             )}
             {drawerOpen && <QuotaNotice api={api} />}
+            {drawerOpen && <ProviderStatus api={api} onStatus={setProvider} />}
             {older && historyLoading && (
               <p role="status" className="job-card-description">
                 กำลังโหลดประวัติ…
@@ -507,6 +540,17 @@ export default function JobRecovery({
                       {typeName(job)}
                     </div>
                     <h3 className="job-card-title">{label(job)}</h3>
+                    {job.execution?.provider && (
+                      <p className="job-card-description">
+                        ผู้ให้บริการที่ตรึงไว้ในงาน:{' '}
+                        {job.execution.provider === 'ollama'
+                          ? 'AI ในเครื่อง'
+                          : job.execution.provider === 'gemini'
+                            ? 'Gemini'
+                            : 'ยังไม่ทราบ'}
+                        {job.execution.model && <> · {job.execution.model}</>}
+                      </p>
+                    )}
                     {quota ? (
                       <p className="job-card-description">
                         {allQuota && quotaTimes.length === 1
@@ -522,6 +566,16 @@ export default function JobRecovery({
                         {stateNames[job.state]}
                       </span>
                       <div className="job-card-actions">
+                        {['completed', 'partial'].includes(job.state) &&
+                          provider?.regenerate.includes(job.kind) && (
+                            <button
+                              className="job-card-action"
+                              disabled={locked || !!resuming}
+                              onClick={() => void regenerate(job)}
+                            >
+                              สร้างใหม่
+                            </button>
+                          )}
                         {canResume && (
                           <button
                             className="job-card-action"
