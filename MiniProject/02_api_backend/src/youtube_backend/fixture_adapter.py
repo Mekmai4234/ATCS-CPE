@@ -217,6 +217,35 @@ class FixtureAdapters:
             provider_metadata=self._metadata(),
         )
 
+    async def companion(self, request, sources, history, context):
+        context.check()
+        return AnswerResult(
+            status="answered",
+            answer="[FIXTURE] Buddy กำลังคุยกับคุณ: " + request["question"],
+            citations=[],
+            coverage=Coverage(
+                expected_videos=0,
+                processed_videos=0,
+                expected_chunks=0,
+                processed_chunks=0,
+                complete=False,
+                notes=["คุยทั่วไป · ไม่ได้อ้างอิงเนื้อหาวิดีโอ"],
+            ),
+            provider_metadata=self._metadata(),
+        )
+
+    async def grade_quiz(self, request, context):
+        context.check()
+        return {
+            "marks": [
+                {
+                    "correct": answer.strip().casefold() == question["answer"].strip().casefold(),
+                    "feedback": "[FIXTURE] เทียบกับเฉลยสำหรับทดสอบ",
+                }
+                for answer, question in zip(request["answers"], request["questions"], strict=True)
+            ]
+        }
+
     async def artifact(self, request, sources, context):
         context.check()
         content = {

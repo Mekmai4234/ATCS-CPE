@@ -19,7 +19,7 @@ def _replacement(repo, c, old, key):
 
 def resume(repo, job_id, moderation_token=None):
     old = repo.get_job(job_id)
-    if old["kind"] not in {"chat", "analysis", "artifact", "research"}:
+    if old["kind"] not in {"chat", "analysis", "artifact", "research", "quiz_grade"}:
         return repo.retry(job_id)
     # A committed replacement is a read, even after ticket/budget expiry.
     key = digest([old["owner_id"], "explicit-resume", job_id])
@@ -42,7 +42,7 @@ def resume(repo, job_id, moderation_token=None):
     _, grant = QuotaBroker(repo).access(
         repo.settings.llm_model,
         "generateContent",
-        "agent" if old["kind"] in {"research", "artifact"} else "chat",
+        "agent" if old["kind"] in {"research", "artifact", "quiz_grade"} else "chat",
     )
     pools = [p for p in state["pools"] if p["bucket"] == grant.bucket]
     if state["status"] == "unverified" or not pools or pools[0]["status"] != "available":
@@ -72,6 +72,19 @@ def resume(repo, job_id, moderation_token=None):
             idempotency_key=key,
             request_hash=original_hash,
         )
+        if old["state"] == "paused":
+            import time
+
+            c.execute(
+                db.jobs.update()
+                .where(db.jobs.c.job_id == old["job_id"])
+                .values(
+                    state="cancelled",
+                    stage="cancelled",
+                    error_code="resumed",
+                    updated_at=time.time(),
+                )
+            )
         if old["kind"] == "chat":
             if ticket_id:
                 from .moderation import bind_admission
