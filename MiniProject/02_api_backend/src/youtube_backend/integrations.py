@@ -82,6 +82,13 @@ class ExecutionContext:
         self.check()
         with self.repository.db.write() as c:
             job = self.repository._owned(c, self.job_id, self.lease_token)
+            from .local_inference import execution_identity
+
+            pinned = job["payload"].get("execution")
+            if pinned and pinned != execution_identity(self.settings):
+                raise AppError(
+                    "execution_changed", "Checkpoint provider configuration changed", 409
+                )
             saved = dict(job["payload"].get("adapter_checkpoints", {}))
             if value is None:
                 return saved.get(key)
