@@ -69,6 +69,7 @@ async def run(url, generation, embedding):
             await old.close()
             rag = RagService(rag_settings, Manifest(worker.repo.db), OllamaEmbedder(rag_settings))
             worker.adapters.answers.rag = rag
+            worker.adapters.answers.answers.knowledge.rag = rag
             worker.adapters.agent.knowledge = domain.RagKnowledge(rag)
             config = AgentSettings.from_backend(settings)
             worker.adapters.agent.settings = config
