@@ -154,6 +154,7 @@ class ExecutionContext:
                     and previous["payload"]["sources"] == job["payload"]["sources"]
                     and result.get("status") == "answered"
                     and result.get("visibility", "published") == "published"
+                    and result.get("provider_metadata", {}).get("provider") != "local-evidence"
                     and result.get("citations")
                     and all(
                         x.get("kind", "transcript") == "transcript" for x in result["citations"]
