@@ -211,6 +211,37 @@ def create_app(settings=None, database=None, adapters=None):
         await runtime.require("ingest", "index", "inventory")
         return dict(jobs=repository.import_urls(body.urls), mode=settings.adapter_mode)
 
+    @app.get("/api/providers")
+    async def providers():
+        from .provider_status import provider_status
+
+        return await provider_status(repository, runtime)
+
+    @app.post("/api/videos/{video_id}/trial-reindex", response_model=Accepted, status_code=202)
+    async def trial_reindex_job(video_id: str, idempotency_key: IdempotencyKey = None):
+        from .job_actions import trial_reindex
+
+        await runtime.start()
+        if not callable(getattr(runtime.adapter, "reindex", None)):
+            raise AppError(
+                "reindex_unsupported", "The mounted adapter has no trial reindex worker", 409
+            )
+        return accepted(trial_reindex(repository, video_id, idempotency_key))
+
+    @app.post("/api/jobs/{job_id}/regenerate", response_model=Accepted, status_code=202)
+    async def regenerate_job(job_id: str, idempotency_key: IdempotencyKey = None):
+        from .job_actions import regenerate
+
+        await runtime.start()
+        return accepted(
+            regenerate(
+                repository,
+                job_id,
+                idempotency_key,
+                getattr(runtime.adapter, "fresh_generation", ()),
+            )
+        )
+
     @app.get("/api/jobs/{job_id}", response_model=JobResponse)
     def get_job(job_id: str):
         return repository.public_job(repository.get_job(job_id))

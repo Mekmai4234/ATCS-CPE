@@ -143,6 +143,10 @@ async def test_local_cancellation_keeps_uncertain_ledger_and_blocks_parallel_cal
         await task
     with budget.db.read() as c:
         assert c.scalar(sa.select(db.v2["reservations"].c.state)) == "uncertain"
+        assert c.scalar(sa.select(db.v2["reservations"].c.expires_at)) == budget.context.deadline_at
+    with pytest.raises(AppError) as caught:
+        await service.call(**request("after-cancellation"))
+    assert caught.value.code == "local_busy"
 
 
 async def test_provider_change_rejects_old_job_before_network(budget):
