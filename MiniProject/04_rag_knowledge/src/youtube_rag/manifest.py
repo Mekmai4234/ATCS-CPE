@@ -158,6 +158,10 @@ class BackendExecution:
             )
         return await call(callback, **request)
 
+    async def local_inference(self, **request):
+        self.check()
+        return await self.context.local_inference(**request)
+
     def cache_scope(self, sources):
         self.authorize(sources)
         self.permission_scope(sources)

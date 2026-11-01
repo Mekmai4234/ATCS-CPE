@@ -60,7 +60,9 @@ class RagService:
                         if scope:
                             scope = {
                                 **scope,
-                                "model_policy": execution.embedding_policy(
+                                "model_policy": self.embedder.policy_identity(execution)
+                                if callable(getattr(self.embedder, "policy_identity", None))
+                                else execution.embedding_policy(
                                     self.settings.embedding_model,
                                     self.embedder.credential_sha256,
                                 ),

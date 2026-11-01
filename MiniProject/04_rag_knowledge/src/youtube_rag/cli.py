@@ -14,7 +14,7 @@ from youtube_backend.schemas import Segment, Source, TranscriptResult
 
 from .binding import StoreBinding
 from .configuration import describe_configuration, load_configuration
-from .embeddings import FixtureEmbedder, GeminiEmbedder
+from .embeddings import create_embedder
 from .errors import error
 from .evaluation import evaluate
 from .maintenance import MaintenanceExecution
@@ -28,6 +28,14 @@ async def maintenance(args):
     )
     if args.command == "config":
         return describe_configuration(settings, config, profile)
+    if args.command == "reindex" and config.embedding_provider == "ollama":
+        raise error(
+            "local_maintenance_unsupported",
+            "Local reindex requires an authenticated execution-bound worker; "
+            "this stopped-maintenance CLI cannot run local inference. "
+            "Keep the current index and use a disposable paired trial store.",
+            status=409,
+        )
     if args.command != "init" and not Path(make_url(settings.database_url).database).is_file():
         raise error("index_schema_missing", "Selected SQLite database does not exist")
     database = Database(settings.database_url)
@@ -48,13 +56,7 @@ async def maintenance(args):
         binding.check()
         if manifest.all_runs():
             await binding.ensure(execution)
-        embedder = (
-            None
-            if args.command == "gc"
-            else FixtureEmbedder(config)
-            if config.embedding_provider == "fixture"
-            else GeminiEmbedder(config)
-        )
+        embedder = None if args.command == "gc" else create_embedder(config)
         service = RagService(config, manifest, embedder)
         if args.command == "gc":
             await service.cleanup(execution, include_staging=True)
