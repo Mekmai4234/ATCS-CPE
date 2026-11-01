@@ -319,7 +319,7 @@ async def test_large_artifact_uses_ranked_subset_with_partial_coverage(unit):
 
     unit.config.max_context_tokens = 24000
     unit.knowledge.records = [
-        evidence(cid=f"chunk-{i}", text="RAG evidence. " * 100) for i in range(20)
+        evidence(cid=f"chunk-{i}", text="RAG evidence. " * 100) for i in range(100)
     ]
     result = await unit.service.artifact(
         {"type": "quiz", "topic": "RAG", "scope": {"video_ids": [VIDEO_A]}},
@@ -329,5 +329,62 @@ async def test_large_artifact_uses_ranked_subset_with_partial_coverage(unit):
     assert result.citations
     assert not result.coverage.complete
     assert result.coverage.processed_chunks == 1
-    assert result.coverage.expected_chunks == 20
+    assert result.coverage.expected_chunks == 100
     assert any(call[0] == "search" for call in unit.knowledge.calls)
+
+
+async def test_full_thai_clip_can_fit_without_dropping_chunks(unit):
+    from conftest import evidence
+
+    unit.knowledge.records = [
+        evidence(cid=f"thai-{i}", text="การค้นข้อมูลช่วยให้ตอบจากหลักฐาน " * 6) for i in range(74)
+    ]
+    result = await unit.service.artifact(
+        {"type": "quiz", "topic": "RAG", "scope": {"video_ids": [VIDEO_A]}}, unit.sources, unit.ctx
+    )
+    assert result.coverage.complete and result.coverage.processed_chunks == 74
+    assert len(unit.model.generated[0][1]) == 74
+    assert not any(call[0] == "search" for call in unit.knowledge.calls)
+
+
+async def test_read_tool_reduces_page_size_without_losing_cursor_or_text(unit):
+    from conftest import evidence
+
+    from youtube_agent.models import ReadArgs
+
+    unit.knowledge.records = [
+        evidence(cid=f"large-{i}", text="RAG evidence " * 100) for i in range(100)
+    ]
+    run = unit.service._run(unit.sources, unit.ctx)
+    await unit.service._inventory(run)
+    observation = await unit.service._tool(
+        "read_video_chunks", ReadArgs(limit=100), unit.request, run
+    )
+    assert len(observation["evidence"]) == 50
+    assert observation["next_cursor"] == "50"
+    assert observation["evidence"][0]["text"] == unit.knowledge.records[0].text
+    assert not run.processed
+
+
+async def test_exact_token_rejection_falls_back_without_claiming_full_coverage(unit):
+    from conftest import evidence
+    from youtube_backend.errors import AppError
+
+    unit.knowledge.records = [evidence(cid=f"token-{i}") for i in range(20)]
+    unit.knowledge.search_limit = 1
+    original = unit.model.generate
+    calls = 0
+
+    async def generate(*args):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise AppError("context_budget_exceeded", "token count refused", 502)
+        return await original(*args)
+
+    unit.model.generate = generate
+    result = await unit.service.artifact(
+        {"type": "quiz", "scope": {"video_ids": [VIDEO_A]}}, unit.sources, unit.ctx
+    )
+    assert calls == 2 and result.coverage.processed_chunks == 1
+    assert not result.coverage.complete
