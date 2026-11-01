@@ -120,7 +120,9 @@ class RagService:
         ]:
             raise error("source_changed", "Index changed while reading; restart this operation")
 
-    async def index(self, source, transcript, execution, *, allow_reindex=False):
+    async def index(
+        self, source, transcript, execution, *, allow_reindex=False, preserve_previous=False
+    ):
         source = Source.model_validate(source)
         transcript = TranscriptResult.model_validate(transcript)
         actual_version = digest(
@@ -190,7 +192,8 @@ class RagService:
         await self.binding.ensure(execution)
         # No await between the atomic backend lease/lifecycle fence and publication.
         self.manifest.publish(run_id, source, records, execution)
-        await self.cleanup(execution, source=source)
+        if not preserve_previous:
+            await self.cleanup(execution, source=source)
         return IndexReceipt(source=source, chunk_count=len(records), complete=True)
 
     async def inventory(self, sources, execution):
@@ -235,6 +238,84 @@ class RagService:
         if sum(len(c.text.encode("utf-8")) + 512 for c in page.items) > max_bytes:
             return None
         return page.items
+
+    async def select_context(self, question, sources, execution, *, limit=24, max_scan=256):
+        """Bounded lexical + time-stratified candidates; no model/embedding dispatch."""
+        from .library import terms
+
+        if (
+            not isinstance(question, str)
+            or not question.strip()
+            or len(question) > 12000
+            or type(limit) is not int
+            or not 1 <= limit <= 100
+            or type(max_scan) is not int
+            or not 1 <= max_scan <= 1000
+        ):
+            raise error("invalid_limit", "Provide a bounded evidence-selection query", status=422)
+        sources, rows, _ = self._snapshot(sources, execution)
+        await self.binding.ensure(execution)
+        total = sum(row["chunk_count"] for row in rows)
+        candidates = []
+        if max_scan < len(rows):
+            raise error("invalid_limit", "Scan budget must cover each selected source", status=422)
+        remaining = max_scan
+        for index, row in enumerate(rows):
+            allocation = min(row["chunk_count"], max(1, remaining // (len(rows) - index)))
+            offsets = (
+                sorted(
+                    {
+                        round(i * (row["chunk_count"] - 1) / max(1, allocation - 1))
+                        for i in range(allocation)
+                    }
+                )
+                if row["chunk_count"]
+                else []
+            )
+            for position in offsets:
+                execution.check()
+                candidates.extend(self.manifest.page([row["run_id"]], position, 1))
+            remaining -= len(offsets)
+            if remaining <= 0:
+                break
+        query = terms(question)
+        scored = sorted(
+            candidates,
+            key=lambda chunk: (
+                -len(query & terms(chunk.text)),
+                chunk.video_id,
+                chunk.start_seconds,
+                chunk.chunk_id,
+            ),
+        )
+        # Relevant matches come first; reserve half the slots for coverage across time/sources.
+        selected = [chunk for chunk in scored if query & terms(chunk.text)][: max(1, limit // 2)]
+        ordered = sorted(candidates, key=lambda chunk: (chunk.start_seconds, chunk.video_id))
+        strata = (
+            [
+                ordered[round(i * (len(ordered) - 1) / max(1, limit - 1))]
+                for i in range(min(limit, len(ordered)))
+            ]
+            if ordered
+            else []
+        )
+        ids = {chunk.chunk_id for chunk in selected}
+        for chunk in [*strata, *scored]:
+            if len(selected) == limit:
+                break
+            if chunk.chunk_id not in ids:
+                selected.append(chunk)
+                ids.add(chunk.chunk_id)
+        self._recheck(sources, rows, execution)
+        return {
+            "items": selected,
+            "indexed_chunks": total,
+            "inspected_chunks": len(candidates),
+            "retrieved_chunks": len(selected),
+            "scan_complete": len(candidates) == total,
+            "selection": "lexical-time-stratified-v1",
+            "model_calls": 0,
+        }
 
     async def search(self, question, sources, execution, *, top_k=None, min_score=None):
         limit = self.settings.retrieval_top_k if top_k is None else top_k
