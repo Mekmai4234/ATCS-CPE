@@ -301,6 +301,7 @@ class ImportResponse(Schema):
 
 
 class JobResponse(Schema):
+    execution: dict[str, Any] | None = None
     wait: dict[str, Any] | None = None
     job_id: str
     request_id: str
