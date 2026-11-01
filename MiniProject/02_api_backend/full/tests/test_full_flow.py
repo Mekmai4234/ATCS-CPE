@@ -397,8 +397,10 @@ async def test_full_factory_cannot_bypass_free_attestation_or_request_broker(
     monkeypatch.setattr(ModelDouble, "generate", forbidden)
     body = {"question": "RAG", "scope": {"video_ids": [VIDEO_A]}}
     denied = await full.client.post("/api/chat", json=body)
-    assert denied.status_code == 503, denied.text
-    assert denied.json()["error"]["code"] == "free_tier_unverified"
+    assert denied.status_code == 202, denied.text
+    await full.worker.run_once(denied.json()["job_id"])
+    blocked = (await full.client.get(f"/api/jobs/{denied.json()['job_id']}")).json()
+    assert blocked["error_code"] == "free_tier_unverified" and not blocked["result"]
     now = datetime.now(UTC)
     policy = dict(
         tier="free",
@@ -425,7 +427,10 @@ async def test_full_factory_cannot_bypass_free_attestation_or_request_broker(
     file.write_text(json.dumps(policy), encoding="utf-8")
     full.runtime_settings.gemini_free_policy_file = str(file)
     denied = await full.client.post("/api/chat", json=body)
-    assert denied.status_code == 503 and denied.json()["error"]["code"] == "gemini_broker_required"
+    assert denied.status_code == 202, denied.text
+    await full.worker.run_once(denied.json()["job_id"])
+    blocked = (await full.client.get(f"/api/jobs/{denied.json()['job_id']}")).json()
+    assert blocked["error_code"] == "gemini_broker_required" and not blocked["result"]
     assert not calls
     assert (await full.client.get(f"/api/videos/{VIDEO_A}/transcript")).status_code == 200
     with full.db.read() as c:
@@ -452,16 +457,21 @@ async def test_authenticated_accounts_share_real_rag_without_cross_account_acces
         second = (await b.post("/api/videos/import", json=data)).json()["jobs"][0]["job_id"]
         assert second != first
         response = await b.post("/api/chat", json=request_body)
-        assert response.status_code == 200, response.text
-        assert response.json()["citations"]
-        conversation_id = response.json()["conversation_id"]
+        assert response.status_code == 202, response.text
+        await full.worker.run_once(response.json()["job_id"])
+        result = (await b.get(f"/api/jobs/{response.json()['job_id']}")).json()
+        assert result["state"] == "completed" and result["result"]["citations"]
+        conversation_id = result["result"]["conversation_id"]
         assert (await a.get(f"/api/conversations/{conversation_id}")).status_code == 404
         followup = await b.post(
             "/api/chat",
             json=dict(request_body, conversation_id=conversation_id, question="RAG again"),
         )
-        assert followup.status_code == 200, followup.text
-        assert followup.json()["conversation_id"] == conversation_id
+        assert followup.status_code == 202, followup.text
+        await full.worker.run_once(followup.json()["job_id"])
+        result = (await b.get(f"/api/jobs/{followup.json()['job_id']}")).json()
+        assert result["state"] == "completed"
+        assert result["result"]["conversation_id"] == conversation_id
         history = (await b.get(f"/api/conversations/{conversation_id}?limit=2&offset=2")).json()
         assert history["total"] == 4 and len(history["messages"]) == 2
         await a.delete(f"/api/videos/{VIDEO_A}")
