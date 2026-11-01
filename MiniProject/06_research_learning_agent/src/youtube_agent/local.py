@@ -26,6 +26,7 @@ class LocalModel:
             raise error("local_broker_required", "Trusted local execution required", status=503)
         settings = self.settings
         body = {
+            "think": False,
             "messages": [
                 {
                     "role": "system",
@@ -74,7 +75,21 @@ class LocalModel:
             ) from None
         if callable(checkpoint):
             checkpoint(key, content.model_dump(mode="json"))
-        return Generated(content, self._metadata((time.monotonic() - started) * 1000))
+        metadata = self._metadata((time.monotonic() - started) * 1000)
+        metadata.usage = {
+            key: response[key]
+            for key in (
+                "prompt_eval_count",
+                "eval_count",
+                "load_duration",
+                "prompt_eval_duration",
+                "eval_duration",
+                "total_duration",
+            )
+            if type(response.get(key)) is int and response[key] >= 0
+        }
+        metadata.usage["generate_requests"] = 1
+        return Generated(content, metadata)
 
     def _metadata(self, latency, *, cached=False):
         return ProviderMetadata(
