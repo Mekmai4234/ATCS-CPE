@@ -232,10 +232,14 @@ export default function JobRecovery({
     if (loading) return;
     const timer = setTimeout(
       () => setRevision((n) => n + 1),
-      hasPending || running.length || queued.length ? 5000 : 15000,
+      hasPending || running.length || queued.length
+        ? 5000
+        : paused.length || drawerOpen
+          ? 15000
+          : 60000,
     );
     return () => clearTimeout(timer);
-  }, [loading, revision, hasPending, running.length, queued.length]);
+  }, [loading, revision, hasPending, running.length, queued.length, paused.length, drawerOpen]);
   useEffect(() => {
     const c = new AbortController();
     const check = () =>
@@ -246,12 +250,12 @@ export default function JobRecovery({
         })
         .catch(() => {});
     check();
-    const timer = setInterval(check, 15000);
+    const timer = setInterval(check, hasPending || running.length || queued.length ? 15000 : 60000);
     return () => {
       c.abort();
       clearInterval(timer);
     };
-  }, [api]);
+  }, [api, hasPending, running.length, queued.length]);
   async function resume(job: RecoverableJob) {
     setResuming(job.job_id);
     setResumeError('');
@@ -276,7 +280,7 @@ export default function JobRecovery({
     } catch (reason) {
       setResumeError(
         reason instanceof ApiError &&
-          ['quota_unavailable', 'quota_wait'].includes(reason.code || '')
+          ['quota_unavailable', 'quota_wait', 'provider_wait'].includes(reason.code || '')
           ? 'ยังรอโควตา งานเดิมถูกเก็บไว้แล้ว กรุณารอเวลาที่แจ้ง'
           : 'ยังทำงานต่อไม่ได้ กรุณาลองใหม่ภายหลัง',
       );
@@ -534,7 +538,9 @@ export default function JobRecovery({
                               : notYet
                                 ? 'ทำต่อเมื่อพร้อม'
                                 : job.state === 'failed'
-                                  ? 'ลองใหม่'
+                                  ? job.error_code === 'quota_wait'
+                                    ? 'ตรวจโควตาและทำต่อ'
+                                    : 'ลองใหม่'
                                   : 'ทำต่อ'}
                           </button>
                         )}

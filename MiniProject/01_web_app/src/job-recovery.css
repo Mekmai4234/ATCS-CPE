@@ -681,3 +681,25 @@ body .job-drawer [role='tabpanel']:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
+.chat-policy-info {
+  margin: 0 48px 24px 296px;
+  color: #526f69;
+  font-size: 13px;
+}
+.chat-policy-info summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.chat-policy-info p {
+  padding: 12px 0;
+}
+@media (max-width: 900px) {
+  .chat-policy-info {
+    margin: 0 22px 110px;
+  }
+}
