@@ -17,6 +17,8 @@ from .chat_review import Feedback, ReviewUpdate
 from .config import Settings
 from .database import SCHEMA_REVISION, Database
 from .errors import AppError
+from .local_evidence import LocalEvidenceRequest
+from .local_evidence import search as search_local_evidence
 from .quota_status import QuotaStatus
 from .repository import Repository
 from .runtime import ManagedAdapters
@@ -478,6 +480,10 @@ def create_app(settings=None, database=None, adapters=None):
         return accepted(
             repository.enqueue("analysis", body.model_dump(mode="json"), idempotency_key)
         )
+
+    @app.post("/api/evidence/search")
+    def local_evidence(body: LocalEvidenceRequest):
+        return search_local_evidence(repository, body)
 
     @app.post("/api/research", response_model=Accepted, status_code=202)
     async def research(body: ResearchRequest, idempotency_key: IdempotencyKey = None):
