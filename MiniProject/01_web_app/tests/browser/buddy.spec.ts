@@ -97,9 +97,7 @@ test('floating and full chat share scope, conversation, messages and 202 status'
   await dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true }).fill('รอผล แล้วอธิบาย RAG');
   await dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true }).press('Enter');
   await expect(
-    dialog(page)
-      .getByText(/กำลังทำงาน/)
-      .first(),
+    dialog(page).getByText('Buddy กำลังพิมพ์คำตอบ…', { exact: true }).first(),
   ).toBeVisible();
   await page.screenshot({ path: 'runtime/screenshots/mint-chat-loading.png', fullPage: true });
   await expect(dialog(page).locator('.buddy-message')).toHaveCount(1);
@@ -136,7 +134,7 @@ test('scope changes start a new conversation and suggestions never submit automa
   await expect(dialog(page).locator('.buddy-message')).toHaveCount(0);
   await dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true }).press('Enter');
   await expect(dialog(page).locator('.buddy-message')).toHaveCount(1);
-  await dialog(page).getByRole('checkbox').nth(1).check();
+  await choose(page, 1);
   await dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true }).fill('ถามด้วยชุดใหม่');
   await dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true }).press('Enter');
   await expect(
@@ -367,4 +365,64 @@ test('position reset remains usable when localStorage is unavailable', async ({ 
   expect((await launcher(page).boundingBox())!.x).toBeCloseTo(origin.x, 0);
   await page.keyboard.press('Enter');
   await expect(dialog(page)).toBeVisible();
+});
+
+test('greetings need no clip, the picker stays collapsed, and no chat API is called', async ({
+  page,
+}) => {
+  await login(page);
+  let calls = 0;
+  page.on('request', (request) => {
+    if (/\/api\/chat(?:\/check)?$/.test(new URL(request.url()).pathname)) calls++;
+  });
+  await open(page);
+  await expect(dialog(page).locator('.buddy-scope')).not.toHaveAttribute('open', '');
+  await expect(
+    dialog(page).getByText('ทักทาย Buddy ได้เลย · เลือกคลิปเมื่อถามเนื้อหา', { exact: true }),
+  ).toBeVisible();
+  const input = dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true });
+  await expect(input).toHaveAttribute('placeholder', 'ทักทายหรือถามเกี่ยวกับ Buddy…');
+  await input.fill('สวัสดี');
+  await input.press('Enter');
+  await expect(
+    dialog(page).getByText('สวัสดีครับ ผม Buddy ผู้ช่วยของ Video Buddy ยินดีที่ได้คุยด้วยครับ', {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(input).toHaveValue('');
+  await input.fill('คุณทำงานเกี่ยวกับอะไร');
+  await dialog(page).getByRole('button', { name: 'ส่งข้อความถึง Buddy' }).click();
+  await expect(dialog(page).getByText(/ผมชื่อ Buddy ช่วยถามตอบจากคลิป YouTube/)).toBeVisible();
+  await expect(dialog(page).locator('.buddy-v5-sources')).toHaveCount(0);
+  await dialog(page).screenshot({ path: 'runtime/screenshots/buddy-greetings-20261101.png' });
+  expect(calls).toBe(0);
+  await input.fill('คลิปนี้เกี่ยวกับอะไร');
+  await expect(dialog(page).getByRole('button', { name: 'ส่งข้อความถึง Buddy' })).toBeDisabled();
+});
+
+test('sending moves the question right and shows mascot typing before the answer', async ({
+  page,
+}) => {
+  await login(page);
+  await open(page);
+  await choose(page);
+  const input = dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true });
+  await input.fill('รอผล แล้วอธิบาย RAG');
+  await input.press('Enter');
+  await expect(input).toHaveValue('');
+  const bubble = dialog(page).locator('.buddy-question').last();
+  await expect(bubble).toHaveText('รอผล แล้วอธิบาย RAG');
+  await expect(dialog(page).getByText('Buddy กำลังพิมพ์คำตอบ…', { exact: true })).toBeVisible();
+  await expect(dialog(page).locator('.buddy-reply-heading .buddy-rig').last()).toBeVisible();
+  await expect(dialog(page).locator('.buddy-scope')).not.toHaveAttribute('open', '');
+  const box = await bubble.boundingBox();
+  const area = await dialog(page).locator('.buddy-messages').boundingBox();
+  expect(box!.x + box!.width).toBeGreaterThan(area!.x + area!.width * 0.8);
+  await expect(
+    dialog(page)
+      .getByRole('link', { name: /^เปิดหลักฐาน/ })
+      .first(),
+  ).toBeVisible();
+  await expect(dialog(page).locator('.buddy-question')).toHaveCount(1);
+  await expect(dialog(page).getByText('Buddy กำลังพิมพ์คำตอบ…', { exact: true })).toHaveCount(0);
 });
