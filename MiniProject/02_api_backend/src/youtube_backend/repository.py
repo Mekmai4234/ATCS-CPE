@@ -96,6 +96,10 @@ class Repository(Ownership):
 
     def _new_job(self, connection, kind, payload, **extra):
         self._check_mode(connection)
+        if "execution" not in payload:
+            from .local_inference import execution_identity
+
+            payload = dict(payload, execution=execution_identity(self.settings))
         payload = dict(
             payload,
             adapter_mode=self.settings.adapter_mode,
