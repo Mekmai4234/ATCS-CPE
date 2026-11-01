@@ -101,9 +101,9 @@ class GeminiModel:
                 except errors.APIError as exc:
                     raise provider_error(exc.code) from None
                 except httpx.TimeoutException:
-                    raise provider_error(504) from None
+                    raise provider_error(504, origin="timeout") from None
                 except httpx.TransportError:
-                    raise provider_error(503) from None
+                    raise provider_error(503, origin="transport") from None
                 usage = getattr(value, "usage_metadata", None)
                 return ProviderReply(
                     value,
