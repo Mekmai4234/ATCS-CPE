@@ -140,7 +140,10 @@ class AnswerAdapters(RagAdapters):
                         cached[1].provider_metadata.requested_model, "generateContent", "vision"
                     )
                 result = cached[1].model_copy(deep=True)
-                result.provider_metadata.provider = "gemini-cache"
+                result.provider_metadata.provider = {
+                    "gemini": "gemini-cache",
+                    "ollama": "ollama-cache",
+                }.get(result.provider_metadata.provider, "answer-cache")
                 result.provider_metadata.usage = {}
                 result.provider_metadata.latency_ms = 0
                 return result
