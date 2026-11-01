@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     local_embedding_model: str = ""
     local_embedding_digest: str = ""
     local_max_concurrent: int = Field(default=1, ge=1, le=4)
+    trial_reindex_enabled: bool = False
     local_context_tokens: int = Field(default=4096, ge=512, le=32768)
     local_max_output_tokens: int = Field(default=1024, ge=64, le=8192)
     media_asset_dir: str = "./runtime/media-assets"
