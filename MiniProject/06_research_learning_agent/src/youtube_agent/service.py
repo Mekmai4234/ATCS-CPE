@@ -350,12 +350,18 @@ class AgentService:
                     ).encode()
                 ).hexdigest()
             )
-            cached = checkpoint(key) if callable(checkpoint) else None
+            cached = (
+                checkpoint(key)
+                if callable(checkpoint) and not getattr(run.context, "cache_bypass", False)
+                else None
+            )
             if cached is not None:
                 run.context.check()
                 metadata = ProviderMetadata.model_validate(cached["metadata"]).model_copy(
                     update={
-                        "provider": cached["metadata"]["provider"] + "-cache",
+                        "provider": cached["metadata"]["provider"]
+                        if cached["metadata"]["provider"].endswith("-cache")
+                        else cached["metadata"]["provider"] + "-cache",
                         "usage": {},
                         "latency_ms": 0,
                     }
@@ -656,6 +662,28 @@ class AgentService:
                 "No authorized evidence fits the bounded local synthesis input",
                 status=409,
             )
+        rag = getattr(self.knowledge, "rag", None)
+        selector = getattr(rag, "select_context", None)
+        selection = None
+        if callable(selector) and (limited or len(records) < run.total):
+            from youtube_rag.manifest import BackendExecution
+
+            selection = await self._bounded(
+                run,
+                lambda _: selector(
+                    request["goal"], run.sources, BackendExecution(run.context), limit=24
+                ),
+            )
+            ranked = self._records(run, [chunk.evidence() for chunk in selection["items"]])
+            selected = {}
+            for record in ranked:
+                candidate = {**selected, record.chunk_id: record}
+                if self.model.research_fits(
+                    request, [wire_evidence(e) for e in candidate.values()]
+                ):
+                    selected = candidate
+            if selected:
+                records = selected
         self._remember(run, list(records.values()))
         result = await self._bounded(
             run,
@@ -665,6 +693,11 @@ class AgentService:
             model=True,
         )
         run.usage.add(result.metadata)
+        run.usage.usage["supplied_chunks"] = len(records)
+        if selection is not None:
+            run.usage.usage["retrieved_chunks"] = selection["retrieved_chunks"]
+            run.usage.usage["inspected_chunks"] = selection["inspected_chunks"]
+            run.usage.usage["indexed_chunks"] = selection["indexed_chunks"]
         # Credit only the exact evidence supplied to the successful synthesis.
         run.processed.update(records)
         run.step += 1
