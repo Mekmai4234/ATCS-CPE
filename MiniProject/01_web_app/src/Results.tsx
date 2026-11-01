@@ -1,5 +1,6 @@
+import QuizContent from './Quiz';
 import { StoredFeedback } from './feedbackSession';
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { citationUrl, timestamp } from './domain';
 import type { Artifact, Citation, Coverage, TaskResult, TaskType } from './types';
 import { evidenceLabels } from './domain';
@@ -78,6 +79,8 @@ export function CoverageNotice({
   insufficient?: boolean;
 }) {
   if (!coverage) return null;
+  if (coverage.expected_videos === 0)
+    return <p className="notice">คุยทั่วไป · ไม่ได้อ้างอิงเนื้อหาวิดีโอ</p>;
   return (
     <div className={`coverage ${coverage.complete ? '' : 'warning'}`}>
       <strong>
@@ -94,7 +97,13 @@ export function CoverageNotice({
           : ''}
       </span>
       {coverage.notes?.map((note, i) => (
-        <span key={i}>{note}</span>
+        <span key={i}>
+          {note.startsWith('Only evidence actually')
+            ? 'นับเฉพาะข้อมูลที่ส่งให้ AI สำเร็จแล้ว บางช่วงอาจยังไม่ได้อ่าน'
+            : note.startsWith('Stopped: context_budget_exceeded')
+              ? 'ข้อมูลเกินงบต่อคำขอ ลองระบุหัวข้อให้แคบลง'
+              : note}
+        </span>
       ))}
     </div>
   );
@@ -131,59 +140,6 @@ function ArtifactPager({
         {noun}ถัดไป <span aria-hidden="true">→</span>
       </button>
     </nav>
-  );
-}
-
-function QuizContent({ artifact }: { artifact: Artifact }) {
-  const [index, setIndex] = useState(0);
-  const [drafts, setDrafts] = useState<Record<number, string>>({});
-  const answerId = useId();
-  const questions = artifact.content.questions || [];
-  const current = Math.min(index, Math.max(0, questions.length - 1));
-  const question = questions[current];
-  if (!question) return <p className="v5r-empty">ยังไม่มีคำถามในผลลัพธ์นี้</p>;
-  return (
-    <div className="v5r-quiz-content">
-      <article className="learning-item v5r-question-card" key={current}>
-        <span className="v5r-position">
-          ข้อ {current + 1} / {questions.length}
-        </span>
-        <strong className="v5r-question-title">
-          {current + 1}. {question.question}
-        </strong>
-        <label htmlFor={answerId}>คำตอบของคุณ</label>
-        <textarea
-          id={answerId}
-          value={drafts[current] || ''}
-          onChange={(event) =>
-            setDrafts((previous) => ({ ...previous, [current]: event.target.value }))
-          }
-          rows={3}
-          placeholder="ลองตอบด้วยคำของคุณ"
-        />
-        <details className="v5r-explanation">
-          <summary>
-            ดูเฉลยและคำอธิบาย <span aria-hidden="true">+</span>
-          </summary>
-          <p>{question.answer}</p>
-          <p>{question.explanation}</p>
-          <ArtifactReferences artifact={artifact} ids={question.citations} />
-        </details>
-      </article>
-      {current < questions.length - 1 ? (
-        <ArtifactPager index={current} count={questions.length} change={setIndex} noun="ข้อ" />
-      ) : (
-        <nav className="v5r-pager" aria-label="จบแบบทดสอบ">
-          <button type="button" disabled={current === 0} onClick={() => setIndex(current - 1)}>
-            ← ข้อก่อนหน้า
-          </button>
-          <span role="status">ครบ {questions.length} ข้อแล้ว</span>
-          <button type="button" onClick={() => setIndex(0)}>
-            ทบทวนตั้งแต่ข้อแรก ↺
-          </button>
-        </nav>
-      )}
-    </div>
   );
 }
 
@@ -235,7 +191,12 @@ export function ArtifactView({ artifact }: { artifact: Artifact }) {
         <div className="v5r-art-stage" aria-hidden="true">
           <BuddyArt pose={artifact.type} />
         </div>
-        {isQuiz && <QuizContent artifact={artifact} />}
+        {isQuiz && (
+          <QuizContent
+            artifact={artifact}
+            references={(ids) => <ArtifactReferences artifact={artifact} ids={ids} />}
+          />
+        )}
         {isCards && <FlashcardContent artifact={artifact} />}
         {artifact.type === 'study_plan' && (
           <div className="v5r-plan-list">
@@ -318,10 +279,12 @@ export function ResultView({
           </aside>
         )}
       </div>
-      <CoverageNotice
-        coverage={result.coverage}
-        insufficient={result.status === 'insufficient_evidence'}
-      />
+      {!result.artifacts?.length && (
+        <CoverageNotice
+          coverage={result.coverage}
+          insufficient={result.status === 'insufficient_evidence'}
+        />
+      )}
       <VisualCoverageNotice value={result.visualCoverage} />
       {kind === 'chat' && result.assistant_message_id && (
         <StoredFeedback key={result.assistant_message_id} id={result.assistant_message_id} />
