@@ -1155,6 +1155,20 @@ export default function App({
             </div>
           )}
           <div className="page-body">
+            {tab === 'home' && (
+              <HomeHero
+                name={member?.name || 'ผู้เรียน'}
+                value={urls}
+                busy={importing}
+                change={setUrls}
+                submit={(event) => {
+                  navigateTab('library');
+                  void importUrls(event);
+                }}
+                openLibrary={() => navigateTab('library')}
+                openChat={() => navigateTab('chat')}
+              />
+            )}
             {member && !demo && (
               <JobRecovery
                 api={api}
@@ -1235,20 +1249,6 @@ export default function App({
                     true,
                   );
                 }}
-              />
-            )}
-            {tab === 'home' && (
-              <HomeHero
-                name={member?.name || 'ผู้เรียน'}
-                value={urls}
-                busy={importing}
-                change={setUrls}
-                submit={(event) => {
-                  navigateTab('library');
-                  void importUrls(event);
-                }}
-                openLibrary={() => navigateTab('library')}
-                openChat={() => navigateTab('chat')}
               />
             )}
             {tab === 'library' && (
