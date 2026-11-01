@@ -7,6 +7,20 @@ import shutil
 import sqlite3
 from pathlib import Path, PurePosixPath
 
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
+from youtube_backend.repository import digest as namespace_digest
+
+
+def media_namespace(database_url):
+    try:
+        url = make_url(database_url)
+    except (ArgumentError, TypeError):
+        raise ValueError("Supply the normalized file-backed SQLite URL") from None
+    if url.drivername != "sqlite" or not url.database or url.database == ":memory:":
+        raise ValueError("Use the actual file-backed SQLite URL")
+    return namespace_digest(database_url)[:24]
+
 
 def digest(path):
     result = hashlib.sha256()
@@ -41,12 +55,22 @@ def separate(source, target):
         raise ValueError("Destination must not exist; restore never overwrites data")
 
 
-def backup(source, target, *, stopped=False):
+def backup(source, target, *, stopped=False, media_source=None, database_url=None):
     if not stopped:
         raise ValueError("Stop ALL API/workers/Chroma clients and acknowledge --services-stopped")
     source, target = Path(source).resolve(), Path(target).resolve()
     separate(source, target)
     validate_state(source)
+    namespace = None
+    if media_source is not None:
+        namespace = media_namespace(database_url)
+        if Path(make_url(database_url).database).resolve() != source / "app.db":
+            raise ValueError("Database URL does not identify the selected source")
+        media_source = Path(media_source).resolve()
+        if media_source.name != namespace or not media_source.is_dir():
+            raise ValueError("Select the existing media namespace for this database URL")
+        if any(p.is_symlink() for p in [media_source, *media_source.rglob("*")]):
+            raise ValueError("Symlinks are not allowed in media assets")
     files = [
         p
         for p in source.rglob("*")
@@ -63,6 +87,11 @@ def backup(source, target, *, stopped=False):
         dest = target / path.relative_to(source)
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(path, dest)
+    if media_source is not None:
+        destination = target / "media-assets" / namespace
+        if destination.exists():
+            raise ValueError("Media namespace already included in the state bundle")
+        shutil.copytree(media_source, destination)
     validate_state(target)
     manifest = dict(
         version=2,
@@ -71,11 +100,13 @@ def backup(source, target, *, stopped=False):
             p.relative_to(target).as_posix(): digest(p) for p in target.rglob("*") if p.is_file()
         },
     )
+    if namespace:
+        manifest["media_namespace"] = namespace
     (target / "backup.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return manifest
 
 
-def restore(source, target):
+def restore(source, target, *, database_url=None):
     source, target = Path(source).resolve(), Path(target).resolve()
     separate(source, target)
     if source.is_symlink() or any(p.is_symlink() for p in source.rglob("*")):
@@ -104,11 +135,32 @@ def restore(source, target):
     }
     if actual != set(manifest["files"]):
         raise ValueError("Backup manifest does not cover all files")
+    namespace = manifest.get("media_namespace")
+    new_namespace = None
+    if namespace:
+        if (
+            not isinstance(namespace, str)
+            or len(namespace) != 24
+            or any(c not in "0123456789abcdef" for c in namespace)
+        ):
+            raise ValueError("Invalid media namespace")
+        if not database_url:
+            raise ValueError("Restore requires the new database URL to relocate media assets")
+        new_namespace = media_namespace(database_url)
+        if Path(make_url(database_url).database).resolve() != target / "app.db":
+            raise ValueError("Database URL does not identify the restore destination")
+        if not (source / "media-assets" / namespace).is_dir():
+            raise ValueError("Media namespace is missing")
+        if namespace != new_namespace and (source / "media-assets" / new_namespace).exists():
+            raise ValueError("Restore media namespace already exists in the bundle")
     validate_state(source)
     target.mkdir(parents=True)
     (target / "chroma").mkdir()
     for name in manifest["files"]:
-        dest = target / name
+        relative = PurePosixPath(name)
+        if namespace and relative.parts[:2] == ("media-assets", namespace):
+            relative = PurePosixPath("media-assets", new_namespace, *relative.parts[2:])
+        dest = target / relative
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source / name, dest)
     validate_state(target)
@@ -120,12 +172,20 @@ def main():
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", type=Path)
     parser.add_argument("--services-stopped", action="store_true")
+    parser.add_argument("--media-source", type=Path)
+    parser.add_argument("--database-url")
     args = parser.parse_args()
     try:
         if args.action == "backup":
-            backup(args.source, args.destination, stopped=args.services_stopped)
+            backup(
+                args.source,
+                args.destination,
+                stopped=args.services_stopped,
+                media_source=args.media_source,
+                database_url=args.database_url,
+            )
         else:
-            restore(args.source, args.destination)
+            restore(args.source, args.destination, database_url=args.database_url)
     except (ValueError, OSError, sqlite3.Error, KeyError) as exc:
         parser.exit(1, f"Recovery refused: {exc}\n")
     print(

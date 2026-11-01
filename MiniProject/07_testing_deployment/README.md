@@ -1,5 +1,19 @@
 # 07 — System verification and deployment
 
+The bounded `scripts/worker_probe.py` executes explicit chat/analysis/research/artifact
+cases once through the selected production factory and actual durable Worker. It
+requires `--allow-live --workers-stopped`, an existing member store, a unique run key,
+and explicit request/input-estimate ceilings. Stop the regular worker first: the
+additional trial cap is process-local. The normal SQL quota broker remains in force.
+Failed/uncertain calls retain allowance; the probe cancels its queued retry work and
+stops on the first unsuccessful case. Results and artifact reads belong in a private
+output location, not Git. Human quality remains pending. The conservative reservation
+estimate can be much higher than actual reported provider tokens, especially when
+the configured context ceiling is large; inspect it before allocating a live run.
+
+See RECOVERY.md for external media namespace relocation when restoring to a new
+SQLite URL. Historical pending-PR descriptions do not replace current source/CI checks.
+
 P0/P1 implementation, commands, measured local latency and pending live/human gates:
 [P0_P1_DELIVERY.md](P0_P1_DELIVERY.md).
 

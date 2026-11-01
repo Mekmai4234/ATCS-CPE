@@ -104,3 +104,39 @@ def test_restore_still_accepts_a_v1_manifest_and_checks_v2_media_bytes(tmp_path)
     with pytest.raises(ValueError, match="checksum"):
         recovery.restore(tmp_path / "v2-backup", tmp_path / "v2-restored")
     assert not (tmp_path / "v2-restored").exists()
+
+
+def test_external_media_restores_into_the_new_database_namespace(tmp_path):
+    from types import SimpleNamespace
+
+    from youtube_backend.media import asset_root
+
+    state, bundle, target = (tmp_path / name for name in ("state", "bundle", "restored"))
+    (state / "chroma").mkdir(parents=True)
+    with sqlite3.connect(state / "app.db") as connection:
+        connection.execute("CREATE TABLE jobs(state TEXT)")
+    original_url = f"sqlite:///{(state / 'app.db').as_posix()}"
+    original = SimpleNamespace(
+        database_url=original_url, media_asset_dir=str(tmp_path / "external")
+    )
+    assets = asset_root(original)
+    assets.mkdir(parents=True)
+    (assets / "frame").write_bytes(b"private reference image")
+    recovery.backup(state, bundle, stopped=True, media_source=assets, database_url=original_url)
+    with pytest.raises(ValueError, match="new database URL"):
+        recovery.restore(bundle, target)
+    assert not target.exists()
+    restored_url = f"sqlite:///{(target / 'app.db').as_posix()}"
+    recovery.restore(bundle, target, database_url=restored_url)
+    restored = SimpleNamespace(
+        database_url=restored_url, media_asset_dir=str(target / "media-assets")
+    )
+    assert (asset_root(restored) / "frame").read_bytes() == b"private reference image"
+    assert not (target / "media-assets" / assets.name).exists()
+    assert (assets / "frame").exists()
+
+
+@pytest.mark.parametrize("url", [None, "invalid", "sqlite:///:memory:", "postgresql://example/db"])
+def test_media_namespace_rejects_missing_or_non_sqlite_configuration(url):
+    with pytest.raises(ValueError, match="SQLite"):
+        recovery.media_namespace(url)
