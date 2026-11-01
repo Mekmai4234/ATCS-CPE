@@ -69,6 +69,14 @@ class IngestionService:
                 context.check()
                 result = normalize(video_id, track, metadata)
                 coverage = caption_coverage(result.segments)
+                logger.info(
+                    "caption_timing segments=%s duplicates=%s overlaps=%s covered_seconds=%.3f "
+                    "duration_known=false speech_completeness_verified=false",
+                    coverage["segment_count"],
+                    coverage["duplicate_segments"],
+                    coverage["overlapping_segments"],
+                    coverage["covered_seconds"],
+                )
                 if coverage["uncovered_intervals"]:
                     logger.info(
                         "caption_uncovered_intervals video_id=%s count=%s "

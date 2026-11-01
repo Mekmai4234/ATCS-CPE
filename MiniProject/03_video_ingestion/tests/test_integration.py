@@ -235,6 +235,48 @@ async def test_index_failure_never_marks_video_ready(integrated, monkeypatch):
     assert env.repo.list_videos(100, 0)["items"][0]["status"] == "failed"
 
 
+@pytest.mark.parametrize("manual_retry", [False, True])
+async def test_index_recovery_uses_durable_transcript_without_fetching_again(
+    integrated, monkeypatch, manual_retry
+):
+    env = integrated
+    original = env.adapters.index
+    attempts = []
+
+    async def fail_once(source, transcript, context):
+        attempts.append((source.model_dump(), transcript.model_dump()))
+        if len(attempts) == 1:
+            raise AppError("index_unavailable", "Fixture index outage", 503, True)
+        return await original(source, transcript, context)
+
+    monkeypatch.setattr(env.adapters, "index", fail_once)
+    job_id = await enqueue(env, VIDEO_B)
+    if manual_retry:
+        import sqlalchemy as sa
+        from youtube_backend import database as db
+
+        with env.db.write() as c:
+            c.execute(sa.update(db.jobs).where(db.jobs.c.job_id == job_id).values(max_attempts=1))
+    await env.worker.run_once(job_id)
+    assert env.repo.get_job(job_id)["state"] == ("failed" if manual_retry else "queued")
+    assert env.repo.list_videos(100, 0)["items"][0]["status"] != "ready"
+
+    async def no_fetch(*args):
+        pytest.fail("Recovery must reuse committed metadata/captions, not fetch YouTube again")
+
+    monkeypatch.setattr(env.captions, "fetch", no_fetch)
+    monkeypatch.setattr(env.adapters.ingestion.metadata, "fetch", no_fetch)
+    if manual_retry:
+        response = await env.client.post(f"/api/jobs/{job_id}/retry")
+        assert response.status_code == 202, response.text
+        job_id = response.json()["job_id"]
+    await env.worker.run_once(job_id)
+    final = env.repo.get_job(job_id)
+    assert final["state"] == "completed" and final["stage"] == "ready"
+    assert len(attempts) == 2 and attempts[0] == attempts[1]
+    assert env.captions.calls == [VIDEO_B]
+
+
 async def test_production_factory_rejects_offline_profile(integrated):
     env = integrated
     settings = env.settings.model_copy(update={"backend_integration_profile": "offline"})
