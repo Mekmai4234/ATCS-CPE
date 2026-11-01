@@ -92,7 +92,8 @@ async def test_real_sdk_schema_count_policy_and_metadata(make_model):
     assert "responseJsonSchema" in body["generationConfig"]
     # Large nested maxItems bounds fail on the real constrained decoder. The local
     # output validator below must retain these limits independently of wire hints.
-    assert "maxItems" not in json.dumps(body["generationConfig"]["responseJsonSchema"])
+    assert '"maxItems": 100' not in json.dumps(body["generationConfig"]["responseJsonSchema"])
+    assert '"maxItems": 1000' not in json.dumps(body["generationConfig"]["responseJsonSchema"])
     assert "tools" not in body
 
 
@@ -444,3 +445,36 @@ async def test_sdk_constrains_citations_to_supplied_evidence(make_model):
         "c1",
         "c2",
     ]
+
+
+@pytest.mark.parametrize(
+    "content,valid",
+    [
+        (
+            {
+                "status": "answered",
+                "statements": [{"text": "fact", "citation_ids": ["c1"]}],
+                "message": "uncited summary",
+            },
+            False,
+        ),
+        ({"status": "answered", "statements": [{"text": "fact", "citation_ids": ["c1"]}]}, True),
+        ({"status": "insufficient_evidence", "message": "ไม่มีหลักฐาน"}, True),
+        (
+            {
+                "status": "insufficient_evidence",
+                "message": "ไม่มีหลักฐาน",
+                "statements": [{"text": "guessed", "citation_ids": ["c1"]}],
+            },
+            False,
+        ),
+    ],
+)
+def test_decoder_outcome_contract_matches_publication_validator(content, valid):
+    import jsonschema
+
+    from youtube_answers.gemini import provider_response_schema
+
+    schema = provider_response_schema(citation_ids=["c1"])
+    validator = jsonschema.Draft202012Validator(schema)
+    assert validator.is_valid(content) is valid
