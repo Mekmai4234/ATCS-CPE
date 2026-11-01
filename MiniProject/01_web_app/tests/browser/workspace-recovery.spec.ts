@@ -323,7 +323,11 @@ test('work strip reports running, queued and paused jobs without counting a paus
       request: { topic: 'แผนเรียนรอโควตา' },
       sources: [],
       created_at: '2026-11-01T01:02:00Z',
-      wait: { estimated_retry_at: '2026-11-01T13:10:58Z', reason: 'quota_wait' },
+      wait: {
+        estimated_retry_at: '2026-11-01T13:10:58Z',
+        reason: 'quota_wait',
+        time_source: 'estimate',
+      },
     },
   ];
   await page.route('**/api/member/jobs?*', (route) =>
@@ -335,7 +339,7 @@ test('work strip reports running, queued and paused jobs without counting a paus
   await expect(strip.getByText('ค้นคว้าที่กำลังทำ', { exact: false })).toBeVisible();
   await page.getByRole('region', { name: 'งานของฉัน', exact: true }).locator('summary').click();
   await expect(page.getByRole('region', { name: 'งานของฉัน', exact: true })).toContainText(
-    'พร้อมประมาณ',
+    'เวลาประมาณการของระบบ',
   );
   await expect(strip.getByRole('button', { name: 'ดูงาน', exact: true })).toHaveCount(1);
   await page.setViewportSize({ width: 390, height: 844 });
