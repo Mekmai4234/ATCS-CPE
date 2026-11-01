@@ -38,6 +38,17 @@ class RagAdapters(UnavailableAdapters):
     async def index(self, source, transcript, context):
         return await self.rag.index(source, transcript, BackendExecution(context))
 
+    async def reindex(self, source, transcript, context):
+        execution = BackendExecution(context)
+        job = context.repository.check_execution(context.job_id, context.lease_token)
+        if job["kind"] != "reindex":
+            raise error(
+                "invalid_operation", "Use a dedicated authenticated trial reindex job", status=403
+            )
+        return await self.rag.index(
+            source, transcript, execution, allow_reindex=True, preserve_previous=True
+        )
+
     async def index_media(self, snapshot, context, *, semantic=True):
         return await self.rag.media.index(snapshot, BackendExecution(context), semantic=semantic)
 
