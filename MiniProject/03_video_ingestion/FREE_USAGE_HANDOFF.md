@@ -22,4 +22,11 @@ transcript version, segment IDs and timestamps. Owner04 must implement the local
 embedding provider/index version and migration; no04 files were changed here.
 ASR/OCR are separate opt-in paths, not a promise that every YouTube link is accessible.
 No ASR model, local embedding index, real-video completeness/quality benchmark or
-production migration is included. No paid API, live provider or user DB was touched.
+production migration is included. No paid API or user DB was touched.
+
+Validation: full offline suite170 passed,2 optional local-tool skips; Ruff passed.
+A separate single live YouTube caption probe on1 November2026 for the user-supplied
+`cWVse_LuFO0` returned370 generated Thai segments. No indexing/model call was made.
+This verifies caption access at that time, not speech/visual completeness, retrieval
+quality or answer correctness. Diagnostic-only report is in ignored runtime; captions
+and provider credentials were not committed.
