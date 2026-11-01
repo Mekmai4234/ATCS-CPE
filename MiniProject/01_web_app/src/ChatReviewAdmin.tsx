@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Api, ApiError } from './api';
+import ProviderNotice from './ProviderNotice';
+import type { Answer } from './types';
 const labelNames: Record<string, string> = {
   user_dissatisfied: 'ผู้ใช้ไม่พอใจ',
   answer_risk_suspected: 'ระบบสงสัยคำตอบเสี่ยง',
@@ -27,7 +29,7 @@ type Detail = {
   question?: { content: string };
   answer?: { content: string };
   visibility?: string;
-  provider_metadata?: { requested_model?: string; returned_model?: string };
+  provider_metadata?: Answer['provider_metadata'];
   review_signal?: unknown;
   moderation?: {
     direction?: 'input' | 'output';
@@ -413,12 +415,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
               <p>{detail.moderation.draft || 'เนื้อหาถูกลบตามอายุการเก็บ'}</p>
             </details>
           )}
-          {detail.provider_metadata && (
-            <p>
-              โมเดล:{' '}
-              {detail.provider_metadata.returned_model || detail.provider_metadata.requested_model}
-            </p>
-          )}
+          <ProviderNotice metadata={detail.provider_metadata} />
           {detail.moderation?.action === 'signal' && (
             <p>สัญญาณระบบเพื่อรอตรวจ — ไม่ใช่ร่างที่ถูกระงับหรือคำตัดสินยืนยัน</p>
           )}
