@@ -115,3 +115,12 @@ async def test_learning_checkpoint_reuses_generated_result_and_revalidates_input
     )
     await unit.service.artifact(request, unit.sources, ctx)
     assert len(unit.model.generated) == 2
+
+
+async def test_local_schema_constrains_citations_to_supplied_ids():
+    ctx = LocalContext()
+    await LocalModel(settings())._structured(
+        {"untrusted_evidence": [{"chunk_id": "chunk-1"}]}, FinishArgs, 1, ctx
+    )
+    shape = ctx.calls[0]["payload"]["format"]
+    assert shape["properties"]["citation_ids"]["items"]["enum"] == ["chunk-1"]
