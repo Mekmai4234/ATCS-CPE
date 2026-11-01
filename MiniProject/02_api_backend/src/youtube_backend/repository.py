@@ -463,6 +463,11 @@ class Repository(Ownership):
             "result",
         )
         result = {k: job[k] for k in keys}
+        execution = job["payload"].get("execution")
+        if execution:
+            from .local_inference import public_execution
+
+            result["execution"] = public_execution(execution)
         if job["kind"] == "chat" and job["result"]:
             result["result"] = self.chat_result(job)
         with self.db.read() as connection:
@@ -1486,7 +1491,7 @@ class Repository(Ownership):
         """Resume indexing a fetched transcript under the same durable generation/owner."""
         with self.db.read() as connection:
             job = self._owned(connection, job_id, token)
-            if job["kind"] != "import":
+            if job["kind"] not in {"import", "reindex"}:
                 raise AppError("invalid_job", "Import checkpoint requires an import job", 409)
             video = row(connection, db.videos, db.videos.c.video_id == job["video_id"])
             version = video["transcript_version"]

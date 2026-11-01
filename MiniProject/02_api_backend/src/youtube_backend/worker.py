@@ -61,6 +61,26 @@ class Worker:
             published = MediaStore(self.repo).publish(context, result)
             self.repo.finish(job_id, token, published)
             return
+        if kind == "reindex":
+            if not self.settings.trial_reindex_enabled or self.settings.app_env not in {
+                "test",
+                "development",
+            }:
+                raise AppError(
+                    "trial_reindex_disabled", "Reindex is restricted to an opted-in trial", 409
+                )
+            source, transcript = self.repo.import_checkpoint(job_id, token)
+            self.repo.stage(job_id, token, "indexing")
+            receipt = IndexReceipt.model_validate(
+                await self.adapters.reindex(source, transcript, context)
+            )
+            if receipt.source != source or not receipt.complete:
+                raise AppError("incomplete_index", "Reindex receipt is incomplete or changed", 502)
+            count = await self.adapters.inventory([source], context)
+            if type(count) is not int or count != receipt.chunk_count:
+                raise AppError("incomplete_index", "Reindex inventory is incomplete", 502)
+            self.repo.finish(job_id, token, receipt.model_dump(mode="json"))
+            return
         if kind == "import":
             self.repo.stage(job_id, token, "fetching_transcript")
             checkpoint = self.repo.import_checkpoint(job_id, token)
