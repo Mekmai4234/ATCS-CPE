@@ -166,9 +166,9 @@ class ExecutionBroker:
             if isinstance(exc, errors.APIError):
                 normalized = provider_error(exc.code)
             elif isinstance(exc, (TimeoutError, httpx.TimeoutException)):
-                normalized = provider_error(504)
+                normalized = provider_error(504, origin="timeout")
             elif isinstance(exc, httpx.TransportError):
-                normalized = provider_error(503)
+                normalized = provider_error(503, origin="transport")
             else:
                 normalized = exc
             self.native.settle(
