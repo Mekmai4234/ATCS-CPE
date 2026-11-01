@@ -13,6 +13,7 @@ export default function ProviderNotice({ metadata }: { metadata?: Answer['provid
     fixture: 'คำตอบสังเคราะห์ · ไม่ใช่ AI จริง',
     system: 'ข้อความจากระบบ · ไม่ใช่การวิเคราะห์คลิปด้วย AI',
     transcript: 'บทถอดเสียงที่บันทึกไว้ · ไม่ได้เรียก AI',
+    'local-evidence': 'ค้นข้อความจากคลิปในเครื่อง · ไม่ได้สร้างคำตอบใหม่ด้วย AI',
     none: 'ไม่มีการเรียกโมเดลในผลนี้',
   };
   const origins = metadata.provider.split(',');
