@@ -1,6 +1,7 @@
 """Observation-driven orchestration. Persistence and execution ownership stay in 02."""
 
 import asyncio
+import hashlib
 import time
 from dataclasses import dataclass, field
 
@@ -15,6 +16,7 @@ from youtube_backend.schemas import (
     Evidence,
     FlashcardsContent,
     ProgressEvent,
+    ProviderMetadata,
     QuizContent,
     ResearchRequest,
     ResearchResult,
@@ -24,8 +26,8 @@ from youtube_backend.schemas import (
 from youtube_backend.urls import canonical_url
 
 from .authorization import member_service
-from .gemini import GeminiModel, byte_size, json_text, wire_evidence
-from .models import TOOL_MODELS, Usage, error
+from .gemini import byte_size, json_text, wire_evidence
+from .models import TOOL_MODELS, Generated, Usage, error
 
 CONTENTS = {"study_plan": StudyPlanContent, "quiz": QuizContent, "flashcards": FlashcardsContent}
 SOURCE_ERRORS = {
@@ -80,7 +82,12 @@ class AgentService:
             sources,
             context,
             time.monotonic() + min(self.settings.agent_timeout_seconds, context.remaining_seconds),
-            Usage(self.settings.llm_model, provider="none"),
+            Usage(
+                self.settings.local_model
+                if self.settings.generation_provider == "ollama"
+                else self.settings.llm_model,
+                provider="none",
+            ),
         )
 
     async def _bounded(self, run, function, *, reserve=True, model=False):
@@ -326,17 +333,58 @@ class AgentService:
             raise error("agent_budget_exhausted", "Preserving the final answer model allowance")
 
         async def generate_selected():
-            return await self._bounded(
+            checkpoint = getattr(run.context, "checkpoint", None)
+            key = (
+                "06-artifact-"
+                + hashlib.sha256(
+                    json_text(
+                        {
+                            "request": request,
+                            "sources": [s.model_dump() for s in run.sources],
+                            "evidence": [e.model_dump(mode="json") for e in records.values()],
+                            "schema": schema.model_json_schema(),
+                            "settings": self.settings.model_dump(
+                                mode="json", exclude={"gemini_api_key"}
+                            ),
+                        }
+                    ).encode()
+                ).hexdigest()
+            )
+            cached = checkpoint(key) if callable(checkpoint) else None
+            if cached is not None:
+                run.context.check()
+                metadata = ProviderMetadata.model_validate(cached["metadata"]).model_copy(
+                    update={
+                        "provider": cached["metadata"]["provider"] + "-cache",
+                        "usage": {},
+                        "latency_ms": 0,
+                    }
+                )
+                return Generated(schema.model_validate(cached["content"]), metadata)
+            generated = await self._bounded(
                 run,
                 lambda timeout: self.model.generate(
                     request,
                     list(records.values()),
                     schema,
                     timeout,
-                    **({"context": run.context} if isinstance(self.model, GeminiModel) else {}),
+                    **(
+                        {"context": run.context}
+                        if getattr(self.model, "requires_context", False)
+                        else {}
+                    ),
                 ),
                 model=True,
             )
+            if callable(checkpoint):
+                checkpoint(
+                    key,
+                    {
+                        "content": schema.model_validate(generated.content).model_dump(mode="json"),
+                        "metadata": generated.metadata.model_dump(mode="json"),
+                    },
+                )
+            return generated
 
         try:
             generated = await generate_selected()
@@ -604,7 +652,11 @@ class AgentService:
                     lambda timeout: self.model.decide(
                         history,
                         timeout,
-                        **({"context": run.context} if isinstance(self.model, GeminiModel) else {}),
+                        **(
+                            {"context": run.context}
+                            if getattr(self.model, "requires_context", False)
+                            else {}
+                        ),
                     ),
                     model=True,
                 )
