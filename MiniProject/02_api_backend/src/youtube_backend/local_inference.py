@@ -264,7 +264,11 @@ class LocalInference:
         finally:
             if not dispatched:
                 state = "cancelled"
+            values = {"state": state}
+            if dispatched and state == "uncertain":
+                # A closed client socket is not proof the model stopped computing.
+                # Keep capacity fenced through the original job deadline, not just
+                # the shorter per-call timeout; never refund the sent ledger entry.
+                values["expires_at"] = job["deadline_at"]
             with self.repo.db.write() as c:
-                c.execute(
-                    table.update().where(table.c.reservation_id == permit).values(state=state)
-                )
+                c.execute(table.update().where(table.c.reservation_id == permit).values(**values))
