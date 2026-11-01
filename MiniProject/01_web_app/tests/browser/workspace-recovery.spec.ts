@@ -691,3 +691,59 @@ test('a failed quota refresh removes the old accounting snapshot', async ({ page
   await expect(drawer.getByText(/ยังตรวจยอดภายในไม่ได้/)).toBeVisible();
   await expect(drawer.getByText(/ตรวจล่าสุด:/)).toHaveCount(0);
 });
+
+test('paused chat can read local excerpts after reload without submitting generation', async ({
+  page,
+}) => {
+  const posts = await fixture(page);
+  await page.route('**/api/member/jobs?*', (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            job_id: 'offline-question',
+            kind: 'chat',
+            state: 'paused',
+            stage: 'paused',
+            error_code: 'quota_wait',
+            request: { question: 'RAG คืออะไร', scope },
+            sources: [{ video_id: video.video_id, generation: 1, transcript_version: 'v1' }],
+          },
+        ],
+        total: 1,
+        offset: 0,
+        limit: 50,
+      },
+    }),
+  );
+  let searches = 0;
+  await page.route('**/api/evidence/search', (route) => {
+    searches++;
+    expect(route.request().postDataJSON()).toEqual({ question: 'RAG คืออะไร', scope });
+    return route.fulfill({
+      json: {
+        items: [
+          {
+            video_id: video.video_id,
+            text: 'ข้อความต้นฉบับ RAG จากคลิป',
+            start_seconds: 84,
+            end_seconds: 90,
+          },
+        ],
+        notice: 'ข้อความจากบทถอดเสียง ไม่ใช่คำตอบ AI',
+      },
+    });
+  });
+  await page.goto(base);
+  await page.reload();
+  await page.getByRole('button', { name: 'ดูงานทั้งหมด', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: 'งานของฉัน', exact: true });
+  await drawer.getByRole('button', { name: 'อ่านข้อความจากคลิปโดยไม่ใช้ AI', exact: true }).click();
+  await expect(drawer.getByText('ข้อความต้นฉบับ RAG จากคลิป', { exact: true })).toBeVisible();
+  await expect(drawer.getByRole('link', { name: 'เปิดคลิปที่ 84 วินาที' })).toHaveAttribute(
+    'href',
+    /watch\?v=dQw4w9WgXcQ&t=84s/,
+  );
+  expect(searches).toBe(1);
+  expect(posts).toHaveLength(0);
+});
