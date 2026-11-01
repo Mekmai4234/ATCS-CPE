@@ -13,6 +13,7 @@ from .models import FinishArgs, Generated, ModelReply, error
 
 class LocalModel:
     requires_context = True
+    deterministic_research = True
 
     def __init__(self, settings):
         self.settings = settings
@@ -21,9 +22,7 @@ class LocalModel:
                 "local_configuration", "Explicit local model configuration required", status=503
             )
 
-    async def _structured(self, payload, schema, timeout, context):
-        if context is None or not callable(getattr(context, "local_inference", None)):
-            raise error("local_broker_required", "Trusted local execution required", status=503)
+    def _prepare(self, payload, schema):
         settings = self.settings
         shape = provider_schema(schema)
         evidence = payload.get("untrusted_evidence", [])
@@ -74,6 +73,35 @@ class LocalModel:
         budget = settings.local_context_tokens - settings.local_max_output_tokens - 512
         if len(json_text(body).encode()) > budget:
             raise error("context_budget_exceeded", "Full local input exceeds configured byte guard")
+        return body
+
+    def research_payload(self, request, evidence):
+        return {
+            "task": request,
+            "untrusted_evidence": evidence,
+            "instructions": "Synthesize only supplied evidence. Cite supplied chunk_id values. "
+            "Coverage may be partial; do not claim to have read omitted evidence.",
+        }
+
+    def research_fits(self, request, evidence):
+        try:
+            self._prepare(self.research_payload(request, evidence), FinishArgs)
+        except Exception as exc:
+            if getattr(exc, "code", None) == "context_budget_exceeded":
+                return False
+            raise
+        return True
+
+    async def synthesize_research(self, request, evidence, timeout, context):
+        return await self._structured(
+            self.research_payload(request, evidence), FinishArgs, timeout, context
+        )
+
+    async def _structured(self, payload, schema, timeout, context):
+        if context is None or not callable(getattr(context, "local_inference", None)):
+            raise error("local_broker_required", "Trusted local execution required", status=503)
+        settings = self.settings
+        body = self._prepare(payload, schema)
         binding = ["local-structured-v1", settings.local_model, settings.local_model_digest, body]
         key = "06-" + hashlib.sha256(json_text(binding).encode()).hexdigest()
         checkpoint = getattr(context, "checkpoint", None)
