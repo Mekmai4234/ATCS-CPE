@@ -472,6 +472,7 @@ async def test_sdk_constrains_citations_to_supplied_evidence(make_model):
 )
 def test_decoder_outcome_contract_matches_publication_validator(content, valid):
     import jsonschema
+
     from youtube_answers.gemini import provider_response_schema
 
     schema = provider_response_schema(citation_ids=["c1"])
