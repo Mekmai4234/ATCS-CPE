@@ -88,6 +88,13 @@ for (const width of [390, 1600]) {
       await expect(page.getByRole('link', { name: /เปิดหลักฐาน หลักฐาน 1/ })).toHaveCount(0);
       await page.locator('.v5r-explanation summary').click();
       await expect(page.getByRole('link', { name: /เปิดหลักฐาน หลักฐาน 2/ })).toBeVisible();
+      await expect(page.getByText('ครบ 2 ข้อแล้ว', { exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: /ข้อถัดไป/ })).toHaveCount(0);
+      await page.getByLabel('คำตอบของคุณ', { exact: true }).fill('ร่างคำตอบสุดท้าย');
+      await page.getByRole('button', { name: /ทบทวนตั้งแต่ข้อแรก/ }).click();
+      await expect(page.getByLabel('คำตอบของคุณ', { exact: true })).toHaveValue('ร่างคำตอบแรก');
+      await page.getByRole('button', { name: /ข้อถัดไป/ }).click();
+      await expect(page.getByLabel('คำตอบของคุณ', { exact: true })).toHaveValue('ร่างคำตอบสุดท้าย');
       await page.getByRole('button', { name: /ข้อก่อนหน้า/ }).click();
       await expect(page.getByLabel('คำตอบของคุณ', { exact: true })).toHaveValue('ร่างคำตอบแรก');
       await page.getByRole('button', { name: 'สร้างใหม่', exact: true }).click();
