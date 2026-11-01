@@ -423,3 +423,24 @@ async def test_vision_generation_outage_is_not_insufficient_evidence(make_model,
         )
     assert caught.value.code == code and caught.value.retryable
     assert len(calls) == 2 and len(model.broker.calls) == 2
+
+
+async def test_sdk_constrains_citations_to_supplied_evidence(make_model):
+    requests = []
+
+    def handler(request):
+        requests.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={"totalTokens": 20} if request.url.path.endswith(":countTokens") else response(),
+        )
+
+    model = make_model(handler)
+    await model.generate(
+        {"untrusted_evidence": [{"text": "evidence", "citation_ids": ["c1", "c2", "c1"]}]}, 5
+    )
+    schema = requests[-1]["generationConfig"]["responseJsonSchema"]
+    assert schema["$defs"]["Statement"]["properties"]["citation_ids"]["items"]["enum"] == [
+        "c1",
+        "c2",
+    ]
