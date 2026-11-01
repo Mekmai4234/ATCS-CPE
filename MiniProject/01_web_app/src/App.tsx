@@ -1,3 +1,4 @@
+import { TaskApiContext } from './TaskApi';
 import { smallTalkReply } from './smallTalk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -383,6 +384,8 @@ export default function App({
         id,
         (update) => {
           setJobs((previous) => ({ ...previous, [id]: update }));
+          if (update.state === 'paused')
+            throw new ApiError(jobStatus(update), 'provider_wait', false);
         },
         controller.signal,
       );
@@ -391,8 +394,10 @@ export default function App({
         await refresh();
       }
     } catch (error) {
-      if (!aborted(error) && alive.current)
+      if (!aborted(error) && alive.current) {
         setWatchErrors((previous) => ({ ...previous, [id]: errorText(error) }));
+        if (error instanceof ApiError && error.code === 'provider_wait') await refresh();
+      }
     } finally {
       watchers.current.delete(id);
     }
@@ -471,7 +476,7 @@ export default function App({
       setConversation(result.conversation_id);
       conversationId.current = result.conversation_id;
       conversationScope.current = scopeFingerprint(
-        (op.payload as { scope: import('./types').Scope }).scope,
+        (op.payload as { scope: import('./types').Scope | null }).scope,
       );
     }
     setOperation(null);
@@ -611,12 +616,14 @@ export default function App({
         setQuestion('');
         return;
       }
-      if (libraryError || loading) throw new Error('กรุณาโหลดคลังคลิปให้สำเร็จก่อนส่งคำถาม');
-      const scope = buildScope(selected, videos, channel, from, to);
       const type = forcedType || (tab === 'learn' ? taskType : 'chat');
+      const general = type === 'chat' && !selected.length;
+      if (!general && (libraryError || loading))
+        throw new Error('กรุณาโหลดคลังคลิปให้สำเร็จก่อนส่งคำถาม');
+      const scope = general ? null : buildScope(selected, videos, channel, from, to);
       if (
         type === 'compare' &&
-        scope.video_ids.filter((id) => {
+        scope!.video_ids.filter((id) => {
           const v = videos.find((video) => video.video_id === id)!;
           return (
             (!channel || v.channel_id === channel) &&
@@ -640,7 +647,12 @@ export default function App({
       else setScopeNotice('');
       const payload =
         type === 'chat'
-          ? { question: text, conversation_id: sameScope ? conversation : null, scope }
+          ? {
+              question: text,
+              conversation_id: sameScope ? conversation : null,
+              scope,
+              ...(general ? { mode: 'general' } : {}),
+            }
           : type === 'summary' || type === 'compare'
             ? { type, scope, instruction: text }
             : type === 'research'
@@ -698,7 +710,7 @@ export default function App({
         payload,
         label: text || taskNames[type],
         type,
-        sources: snapshotSources(videos, scope, libraryRevisions.current),
+        sources: scope ? snapshotSources(videos, scope, libraryRevisions.current) : [],
       });
     } catch (error) {
       setTaskError(errorText(error));
@@ -891,7 +903,10 @@ export default function App({
       setTo(savedScope.date_to || '');
       setConversation(initialConversationId);
       conversationId.current = initialConversationId;
-      conversationScope.current = scopeFingerprint(savedScope);
+      conversationScope.current =
+        scope === null && !savedScope.video_ids.length
+          ? scopeFingerprint(null)
+          : scopeFingerprint(savedScope);
       setQuestion('');
       setNewResults(false);
       setScopeNotice('');
@@ -936,7 +951,8 @@ export default function App({
           }
         }
       } else {
-        if (!jobs[id] || !['import', 'delete'].includes(jobs[id].kind))
+        const original = jobs[id] || (await api.job(id));
+        if (!['import', 'delete'].includes(original.kind))
           throw new Error('API ยังไม่อนุญาตให้ retry งานชนิดนี้');
         const accepted = await api.retry(id);
         setJobs((previous) => {
@@ -1033,7 +1049,7 @@ export default function App({
               ? 'เลือกแหล่งข้อมูลได้สูงสุด 100 คลิป'
               : '';
 
-  return (
+  const content = (
     <EvidenceContext.Provider value={api.loadFrame}>
       <div
         className={`app-shell forest-workspace v5-workspace view-${tab}${tab === 'learn' && learningFocus ? ' learning-result' : ''}`}
@@ -1142,13 +1158,48 @@ export default function App({
             {member && !demo && (
               <JobRecovery
                 api={api}
-                hasPending={
-                  !!operation ||
-                  deferred.length > 0 ||
-                  Object.values(jobs).some((job) => !terminal(job.state))
-                }
+                liveJobs={Object.values(jobs)}
+                videoTitles={Object.fromEntries(
+                  videos.map((video) => [video.video_id, video.title || video.video_id]),
+                )}
+                hasPending={busy}
                 locked={taskLocked || archiveLoading}
                 restore={(job) => {
+                  if (job.kind === 'quiz_grade' && job.request.artifact_id) {
+                    void api
+                      .artifact(job.request.artifact_id)
+                      .then((artifact) => {
+                        updateTurns((previous) => [
+                          ...previous.filter((turn) => turn.id !== `grade-${job.job_id}`),
+                          {
+                            id: `grade-${job.job_id}`,
+                            type: 'quiz',
+                            label: 'ผลแบบทดสอบ',
+                            partial: false,
+                            sources: [],
+                            result: {
+                              artifacts: [
+                                {
+                                  ...artifact,
+                                  grading:
+                                    job.state === 'completed'
+                                      ? (job.result as unknown as import('./types').QuizGrade)
+                                      : undefined,
+                                  grading_job_id:
+                                    job.state === 'completed' ? undefined : job.job_id,
+                                  submitted_answers: job.request.answers,
+                                },
+                              ],
+                            },
+                          },
+                        ]);
+                        setTaskType('quiz');
+                        setLearningFocus(true);
+                        navigateTab('learn');
+                      })
+                      .catch((error) => setTaskError(errorText(error)));
+                    return;
+                  }
                   if (job.kind === 'import' || job.kind === 'enrich') {
                     void watchImport(job.job_id);
                     return;
@@ -1512,14 +1563,32 @@ export default function App({
                         ▶
                       </a>
                       <span className={`status-pill ${video.status}`}>
-                        {videoQueryable(video) && video.status !== 'ready'
-                          ? 'พร้อมถามจากข้อมูลภาพ'
-                          : statusLabels[video.status] || video.status}
+                        {video.import_job?.state === 'paused'
+                          ? 'พักรอโควตา'
+                          : videoQueryable(video) && video.status !== 'ready'
+                            ? 'พร้อมถามจากข้อมูลภาพ'
+                            : statusLabels[video.status] || video.status}
                       </span>
                     </div>
                     <div className="video-info">
                       <SourceBadges video={video} />
                       {member && !demo && <MediaEvidence api={api} video={video} />}
+                      {video.import_job?.error_code && (
+                        <p className="notice warning">
+                          {importMessage(video.import_job.error_code)}
+                        </p>
+                      )}
+                      {video.import_job?.retryable &&
+                        ['failed', 'paused'].includes(video.import_job.state) && (
+                          <button
+                            className="secondary"
+                            disabled={taskLocked}
+                            onClick={() => void jobAction(video.import_job!.job_id, 'retry')}
+                          >
+                            ลองนำเข้าคลิปนี้อีกครั้ง
+                          </button>
+                        )}
+
                       <div className="video-title-row">
                         <label className="video-select">
                           <input
@@ -1710,7 +1779,9 @@ export default function App({
                   />
                   <div className="form-footer">
                     <small id="task-scope-help" role="status">
-                      {scopeHelp ||
+                      {(tab === 'chat' && !selected.length
+                        ? 'คุยทั่วไป · เลือกคลิปเมื่อถามเนื้อหา'
+                        : scopeHelp) ||
                         (tab === 'learn' && taskType === 'compare' && selectedInFilter.length < 2
                           ? 'เลือกคลิปที่ตรงตัวกรองอย่างน้อย 2 คลิปเพื่อเปรียบเทียบ'
                           : 'อ้างอิงเฉพาะคลิปที่เลือกและตรงกับตัวกรอง')}
@@ -1720,7 +1791,8 @@ export default function App({
                       aria-describedby="task-scope-help"
                       disabled={
                         taskLocked ||
-                        (!!scopeHelp && !(tab === 'chat' && smallTalkReply(question))) ||
+                        (!!scopeHelp &&
+                          !(tab === 'chat' && (!selected.length || smallTalkReply(question)))) ||
                         (tab === 'chat' && !question.trim()) ||
                         (tab === 'learn' && taskType === 'research' && !question.trim()) ||
                         (tab === 'learn' && taskType === 'compare' && selectedInFilter.length < 2)
@@ -1953,7 +2025,12 @@ export default function App({
             change={setQuestion}
             submit={(event) => submitTask(event, 'chat')}
             turns={turns.filter((turn) => turn.type === 'chat')}
-            locked={taskLocked || loading || !!libraryError || archiveLoading || viewingHistory}
+            locked={
+              taskLocked ||
+              (selected.length > 0 && (loading || !!libraryError)) ||
+              archiveLoading ||
+              viewingHistory
+            }
             busy={busy}
             pending={
               operation?.type === 'chat' ? { id: operation.key, label: operation.label } : undefined
@@ -2010,4 +2087,5 @@ export default function App({
       </div>
     </EvidenceContext.Provider>
   );
+  return <TaskApiContext.Provider value={api}>{content}</TaskApiContext.Provider>;
 }
