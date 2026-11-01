@@ -102,7 +102,17 @@ class LocalModel:
             raise error("local_broker_required", "Trusted local execution required", status=503)
         settings = self.settings
         body = self._prepare(payload, schema)
-        binding = ["local-structured-v1", settings.local_model, settings.local_model_digest, body]
+        binding = [
+            "local-structured-v2",
+            settings.local_model,
+            settings.local_model_digest,
+            settings.local_context_tokens,
+            settings.local_max_output_tokens,
+            body,
+            getattr(context, "job_id", "explicit-fresh")
+            if getattr(context, "cache_bypass", False)
+            else None,
+        ]
         key = "06-" + hashlib.sha256(json_text(binding).encode()).hexdigest()
         checkpoint = getattr(context, "checkpoint", None)
         cached = checkpoint(key) if callable(checkpoint) else None
