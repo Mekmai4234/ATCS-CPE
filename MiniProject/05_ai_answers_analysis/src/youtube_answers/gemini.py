@@ -12,6 +12,7 @@ from youtube_backend.schemas import ProviderMetadata
 from .models import Generated, GeneratedAnswer, error
 from .prompts import POLICY, json_text
 from .quota import verified_grant
+from .timing import provider_call
 
 
 def provider_response_schema(schema=GeneratedAnswer):
@@ -115,6 +116,7 @@ class GeminiModel:
                     output_tokens=0,
                 ) as count_lease:
                     self._recheck(grant)
+                    provider_call("count_tokens")
                     count = await self.client.aio.models.count_tokens(
                         model=model,
                         contents=contents,
@@ -139,6 +141,7 @@ class GeminiModel:
                     output_tokens=config.max_output_tokens,
                 ) as lease:
                     self._recheck(grant)
+                    provider_call("generate_content")
                     response = await self.client.aio.models.generate_content(
                         model=model, contents=contents, config=config
                     )

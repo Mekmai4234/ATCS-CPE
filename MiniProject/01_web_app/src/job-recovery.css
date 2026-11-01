@@ -698,6 +698,26 @@ body .job-drawer [role='tabpanel']:focus-visible {
 .chat-policy-info p {
   padding: 12px 0;
 }
+.job-quota {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #d3ded5;
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+.job-quota summary {
+  cursor: pointer;
+  min-height: 44px;
+  align-content: center;
+}
+.job-quota button {
+  min-height: 44px;
+}
+.provider-notice {
+  color: #465549;
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+}
 @media (max-width: 900px) {
   .chat-policy-info {
     margin: 0 22px 110px;

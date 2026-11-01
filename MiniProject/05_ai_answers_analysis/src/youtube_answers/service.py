@@ -539,6 +539,7 @@ class AnswerService:
             for key, value in meta.usage.items():
                 usage[key] = usage.get(key, 0) + value
         versions = list(dict.fromkeys(m.returned_model for m in run.metadata if m.returned_model))
+        requested = list(dict.fromkeys(m.requested_model for m in run.metadata))
         providers = list(dict.fromkeys(m.provider for m in run.metadata))
         result = AnswerResult(
             status=output.status,
@@ -554,7 +555,7 @@ class AnswerService:
             ),
             provider_metadata=ProviderMetadata(
                 provider=",".join(providers) or "none",
-                requested_model=self.settings.llm_model,
+                requested_model=",".join(requested) or self.settings.llm_model,
                 returned_model=",".join(versions) or None,
                 usage=usage,
                 latency_ms=sum(m.latency_ms for m in run.metadata),
