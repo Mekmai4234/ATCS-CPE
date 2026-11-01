@@ -86,7 +86,9 @@ class ExecutionContext:
 
             pinned = job["payload"].get("execution")
             if pinned and pinned != execution_identity(self.settings):
-                raise AppError("execution_changed", "Checkpoint provider configuration changed", 409)
+                raise AppError(
+                    "execution_changed", "Checkpoint provider configuration changed", 409
+                )
             saved = dict(job["payload"].get("adapter_checkpoints", {}))
             if value is None:
                 return saved.get(key)
