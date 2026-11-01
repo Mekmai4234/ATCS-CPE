@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     gemini_free_policy_file: str | None = None
     gemini_max_concurrent: int = Field(default=1, ge=1, le=20)
     gemini_user_concurrent: int = Field(default=1, ge=1, le=10)
+    generation_provider: Literal["gemini", "ollama"] = "gemini"
+    local_base_url: str = "http://127.0.0.1:11434"
+    local_model: str = ""
+    local_model_digest: str = ""
+    local_embedding_model: str = ""
+    local_embedding_digest: str = ""
+    local_max_concurrent: int = Field(default=1, ge=1, le=4)
+    local_context_tokens: int = Field(default=4096, ge=512, le=32768)
+    local_max_output_tokens: int = Field(default=1024, ge=64, le=8192)
     media_asset_dir: str = "./runtime/media-assets"
     media_max_frames: int = Field(default=12, ge=1, le=100)
     media_max_frame_bytes: int = Field(default=2_000_000, ge=1024, le=20_000_000)
