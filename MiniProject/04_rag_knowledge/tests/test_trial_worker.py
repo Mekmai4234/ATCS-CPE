@@ -107,6 +107,16 @@ async def test_authenticated_local_trial_worker_preserves_old_index_and_resumes_
         old = await env.rag.vectors.call("get", 30, where={"run_id": previous}, include=[])
         assert old["ids"]
         assert len(dispatches) == result["result"]["chunk_count"] + 1
+        another = trial_reindex(env.repo, VIDEO_A, "trial-demoted")
+        claim = env.repo.claim(another["job_id"])
+        with env.db.write() as c:
+            c.execute(db.users.update().where(db.users.c.user_id == "admin").values(role="user"))
+        before_calls = len(dispatches)
+        with pytest.raises(AppError):
+            await adapter.reindex(source, transcript(), env.context(claim))
+        assert len(dispatches) == before_calls
+        with env.db.read() as c:
+            assert c.scalar(sa.select(active.c.run_id)) == current
         with pytest.raises(AppError):
             await adapter.reindex(source, transcript(), env.query(VIDEO_A).ctx)
     finally:
