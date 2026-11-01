@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Api, ApiError } from './api';
-import { jobStatus, terminal } from './domain';
+import { jobStatus, retryTime, terminal } from './domain';
 import type { Job, RecoverableJob } from './types';
 import { UiIcon } from './Visuals';
+import QuotaNotice from './QuotaNotice';
 
 function WorkIcon({ name }: { name: 'list' | 'pause' | 'close' | 'check' | 'clock' }) {
   const paths = {
@@ -61,13 +62,7 @@ function typeName(job: RecoverableJob) {
   );
 }
 function waitMessage(job: RecoverableJob) {
-  const providerTime =
-    job.presentation?.retryAt ||
-    (job.wait?.time_source === 'provider' ? job.wait.retry_at : undefined);
-  const estimate = job.wait?.time_source === 'estimate' ? job.wait.estimated_retry_at : undefined;
-  const time = providerTime || estimate;
-  if (!time || !Number.isFinite(Date.parse(time))) return '';
-  return `${providerTime ? 'ลองทำต่อได้หลัง' : 'ลองทำต่อได้ประมาณ'} ${new Date(time).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}`;
+  return retryTime(job.wait || {}, job.presentation?.retryAt);
 }
 function quotaPaused(job: RecoverableJob) {
   return (
@@ -470,7 +465,7 @@ export default function JobRecovery({
               <div className="job-drawer-notice">
                 <WorkIcon name="clock" />
                 <div>
-                  <strong>ใช้งานครบขีดจำกัดแล้ว</strong>
+                  <strong>งบการใช้งานภายในเว็บเต็ม</strong>
                   <p>
                     {quotaTimes.length === 1
                       ? quotaTimes[0]
@@ -481,6 +476,7 @@ export default function JobRecovery({
                 </div>
               </div>
             )}
+            {drawerOpen && <QuotaNotice api={api} />}
             {older && historyLoading && (
               <p role="status" className="job-card-description">
                 กำลังโหลดประวัติ…
@@ -490,8 +486,7 @@ export default function JobRecovery({
               {list.map((job) => {
                 const quota = quotaPaused(job);
                 const providerAt =
-                  job.presentation?.retryAt ||
-                  (job.wait?.time_source === 'provider' ? job.wait.retry_at : undefined);
+                  job.wait?.time_source === 'provider' ? job.wait.retry_at : undefined;
                 const notYet = !!providerAt && Date.parse(providerAt) > Date.now();
                 const canRestore = ['completed', 'partial', 'running', 'queued'].includes(
                   job.state,

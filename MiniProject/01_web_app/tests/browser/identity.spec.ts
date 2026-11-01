@@ -33,6 +33,23 @@ async function importOne(page: Page) {
   await expect.poll(async () => page.locator('input[type="checkbox"]:enabled').count()).toBe(1);
 }
 
+test('real HTTP quota reports an internal ledger without a Google balance claim', async ({
+  page,
+}) => {
+  await signIn(page, 'fixture-quota-display');
+  const received = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/api/quota' && response.ok(),
+  );
+  await page.getByRole('button', { name: 'ดูงานทั้งหมด', exact: true }).click();
+  const data = await (await received).json();
+  expect(data.accounting_source).toBe('local_ledger');
+  expect(data.provider_balance_verified).toBe(false);
+  const drawer = page.getByRole('dialog', { name: 'งานของฉัน', exact: true });
+  await drawer.getByText('ตรวจยอดใช้งานภายในระบบ', { exact: true }).click();
+  await expect(drawer.getByText(/ตรวจล่าสุด:/)).toBeVisible();
+  await expect(drawer.getByText(/ยอดภายในเว็บ ไม่ใช่ยอดคงเหลือ Google/)).toBeVisible();
+});
+
 test('private history survives reload and continues through real HTTP without resubmitting on open', async ({
   page,
 }) => {
