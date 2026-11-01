@@ -50,6 +50,13 @@ def terms(text):
     return words
 
 
+def overlaps(start, end, lower, upper):
+    """Positive overlap with [lower, upper); point observations include only their instant."""
+    if start == end:
+        return (lower is None or start >= lower) and (upper is None or start < upper)
+    return (lower is None or end > lower) and (upper is None or start < upper)
+
+
 class EvidenceLibrary:
     def __init__(self, rag):
         self.rag = rag
@@ -155,9 +162,7 @@ class EvidenceLibrary:
         query = terms(question)
         scored = []
         for record in records:
-            if start_seconds is not None and record.end_seconds < start_seconds:
-                continue
-            if end_seconds is not None and record.start_seconds > end_seconds:
+            if not overlaps(record.start_seconds, record.end_seconds, start_seconds, end_seconds):
                 continue
             overlap = query & terms(record.text)
             if overlap:
@@ -186,9 +191,9 @@ class EvidenceLibrary:
                 for record in nearby[max(0, index - neighbors) : index + neighbors + 1]:
                     if len(selected) >= limit:
                         break
-                    if start_seconds is not None and record.end_seconds < start_seconds:
-                        continue
-                    if end_seconds is not None and record.start_seconds > end_seconds:
+                    if not overlaps(
+                        record.start_seconds, record.end_seconds, start_seconds, end_seconds
+                    ):
                         continue
                     if not any(
                         r.evidence_id == record.evidence_id
@@ -205,6 +210,14 @@ class EvidenceLibrary:
             notes=[
                 "Lexical relevance only; sampled observations do not establish exhaustive coverage."
             ]
+            + (
+                [
+                    "Time filter uses positive overlap with [start, end); citations retain their "
+                    "full original intervals and may extend beyond the requested window."
+                ]
+                if start_seconds is not None or end_seconds is not None
+                else []
+            )
             + (
                 []
                 if complete
@@ -231,9 +244,9 @@ class EvidenceLibrary:
             )
         )
         if start is not None:
-            conditions.append(chunks.c.data["end_seconds"].as_float() >= start)
+            conditions.append(chunks.c.data["end_seconds"].as_float() > start)
         if end is not None:
-            conditions.append(chunks.c.data["start_seconds"].as_float() <= end)
+            conditions.append(chunks.c.data["start_seconds"].as_float() < end)
         with self.rag.manifest.database.read() as c:
             raw = (
                 c.execute(
@@ -254,9 +267,7 @@ class EvidenceLibrary:
                     max(0, chunk.ordinal - neighbors),
                     2 * neighbors + 1,
                 ):
-                    if (start is not None and adjacent.end_seconds < start) or (
-                        end is not None and adjacent.start_seconds > end
-                    ):
+                    if not overlaps(adjacent.start_seconds, adjacent.end_seconds, start, end):
                         continue
                     if adjacent.chunk_id not in selected:
                         if len(selected) == limit:
