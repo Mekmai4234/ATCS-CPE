@@ -611,6 +611,84 @@ class AgentService:
             provider_metadata=run.usage.result(),
         )
 
+    async def _local_research(self, request, run):
+        """Meter deterministic reads as tools and reserve one actual synthesis call."""
+        await self._inventory(run)
+        records, cursor, seen = {}, None, set()
+        limited = False
+        # Keep a synthesis step and final evidence/inventory validation allowance.
+        read_limit = min(self.settings.agent_max_steps - 1, self.settings.agent_max_tool_calls - 5)
+        for step in range(max(0, read_limit)):
+            run.step = step + 1
+            page = await self._bounded(
+                run,
+                lambda _, cursor=cursor: self.knowledge.read(
+                    run.sources, run.context, limit=8, cursor=cursor
+                ),
+            )
+            batch = self._records(
+                run, [e.evidence() if hasattr(e, "evidence") else e for e in page.items]
+            )
+            for record in batch:
+                candidate = {**records, record.chunk_id: record}
+                if not self.model.research_fits(
+                    request, [wire_evidence(e) for e in candidate.values()]
+                ):
+                    limited = True
+                    break
+                records = candidate
+            self._event(
+                run,
+                run.step,
+                "read_video_chunks",
+                "completed",
+                f"Read authorized page; selected_chunks={len(records)}",
+            )
+            if limited or page.next_cursor is None:
+                break
+            if page.next_cursor in seen or not batch:
+                raise error("invalid_cursor", "Knowledge pagination made no progress")
+            seen.add(page.next_cursor)
+            cursor = page.next_cursor
+        if not records:
+            raise error(
+                "context_budget_exceeded" if limited else "insufficient_evidence",
+                "No authorized evidence fits the bounded local synthesis input",
+                status=409,
+            )
+        self._remember(run, list(records.values()))
+        result = await self._bounded(
+            run,
+            lambda timeout: self.model.synthesize_research(
+                request, [wire_evidence(e) for e in records.values()], timeout, run.context
+            ),
+            model=True,
+        )
+        run.usage.add(result.metadata)
+        # Credit only the exact evidence supplied to the successful synthesis.
+        run.processed.update(records)
+        run.step += 1
+        ids = result.content.citation_ids
+        if not ids:
+            raise error("invalid_citation", "Local synthesis needs supporting citations")
+        coverage = self._coverage(run)
+        if not coverage.complete:
+            coverage.notes.append(
+                "Local synthesis used a bounded subset; remaining evidence "
+                "was not supplied to the model."
+            )
+        return await self._deliver(
+            run,
+            ResearchResult(
+                state="completed" if coverage.complete else "partial",
+                content=result.content.content,
+                citations=self._citations(run, ids),
+                artifacts=[],
+                coverage=coverage,
+                provider_metadata=run.usage.result(),
+            ),
+        )
+
     async def research(self, request, sources, context):
         member = member_service(self, context)
         if member is not None:
@@ -618,6 +696,8 @@ class AgentService:
         run = self._run(sources, context)
         run.research = True
         request = self._request(ResearchRequest, request, run)
+        if getattr(self.model, "deterministic_research", False):
+            return await self._local_research(request, run)
         history = [
             {
                 "role": "user",
