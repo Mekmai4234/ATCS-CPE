@@ -27,7 +27,11 @@ class TeamAdapters(UnavailableAdapters):
     )
 
     def __init__(self, answers, ingestion, agent):
+        from youtube_agent.service import AgentService
+
         self.answers, self.ingestion, self.agent = answers, ingestion, agent
+        # This controller implements fresh-job cache bypass and per-job restart checkpoints.
+        self.fresh_generation = ("artifact", "research") if isinstance(agent, AgentService) else ()
         self.provider_operations = dict(answers.provider_operations)
         answer_mode = (
             "local"
@@ -61,6 +65,9 @@ class TeamAdapters(UnavailableAdapters):
 
     async def index(self, *args):
         return await self.answers.index(*args)
+
+    async def reindex(self, *args):
+        return await self.answers.reindex(*args)
 
     async def delete(self, *args):
         return await self.answers.delete(*args)

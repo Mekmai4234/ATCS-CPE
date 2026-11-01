@@ -15,7 +15,7 @@ from .quota import verified_grant
 from .timing import provider_call
 
 
-def provider_response_schema(schema=GeneratedAnswer):
+def provider_response_schema(schema=GeneratedAnswer, *, citation_ids=()):
     """Keep high-cardinality array bounds out of Gemini's constrained decoder.
 
     The nested 100 statements / 1000 citation IDs limits can make generateContent
@@ -30,7 +30,12 @@ def provider_response_schema(schema=GeneratedAnswer):
             return [compact(item) for item in value]
         return value
 
-    return compact(schema.model_json_schema())
+    result = compact(schema.model_json_schema())
+    if schema is GeneratedAnswer and citation_ids:
+        result["$defs"]["Statement"]["properties"]["citation_ids"]["items"]["enum"] = sorted(
+            set(citation_ids)
+        )
+    return result
 
 
 class GeminiModel:
@@ -87,7 +92,14 @@ class GeminiModel:
                 output_limit or self.settings.answer_max_output_tokens,
             ),
             response_mime_type="application/json",
-            response_json_schema=provider_response_schema(schema),
+            response_json_schema=provider_response_schema(
+                schema,
+                citation_ids=[
+                    cid
+                    for item in payload.get("untrusted_evidence", [])
+                    for cid in item.get("citation_ids", [])
+                ],
+            ),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
         # Gemini 3 Flash shares max_output_tokens between thinking and answer JSON.
