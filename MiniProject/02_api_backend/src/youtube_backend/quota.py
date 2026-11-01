@@ -1,7 +1,7 @@
 """Project-wide durable budgets and an operator-attested, fail-closed Free Tier gate.
 
-Local rolling 60s/24h accounting is conservative admission control, NOT Google's
-remaining balance or reset clock. Consumers must wrap EVERY outbound request,
+Local rolling 60s / Pacific calendar-day accounting is conservative admission
+control, NOT Google's remaining balance. Consumers must wrap EVERY outbound request,
 including countTokens and embedding, through call(). No key rotation/fallback.
 Token counting has its own project-wide request budget, not inference RPM/TPM/RPD.
 """
@@ -12,10 +12,11 @@ import hashlib
 import json
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
 from pydantic import Field, model_validator
@@ -29,6 +30,13 @@ from .schemas import Schema
 # Deliberately below the separate token-counting endpoint limit. Authentication,
 # policy grants, durable leases, FIFO, concurrency and provider circuits still apply.
 COUNT_TOKENS_RPM = 60
+
+
+def daily_window(now):
+    """Provider calendar boundaries, including 23/25-hour DST days."""
+    local = datetime.fromtimestamp(now, ZoneInfo("America/Los_Angeles"))
+    start = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    return start.timestamp(), (start + timedelta(days=1)).timestamp()
 
 
 class Limits(Schema):
@@ -186,6 +194,20 @@ class QuotaBroker:
         ):
             raise AppError("budget_invalid", "Request fingerprint must be SHA256", 422)
         binding = self.repo.check_execution(context.job_id, context.lease_token)
+        from .local_inference import execution_identity
+
+        pinned = binding["payload"].get("execution")
+        if pinned and pinned != execution_identity(self.settings):
+            raise AppError(
+                "execution_changed", "Provider configuration changed; create new work", 409
+            )
+        if pinned and (
+            (endpoint == "embedContent" and pinned["embedding_provider"] == "ollama")
+            or (endpoint == "generateContent" and pinned["provider"] == "ollama")
+        ):
+            raise AppError(
+                "provider_route_denied", "This request is pinned to local inference", 409
+            )
         default_role = (
             "embedding"
             if endpoint == "embedContent" or binding["kind"] == "import"
@@ -213,6 +235,7 @@ class QuotaBroker:
             raise AppError("budget_role_denied", "Operation role exceeds this job's authority", 403)
         policy, grant = self.access(model, endpoint, role)
         limits, now = policy.pools[grant.bucket], self.clock()
+        day_start, day_end = daily_window(now)
         counting = endpoint == "countTokens"
         if not counting and input_tokens > limits.tpm:
             raise AppError(
@@ -292,7 +315,13 @@ class QuotaBroker:
                 for r in c.execute(
                     sa.select(reservations).where(
                         reservations.c.project == policy.project_ref,
-                        reservations.c.created_at > now - 86400,
+                        sa.or_(
+                            reservations.c.created_at >= min(day_start, now - 60),
+                            sa.and_(
+                                reservations.c.state.in_(["held", "sent"]),
+                                reservations.c.expires_at > now,
+                            ),
+                        ),
                         reservations.c.state != "cancelled",
                     )
                 ).mappings()
@@ -311,6 +340,7 @@ class QuotaBroker:
                 ]
             )
             minute = [r for r in pool if r["created_at"] > now - 60]
+            daily = [r for r in pool if r["created_at"] >= day_start or r["state"] == "held"]
             rpm = COUNT_TOKENS_RPM if counting else limits.rpm
             user_rpm = min(limits.user_rpm, COUNT_TOKENS_RPM) if counting else limits.user_rpm
             circuit = db.v2["circuits"]
@@ -334,11 +364,8 @@ class QuotaBroker:
                 .mappings()
                 .first()
             )
-            if not counting and len(pool) >= limits.rpd:
-                # A rolling daily window cannot recover after a one-minute retry.
-                blocked = max(
-                    blocked, sorted(r["created_at"] for r in pool)[len(pool) - limits.rpd] + 86400
-                )
+            if not counting and len(daily) >= limits.rpd:
+                blocked = max(blocked, day_end)
             # Per-member caps plus FIFO within priority classes prevent repeated reacquisition
             # by one hot worker while another member is waiting. Interactive beats background.
             if (
@@ -347,7 +374,7 @@ class QuotaBroker:
                 or sum(r["owner_id"] == job["owner_id"] for r in active)
                 >= self.settings.gemini_user_concurrent
                 or len(minute) >= rpm
-                or (not counting and len(pool) >= limits.rpd)
+                or (not counting and len(daily) >= limits.rpd)
                 or (not counting and sum(r["tokens"] for r in minute) + input_tokens > limits.tpm)
                 or sum(r["owner_id"] == job["owner_id"] for r in minute) >= user_rpm
                 or (first and first["wait_id"] != wait_id)
