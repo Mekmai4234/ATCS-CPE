@@ -238,15 +238,27 @@ async def test_bounded_retries_and_manual_retry(env, monkeypatch):
 
 
 async def test_timeout_cancels_adapter_and_preserves_deadline(env, monkeypatch):
-    env.settings.job_timeout_seconds = 0.05
     cancelled = asyncio.Event()
+    deadlines = []
+    timeout = None
+    real_timeout = asyncio.timeout
+
+    def controlled_timeout(delay):
+        nonlocal timeout
+        timeout = real_timeout(delay)
+        return timeout
 
     async def slow(*args):
+        deadlines.append(args[-1].deadline_at)
         try:
-            await asyncio.sleep(2)
+            # Expire the real worker timeout only after the adapter has entered.
+            # A 50 ms queue/setup deadline can expire before ingest on a loaded runner.
+            timeout.reschedule(asyncio.get_running_loop().time())
+            await asyncio.Event().wait()
         finally:
             cancelled.set()
 
+    monkeypatch.setattr("youtube_backend.worker.asyncio.timeout", controlled_timeout)
     monkeypatch.setattr(env.adapters, "ingest", slow)
     job_id = queue_import(env)
     await env.worker.run_once(job_id)
@@ -255,6 +267,7 @@ async def test_timeout_cancels_adapter_and_preserves_deadline(env, monkeypatch):
     assert result["error_code"] == "task_timeout"
     assert result["state"] == "failed"
     assert result["attempt_count"] == 1
+    assert result["deadline_at"] == deadlines[0]
 
 
 def test_hard_timeout_is_terminal_even_before_wall_clock_deadline(env):
