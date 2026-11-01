@@ -38,7 +38,8 @@ async def installed(settings, *, transport=None):
 
 async def provider_status(repo, runtime, *, transport=None):
     with repo.db.read() as c:
-        repo._actor(c)
+        owner = repo._actor(c)
+        admin = c.scalar(sa.select(db.users.c.role).where(db.users.c.user_id == owner)) == "admin"
         table = db.v2["reservations"]
         active = c.scalar(
             sa.select(sa.func.count())
@@ -114,7 +115,9 @@ async def provider_status(repo, runtime, *, transport=None):
         "regenerate": sorted(
             set(getattr(runtime.adapter, "fresh_generation", ())) & {"artifact", "research"}
         ),
-        "trial_reindex": settings.trial_reindex_enabled
+        "trial_reindex": admin
+        and callable(getattr(runtime.adapter, "reindex", None))
+        and settings.trial_reindex_enabled
         and settings.auth_enabled
         and settings.app_env in {"test", "development"},
     }
