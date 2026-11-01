@@ -14,4 +14,5 @@ import '../src/v5.css';
 import '../src/results-v5.css';
 import '../src/secondary-v5.css';
 import '../src/auth-v5.css';
+import '../src/job-recovery.css';
 createRoot(document.getElementById('root')!).render(<App />);
