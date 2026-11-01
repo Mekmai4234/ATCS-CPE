@@ -74,6 +74,7 @@ async def test_local_answer_uses_existing_evidence_validation_and_one_request(en
     try:
         answer = await env.service.answer(env.request, env.sources, [], env.ctx)
         assert answer.provider_metadata.provider == "ollama"
+        assert answer.provider_metadata.requested_model == "fixture-local:1"
         assert answer.provider_metadata.returned_model == "fixture-local:1"
         assert answer.citations and answer.coverage.complete
         assert len(sent) == 1 and sent[0]["stream"] is False
