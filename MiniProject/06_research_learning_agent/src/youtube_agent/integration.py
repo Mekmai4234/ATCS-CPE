@@ -28,6 +28,8 @@ class RagKnowledge:
 
 
 class AgentAdapters(RagAdapters):
+    fresh_generation = ("artifact", "research")
+
     def __init__(
         self,
         *,
@@ -65,6 +67,21 @@ class AgentAdapters(RagAdapters):
 
     async def artifact(self, request, sources, context):
         return await self.agent.artifact(request, sources, context)
+
+    async def grade_quiz(self, request, context):
+        job = context.repository.check_execution(context.job_id, context.lease_token)
+        if job["kind"] != "quiz_grade":
+            from .models import error
+
+            raise error("invalid_operation", "Use a server-owned quiz grading job", status=403)
+        agent = self.agent.agent if isinstance(self.agent, MemberAgentService) else self.agent
+        result = await agent.model.grade_quiz(
+            request,
+            min(context.settings.llm_timeout_seconds, context.remaining_seconds),
+            context=context,
+        )
+        context.check()
+        return result
 
     async def research_media(self, request, snapshots, context, *, planner=None, vision=None):
         """Internal v2 handoff only. 02 does not publish this through v1 research jobs."""
