@@ -29,6 +29,10 @@ export default function JobRecovery({
   const [loading, setLoading] = useState(true);
   const [worker, setWorker] = useState<boolean>();
   const [resuming, setResuming] = useState<string | null>(null);
+  const incomingIds = liveJobs?.map((job) => job.job_id).join(',') || '';
+  useEffect(() => {
+    if (incomingIds) setRevision((n) => n + 1);
+  }, [incomingIds]);
   const label = (job: RecoverableJob) =>
     job.request.question ||
     job.request.goal ||
@@ -199,12 +203,7 @@ export default function JobRecovery({
           <div className="work-status-item" key={job.job_id}>
             <span>
               {label(job)}
-              <small>
-                {jobStatus(job)}
-                {job.wait?.retry_at || job.wait?.estimated_retry_at
-                  ? ` · พร้อมประมาณ ${new Date((job.wait.retry_at || job.wait.estimated_retry_at)!).toLocaleString('th-TH')}`
-                  : ''}
-              </small>
+              <small>{jobStatus(job)}</small>
             </span>
             <button className="secondary" disabled={locked} onClick={() => open(job)}>
               ดูงาน
@@ -256,14 +255,6 @@ export default function JobRecovery({
                 <div>
                   <strong>{label(job)}</strong>
                   <p>{jobStatus(job)}</p>
-                  {(job.wait?.retry_at || job.wait?.estimated_retry_at) && (
-                    <small>
-                      พร้อมประมาณ{' '}
-                      {new Date((job.wait.retry_at || job.wait.estimated_retry_at)!).toLocaleString(
-                        'th-TH',
-                      )}
-                    </small>
-                  )}
                 </div>
                 {job.retryable && ['failed', 'paused'].includes(job.state) && (
                   <button
