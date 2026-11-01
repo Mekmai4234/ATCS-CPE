@@ -37,6 +37,9 @@
   not established by fixture UI tests. No billing/config/user-database changes.
 
 Validation: unit139, affected recovery/admin browser19, TypeScript, production build
-and Prettier passed. A separate real HTTP quota smoke uses isolated SQLite, real
-backend auth/session and fixture identity/provider; its result is recorded in PR.
+and Prettier passed. Full actual-HTTP identity/feedback/moderation/quiz suite12
+passed with isolated SQLite, real backend auth/session and fixture identity/provider.
+The inherited policy E2E now opens the existing disclosure before checking notice
+visibility; its privacy assertion is retained. This fixes the shared CI finding
+observed on PR55's unchanged frontend base, without changing auth limits or07.
 No source files outside module01 were edited. Merge develop precedes this work.

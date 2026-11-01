@@ -470,6 +470,10 @@ test('real HTTP feedback, moderation confirmation and audited admin review', asy
   test.setTimeout(90000);
   await signIn(page, 'fixture-feedback-review');
   await importOne(page);
+  await page
+    .getByRole('complementary', { name: 'ข้อมูลการใช้แชท', exact: true })
+    .locator('summary')
+    .click();
   await expect(
     page.getByText('บทสนทนาอาจได้รับการตรวจโดยผู้ดูแลเพื่อปรับปรุงบริการ'),
   ).toBeVisible();
