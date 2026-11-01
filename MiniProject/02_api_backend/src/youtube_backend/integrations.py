@@ -33,6 +33,13 @@ class ExecutionContext:
 
         return await QuotaBroker(self.repository).call(self, callback, **request)
 
+    async def local_inference(self, *, model, digest, operation, payload, call_key):
+        from .local_inference import LocalInference
+
+        return await LocalInference(self).call(
+            model=model, digest=digest, operation=operation, payload=payload, call_key=call_key
+        )
+
     @property
     def user_id(self):
         """Trusted durable owner, never a client-supplied request/payload field."""
@@ -63,6 +70,30 @@ class ExecutionContext:
         from .answer_review import stage
 
         stage(self.repository, self.job_id, self.lease_token, signals)
+
+    def checkpoint(self, key, value=None):
+        """Private bounded adapter checkpoint, inherited only by a frozen replacement job."""
+        import json
+
+        from . import database as db
+
+        if not isinstance(key, str) or not 1 <= len(key) <= 100:
+            raise AppError("checkpoint_invalid", "Invalid checkpoint key", 422)
+        self.check()
+        with self.repository.db.write() as c:
+            job = self.repository._owned(c, self.job_id, self.lease_token)
+            saved = dict(job["payload"].get("adapter_checkpoints", {}))
+            if value is None:
+                return saved.get(key)
+            saved[key] = value
+            if len(json.dumps(saved).encode()) > 512_000:
+                raise AppError("checkpoint_invalid", "Checkpoint budget exceeded", 422)
+            c.execute(
+                db.jobs.update()
+                .where(db.jobs.c.job_id == self.job_id)
+                .values(payload=dict(job["payload"], adapter_checkpoints=saved))
+            )
+            return value
 
 
 class Adapters(Protocol):

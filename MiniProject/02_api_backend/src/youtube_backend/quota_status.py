@@ -10,7 +10,7 @@ from pydantic import Field
 from . import database as db
 from .admin import require_admin
 from .errors import AppError
-from .quota import COUNT_TOKENS_RPM, Limits, QuotaBroker
+from .quota import COUNT_TOKENS_RPM, Limits, QuotaBroker, daily_window
 from .repository import iso
 from .schemas import Schema
 from .workspace import worker_status
@@ -24,12 +24,16 @@ class QuotaBlocker(Schema):
 
 
 class QuotaUsage(Schema):
+    requests_provider_day: int = Field(default=0, ge=0)
     requests_24h: int = Field(ge=0)
     requests_60s: int = Field(ge=0)
     tokens_60s: int = Field(ge=0)
 
 
 class QuotaPool(Schema):
+    daily_reset_at: datetime | None = None
+    daily_timezone: str = "America/Los_Angeles"
+    remaining_requests_provider_day: int | None = Field(default=None, ge=0)
     bucket: str
     status: Literal["waiting", "available"]
     usage: QuotaUsage
@@ -52,6 +56,7 @@ class QuotaStatus(Schema):
 
 def quota_status(repo, *, admin=False, clock=time.time):
     now = clock()
+    day_start, day_end = daily_window(now)
     with repo.db.read() as c:
         owner = repo._actor(c)
         if owner is None:
@@ -83,7 +88,13 @@ def quota_status(repo, *, admin=False, clock=time.time):
             for r in c.execute(
                 sa.select(reservations).where(
                     reservations.c.project == policy.project_ref,
-                    reservations.c.created_at > now - 86400,
+                    sa.or_(
+                        reservations.c.created_at >= min(day_start, now - 86400),
+                        sa.and_(
+                            reservations.c.state.in_(["held", "sent"]),
+                            reservations.c.expires_at > now,
+                        ),
+                    ),
                     reservations.c.state != "cancelled",
                 )
             ).mappings()
@@ -100,6 +111,7 @@ def quota_status(repo, *, admin=False, clock=time.time):
     for name, limits in policy.pools.items():
         pool = [r for r in rows if r["bucket"] == name and r["endpoint"] != "countTokens"]
         minute = [r for r in pool if r["created_at"] > now - 60]
+        daily = [r for r in pool if r["created_at"] >= day_start or r["state"] == "held"]
         own_minute = [r for r in minute if r["owner_id"] == owner]
         active = [r for r in rows if r["state"] in {"held", "sent"} and r["expires_at"] > now]
         blockers = []
@@ -113,11 +125,8 @@ def quota_status(repo, *, admin=False, clock=time.time):
                 )
             )
 
-        if len(pool) >= limits.rpd:
-            block(
-                "local_daily_limit",
-                sorted(r["created_at"] for r in pool)[len(pool) - limits.rpd] + 86400,
-            )
+        if len(daily) >= limits.rpd:
+            block("local_daily_limit", day_end)
         if len(minute) >= limits.rpm:
             block(
                 "local_request_limit",
@@ -154,9 +163,13 @@ def quota_status(repo, *, admin=False, clock=time.time):
         visible = pool if admin else [r for r in pool if r["owner_id"] == owner]
         item = dict(
             bucket=name,
+            daily_reset_at=iso(day_end),
             status="waiting" if blockers else "available",
             usage=dict(
-                requests_24h=len(visible),
+                requests_24h=sum(r["created_at"] > now - 86400 for r in visible),
+                requests_provider_day=sum(
+                    r["created_at"] >= day_start or r["state"] == "held" for r in visible
+                ),
                 requests_60s=sum(r["created_at"] > now - 60 for r in visible),
                 tokens_60s=sum(r["tokens"] for r in visible if r["created_at"] > now - 60),
             ),
@@ -164,7 +177,10 @@ def quota_status(repo, *, admin=False, clock=time.time):
         )
         if admin:
             item["limits"] = limits.model_dump()
-            item["remaining_requests_24h"] = max(0, limits.rpd - len(pool))
+            item["remaining_requests_24h"] = max(
+                0, limits.rpd - sum(r["created_at"] > now - 86400 for r in pool)
+            )
+            item["remaining_requests_provider_day"] = max(0, limits.rpd - len(daily))
         result["pools"].append(item)
     return dict(
         result,
