@@ -21,7 +21,7 @@ async def test_saved_answer_survives_lru_loss_and_never_calls_generation(integra
     restored = env.repo.get_job(second.json()["job_id"])
     assert restored["state"] == "completed", restored
     assert restored["result"]["answer"] == original["result"]["answer"]
-    assert restored["result"]["provider_metadata"]["provider"] == "saved-answer-cache"
+    assert restored["result"]["provider_metadata"]["provider"] == "answer-cache"
     assert restored["result"]["assistant_message_id"] != original["result"]["assistant_message_id"]
     assert restored["conversation_id"] != original["conversation_id"]
     third = await env.client.post("/api/chat", json={**body, "question": "A different question"})
