@@ -1,4 +1,5 @@
 import QuizContent from './Quiz';
+import ProviderNotice from './ProviderNotice';
 import { StoredFeedback } from './feedbackSession';
 import { useState } from 'react';
 import { citationUrl, timestamp } from './domain';
@@ -247,9 +248,7 @@ export function ResultView({
       {result.sources_available === false && (
         <p className="notice warning">แหล่งข้อมูลเดิมถูกลบหรือเปลี่ยนแปลงแล้ว</p>
       )}
-      {result.provider_metadata?.provider === 'fixture' && (
-        <span className="tag">คำตอบสังเคราะห์ · ไม่ใช่ AI จริง</span>
-      )}
+      <ProviderNotice metadata={result.provider_metadata} />
       <div className={illustrated ? 'v5r-answer-layout' : 'v5r-answer-plain'}>
         <div className="v5r-answer-copy">
           {illustrated && (

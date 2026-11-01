@@ -4,6 +4,7 @@ import {
   citationUrl,
   jobStatus,
   jobWarning,
+  retryTime,
   terminal,
   videoIdFromUrl,
 } from '../src/domain';
@@ -63,6 +64,12 @@ describe('YouTube and citation validation', () => {
   });
 });
 describe('source scope', () => {
+  it('never labels a bridge estimate as provider evidence', () => {
+    const value = retryTime({}, '2099-01-01T00:00:00Z');
+    expect(value).toContain('เป็นเวลาประมาณของระบบ');
+    expect(value).not.toContain('ผู้ให้บริการระบุ');
+    expect(retryTime({ time_source: 'provider', retry_at: 'invalid' })).toBe('');
+  });
   it.each(['failed', 'cancelled', 'completed', 'partial'])(
     'shows terminal %s rather than a stale processing stage or retry time',
     (state) => {
@@ -127,7 +134,7 @@ describe('source scope', () => {
       jobWarning({ state: 'failed', error_code: 'generation_provider_busy' } as Job),
     ).toContain('ไม่พร้อมให้บริการชั่วคราว');
     expect(jobWarning({ state: 'failed', error_code: 'generation_rate_limited' } as Job)).toContain(
-      'มีคำขอจำนวนมาก',
+      'ผู้ให้บริการจำกัดการใช้งาน',
     );
     expect(
       jobWarning({ state: 'queued', error_code: 'generation_provider_busy' } as Job),
