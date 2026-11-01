@@ -24,7 +24,7 @@ from youtube_backend.schemas import (
 from youtube_backend.urls import canonical_url
 
 from .authorization import member_service
-from .gemini import GeminiModel, byte_size, json_text
+from .gemini import GeminiModel, byte_size, json_text, wire_evidence
 from .models import TOOL_MODELS, Usage, error
 
 CONTENTS = {"study_plan": StudyPlanContent, "quiz": QuizContent, "flashcards": FlashcardsContent}
@@ -245,9 +245,9 @@ class AgentService:
         return [allowed[i] for i in ids]
 
     def _input_fits(self, payload):
-        # Reserve half for instructions, native model signatures, tools and output schemas.
-        # Live preflight counts native contents and reserves configuration byte overhead.
-        if byte_size(payload) > self.settings.max_context_tokens // 2:
+        # Byte packing is a coarse transport guard, not a token count.
+        # Gemini counts actual input tokens plus configuration before any generation.
+        if byte_size(payload) > self.settings.max_context_tokens * 3:
             raise error("context_budget_exceeded", "Evidence/history exceeds local byte guard")
 
     async def _inventory(self, run):
@@ -277,7 +277,7 @@ class AgentService:
             records.update({e.chunk_id: e for e in batch})
             try:
                 self._input_fits(
-                    {"request": request, "evidence": [e.model_dump() for e in records.values()]}
+                    {"request": request, "evidence": [wire_evidence(e) for e in records.values()]}
                 )
             except AppError as exc:
                 if exc.code != "context_budget_exceeded":
@@ -302,10 +302,10 @@ class AgentService:
                             byte_size(
                                 {
                                     "request": request,
-                                    "evidence": [e.model_dump() for e in candidate.values()],
+                                    "evidence": [wire_evidence(e) for e in candidate.values()],
                                 }
                             )
-                            <= self.settings.max_context_tokens // 2
+                            <= self.settings.max_context_tokens * 3
                         ):
                             records = candidate
                 self._remember(run, list(records.values()))
@@ -324,17 +324,54 @@ class AgentService:
         schema = CONTENTS[request["type"]]
         if run.research and run.model_calls >= self.settings.agent_max_model_calls - 1:
             raise error("agent_budget_exhausted", "Preserving the final answer model allowance")
-        generated = await self._bounded(
-            run,
-            lambda timeout: self.model.generate(
-                request,
-                list(records.values()),
-                schema,
-                timeout,
-                **({"context": run.context} if isinstance(self.model, GeminiModel) else {}),
-            ),
-            model=True,
-        )
+
+        async def generate_selected():
+            return await self._bounded(
+                run,
+                lambda timeout: self.model.generate(
+                    request,
+                    list(records.values()),
+                    schema,
+                    timeout,
+                    **({"context": run.context} if isinstance(self.model, GeminiModel) else {}),
+                ),
+                model=True,
+            )
+
+        try:
+            generated = await generate_selected()
+        except AppError as exc:
+            if exc.code != "context_budget_exceeded":
+                raise
+            selected = {}
+            for source in run.sources:
+                hits = await self._bounded(
+                    run,
+                    lambda _, source=source: self.knowledge.search(
+                        request.get("topic") or "main concepts key points",
+                        [source],
+                        run.context,
+                        top_k=8,
+                    ),
+                )
+                for hit in hits:
+                    record = self._records(run, [hit.chunk.evidence()])[0]
+                    candidate = {**selected, record.chunk_id: record}
+                    if (
+                        byte_size(
+                            {
+                                "request": request,
+                                "evidence": [wire_evidence(e) for e in candidate.values()],
+                            }
+                        )
+                        <= self.settings.max_context_tokens * 3
+                    ):
+                        selected = candidate
+            if not selected or set(selected) == set(records):
+                raise
+            records = selected
+            self._remember(run, list(records.values()))
+            generated = await generate_selected()
         run.usage.add(generated.metadata)
         try:
             content = schema.model_validate(generated.content)
@@ -402,21 +439,33 @@ class AgentService:
                 ),
             )
             records = self._records(run, [h.chunk.evidence() for h in hits])
-            observation = {"evidence": [e.model_dump() for e in records]}
+            observation = {"evidence": [wire_evidence(e) for e in records]}
         elif name == "read_video_chunks":
             sources = self._subset(run, args.video_ids)
-            page = await self._bounded(
-                run,
-                lambda _: self.knowledge.read(
-                    sources, run.context, limit=args.limit, cursor=args.cursor
-                ),
-            )
-            records = self._records(run, [e.evidence() for e in page.items], sources=sources)
-            observation = {
-                "evidence": [e.model_dump() for e in records],
-                "next_cursor": page.next_cursor,
-                "total": page.total,
-            }
+            limit = args.limit
+            while True:
+                page = await self._bounded(
+                    run,
+                    lambda _, limit=limit: self.knowledge.read(
+                        sources,
+                        run.context,
+                        limit=limit,
+                        cursor=args.cursor,
+                    ),
+                )
+                records = self._records(run, [e.evidence() for e in page.items], sources=sources)
+                observation = {
+                    "evidence": [wire_evidence(e) for e in records],
+                    "next_cursor": page.next_cursor,
+                    "total": page.total,
+                }
+                try:
+                    self._input_fits(observation)
+                    break
+                except AppError as exc:
+                    if exc.code != "context_budget_exceeded" or limit == 1:
+                        raise
+                    limit = max(1, limit // 2)
         elif name == "compare_videos":
             sources = self._subset(run, args.video_ids)
             if self.analyzer is None:
@@ -464,7 +513,7 @@ class AgentService:
                 "status": answer.status,
                 "citations": [c.model_dump() for c in answer.citations],
                 "coverage": answer.coverage.model_dump(),
-                "evidence": [e.model_dump() for e in records],
+                "evidence": [wire_evidence(e) for e in records],
             }
         else:
             artifact_request = ArtifactRequest(
@@ -481,6 +530,15 @@ class AgentService:
                 "created": True,
                 "citation_ids": [c.citation_id for c in artifact.citations],
             }
+        if name == "search_evidence":
+            while (
+                len(records) > 1 and byte_size(observation) > self.settings.max_context_tokens * 3
+            ):
+                records.pop()
+                observation = {
+                    "evidence": [wire_evidence(e) for e in records],
+                    "budget_limited": True,
+                }
         self._input_fits(observation)
         self._remember(run, records)
         run.pending.update(e.chunk_id for e in records)

@@ -63,11 +63,15 @@ class Worker:
             return
         if kind == "import":
             self.repo.stage(job_id, token, "fetching_transcript")
-            transcript = TranscriptResult.model_validate(
-                await self.adapters.ingest(job["video_id"], context)
-            )
-            context.check()
-            source = self.repo.save_transcript(job_id, token, transcript)
+            checkpoint = self.repo.import_checkpoint(job_id, token)
+            if checkpoint is None:
+                transcript = TranscriptResult.model_validate(
+                    await self.adapters.ingest(job["video_id"], context)
+                )
+                context.check()
+                source = self.repo.save_transcript(job_id, token, transcript)
+            else:
+                source, transcript = checkpoint
             self.repo.stage(job_id, token, "indexing")
             receipt = IndexReceipt.model_validate(
                 await self.adapters.index(source, transcript, context)
@@ -97,13 +101,50 @@ class Worker:
         sources = [Source.model_validate(s) for s in payload["sources"]]
         request = payload["request"]
         state = "completed"
+        if kind == "quiz_grade":
+            from .schemas import QuizGradeContent
+
+            method = getattr(self.adapters, "grade_quiz", None)
+            if not callable(method):
+                raise AppError("grading_unavailable", "Quiz grading adapter is not installed", 503)
+            graded = QuizGradeContent.model_validate(await method(request, context))
+            if len(graded.marks) != len(request["questions"]):
+                raise AppError("invalid_grading", "Grading result count does not match quiz", 502)
+            marks = [mark.model_dump() for mark in graded.marks]
+            for answer, mark in zip(request["answers"], marks, strict=True):
+                if not answer.strip():
+                    mark.update(correct=False, feedback="ยังไม่ได้ตอบข้อนี้")
+            self.repo.finish(
+                job_id,
+                token,
+                dict(
+                    artifact_id=request["artifact_id"],
+                    marks=marks,
+                    correct=sum(mark["correct"] for mark in marks),
+                    total=len(marks),
+                    answers=request["answers"],
+                ),
+            )
+            return
         if kind == "chat":
             from .moderation import check_execution
 
             check_execution(self.repo, job)
-            result = AnswerResult.model_validate(
-                await self.adapters.answer(request, sources, payload["history"], context)
+            method = (
+                self.adapters.companion
+                if request.get("mode") == "general"
+                else self.adapters.answer
             )
+            result = AnswerResult.model_validate(
+                await method(request, sources, payload["history"], context)
+            )
+            if request.get("mode") == "general":
+                if result.citations or result.coverage.expected_videos != 0:
+                    raise AppError(
+                        "invalid_grading", "General chat cannot claim video evidence", 502
+                    )
+                self.repo.finish(job_id, token, result.model_dump(mode="json"))
+                return
         elif kind == "analysis":
             result = AnswerResult.model_validate(
                 await self.adapters.analyze(request, sources, context)

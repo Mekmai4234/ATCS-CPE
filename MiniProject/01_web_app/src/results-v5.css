@@ -661,3 +661,18 @@ body .v5r-result h4 {
     animation: none;
   }
 }
+
+.quiz-score {
+  border-radius: 24px;
+  padding: 28px;
+  background: #d5f5e9;
+  color: #083d3b;
+  text-align: center;
+}
+.quiz-score > strong {
+  font-size: clamp(40px, 5vw, 64px);
+  line-height: 1.2;
+}
+.v5r-quiz-content .learning-item {
+  overflow-wrap: anywhere;
+}

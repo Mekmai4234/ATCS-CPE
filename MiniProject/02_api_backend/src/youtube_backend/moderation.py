@@ -58,7 +58,13 @@ def classify(text):
 
 
 def request_digest(request):
-    return digest({k: v for k, v in request.items() if k != "moderation_token"})
+    return digest(
+        {
+            k: v
+            for k, v in request.items()
+            if k != "moderation_token" and not (k == "mode" and v == "video")
+        }
+    )
 
 
 def add_event(

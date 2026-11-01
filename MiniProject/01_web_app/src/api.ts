@@ -282,9 +282,9 @@ export class Api {
     this.mediaSnapshots.set(videoId, data);
     return data;
   }
-  async memberJobs(includeCompleted = false, offset = 0, signal?: AbortSignal) {
+  async memberJobs(includeCompleted = false, offset = 0, signal?: AbortSignal, limit = 50) {
     const { data } = await this.request<Page<import('./types').RecoverableJob>>(
-      `/api/member/jobs?limit=50&offset=${offset}&include_completed=${includeCompleted}`,
+      `/api/member/jobs?limit=${limit}&offset=${offset}&include_completed=${includeCompleted}`,
       { signal },
     );
     if (

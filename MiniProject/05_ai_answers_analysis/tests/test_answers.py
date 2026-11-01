@@ -16,7 +16,7 @@ async def test_answer_scoped_citations_metadata_and_ranked_coverage(env):
     assert result.citations[0].url == f"https://www.youtube.com/watch?v={VIDEO_A}&t=0s"
     assert result.citations[0].citation_id == "1" and "[1]" in result.answer
     assert result.coverage.processed_chunks == 1
-    assert not result.coverage.complete  # Ranked search never claims a full analysis.
+    assert result.coverage.complete  # The single supplied chunk is the entire indexed scope.
     assert result.provider_metadata.provider == "fixture"
 
 
@@ -98,6 +98,7 @@ async def test_transcript_injection_is_untrusted_payload(env):
         "request",
         "untrusted_history",
         "untrusted_evidence",
+        "source_titles",
     }
 
 
@@ -270,7 +271,7 @@ def test_uncited_or_invalid_output_schema(data):
 
 async def test_qa_trims_low_ranked_chunks_and_reports_measured_coverage(env):
     env.config.max_context_tokens = 6000
-    env.knowledge.chunks = [chunk(i, text="RAG evidence " * 90) for i in range(5)]
+    env.knowledge.chunks = [chunk(i, text="RAG evidence " * 300) for i in range(5)]
     env.knowledge.hits = env.knowledge.chunks
     result = await env.service.answer(env.request, env.sources, [], env.ctx)
     assert 0 < result.coverage.processed_chunks < 5
@@ -278,7 +279,7 @@ async def test_qa_trims_low_ranked_chunks_and_reports_measured_coverage(env):
 
 
 async def test_single_oversized_evidence_fails_without_generation(env):
-    env.knowledge.chunks = env.knowledge.hits = [chunk(text="x" * 30000)]
+    env.knowledge.chunks = env.knowledge.hits = [chunk(text="x" * 100000)]
     with pytest.raises(AppError) as caught:
         await env.service.answer(env.request, env.sources, [], env.ctx)
     assert caught.value.code == "context_budget_exceeded" and not env.model.payloads
@@ -323,12 +324,14 @@ async def test_recursive_synthesis_compresses_multiple_levels(env):
     from youtube_answers.models import Generated
 
     env.config.max_context_tokens = 6000
-    env.knowledge.chunks = [chunk(i, text="RAG evidence " * 100) for i in range(20)]
+    env.knowledge.chunks = [chunk(i, text="RAG evidence " * 300) for i in range(20)]
 
     async def compress(data, timeout):
         env.model.payloads.append(data)
         refs = list(dict.fromkeys(c for n in data["untrusted_evidence"] for c in n["citation_ids"]))
-        text = "Evidence finding. " * 75 if data["task"] == "summarize_batch" else "Merged finding."
+        text = (
+            "Evidence finding. " * 225 if data["task"] == "summarize_batch" else "Merged finding."
+        )
         return Generated(
             GeneratedAnswer.model_validate(
                 {
@@ -414,3 +417,15 @@ async def test_insufficient_retrieval_expands_evidence_without_new_embedding(env
     assert calls == 2
     assert len(env.knowledge.queries) == 1
     assert any(c.chunk_id == "extra-chunk" for c in result.citations)
+
+
+async def test_complete_short_thai_clip_avoids_remote_search_and_credits_all_chunks(env):
+    async def no_shortcut(*args):
+        return None
+
+    env.knowledge.short_context = no_shortcut
+    env.knowledge.chunks = [chunk(i, text="การค้นข้อมูลช่วยให้ตอบจากหลักฐาน " * 6) for i in range(74)]
+    result = await env.service.answer(env.request, env.sources, [], env.ctx)
+    assert result.coverage.complete and result.coverage.processed_chunks == 74
+    assert not env.knowledge.queries
+    assert "Limitations:" not in result.answer
