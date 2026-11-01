@@ -14,7 +14,25 @@ def _replacement(repo, c, old, key):
     existing = repo._replay_job(c, key, request_digest(old["payload"]["request"]))
     if existing and existing["payload"]["sources"] != old["payload"]["sources"]:
         raise AppError("idempotency_conflict", "Replacement sources differ from original work", 409)
-    return existing
+    seen = {old["job_id"]}
+    for _ in range(100):
+        if not existing:
+            return None
+        repo._private(c, existing)
+        if existing["job_id"] in seen:
+            raise AppError("replacement_cycle", "Invalid replacement chain", 409)
+        seen.add(existing["job_id"])
+        following = repo._replay_job(
+            c,
+            digest([existing["owner_id"], "explicit-resume", existing["job_id"]]),
+            request_digest(existing["payload"]["request"]),
+        )
+        if not following:
+            return existing
+        if following["payload"]["sources"] != old["payload"]["sources"]:
+            raise AppError("idempotency_conflict", "Replacement sources changed", 409)
+        existing = following
+    raise AppError("replacement_chain_limit", "Replacement chain is too long", 409)
 
 
 def resume(repo, job_id, moderation_token=None):
@@ -38,15 +56,17 @@ def resume(repo, job_id, moderation_token=None):
 
         ticket_id = admit(repo, dict(old["payload"]["request"], moderation_token=moderation_token))
     original_hash = request_digest(old["payload"]["request"])
-    state = quota_status(repo)
-    _, grant = QuotaBroker(repo).access(
-        repo.settings.llm_model,
-        "generateContent",
-        "agent" if old["kind"] in {"research", "artifact", "quiz_grade"} else "chat",
-    )
-    pools = [p for p in state["pools"] if p["bucket"] == grant.bucket]
-    if state["status"] == "unverified" or not pools or pools[0]["status"] != "available":
-        raise AppError("quota_unavailable", "Local budget or verified policy is not ready", 409)
+    from .local_inference import execution_identity
+
+    execution = old["payload"].get("execution")
+    if execution and execution != execution_identity(repo.settings):
+        raise AppError("execution_changed", "Provider configuration changed; create new work", 409)
+    if (execution or {}).get("provider") == "ollama":
+        state = None  # Local capacity is admitted atomically by the local execution broker.
+    else:
+        state = quota_status(repo)
+    if state is not None:
+        _require_gemini_budget(repo, old, state)
     with repo.db.write() as c:
         old = row(c, db.jobs, db.jobs.c.job_id == job_id)
         repo._private(c, old)
@@ -102,3 +122,14 @@ def resume(repo, job_id, moderation_token=None):
                 )
             )
         return job
+
+
+def _require_gemini_budget(repo, old, state):
+    _, grant = QuotaBroker(repo).access(
+        repo.settings.llm_model,
+        "generateContent",
+        "agent" if old["kind"] in {"research", "artifact", "quiz_grade"} else "chat",
+    )
+    pools = [p for p in state["pools"] if p["bucket"] == grant.bucket]
+    if state["status"] == "unverified" or not pools or pools[0]["status"] != "available":
+        raise AppError("quota_unavailable", "Local budget or verified policy is not ready", 409)
