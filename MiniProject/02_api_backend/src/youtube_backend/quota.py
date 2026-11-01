@@ -578,7 +578,7 @@ class QuotaBroker:
             if isinstance(error, TimeoutError):
                 from .provider_errors import provider_error
 
-                normalized = provider_error(504)
+                normalized = provider_error(504, origin="timeout")
                 self.settle(permit, error=normalized, unsent=not dispatched)
                 raise normalized from None
             self.settle(

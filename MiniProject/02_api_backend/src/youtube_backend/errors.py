@@ -14,6 +14,8 @@ class AppError(Exception):
         retry_after_seconds=None,
         retry_time_source=None,
         pause=False,
+        failure_origin=None,
+        provider_status=None,
     ):
         self.code = code
         self.message = message
@@ -29,6 +31,16 @@ class AppError(Exception):
             retry_time_source if retry_time_source in {"provider", "estimate"} else None
         )
         self.pause = pause
+        self.failure_origin = (
+            failure_origin if failure_origin in {"http", "transport", "timeout"} else None
+        )
+        self.provider_status = (
+            provider_status
+            if self.failure_origin == "http"
+            and type(provider_status) is int
+            and 100 <= provider_status <= 599
+            else None
+        )
         super().__init__(message)
 
 
