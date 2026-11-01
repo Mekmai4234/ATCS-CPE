@@ -18,7 +18,7 @@ describe('public service error messages', () => {
     },
   );
   it('retains retry guidance without exposing provider or HTTP diagnostics', () => {
-    expect(serviceMessage('generation_rate_limited', 429)).toBe(userMessages.busy);
+    expect(serviceMessage('generation_rate_limited', 429)).toBe(userMessages.providerLimited);
     expect(serviceMessage('provider_unavailable', 503)).toBe(userMessages.unavailable);
     expect(serviceMessage('unrecognized_backend_error', 502)).toBe(userMessages.unavailable);
     expect(jobWarning({ state: 'failed', error_code: 'database_internal_detail' } as Job)).toBe(
