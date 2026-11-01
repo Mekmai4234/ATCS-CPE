@@ -123,6 +123,7 @@ export interface TaskResult extends Partial<Answer> {
   artifact_ids?: string[];
 }
 export interface Job {
+  execution?: { provider?: string | null; model?: string | null; version?: string | null } | null;
   created_at?: string;
   updated_at?: string;
   wait?: {

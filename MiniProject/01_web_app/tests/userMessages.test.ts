@@ -5,6 +5,13 @@ import type { Job } from '../src/types';
 import { serviceMessage, userMessages } from '../src/userMessages';
 
 describe('public service error messages', () => {
+  it('explains local queue, model mismatch and text-only capability without Google quota claims', () => {
+    expect(serviceMessage('local_busy', 429)).toContain('คิว AI ในเครื่องเต็ม');
+    expect(serviceMessage('local_model_changed', 503)).toContain('ไม่ตรงกับรุ่น');
+    expect(serviceMessage('local_unsupported', 409)).toContain('ข้อความเท่านั้น');
+    expect(serviceMessage('execution_changed', 409)).toContain('เปลี่ยนไป');
+    expect(serviceMessage('local_busy', 429)).not.toContain('Google');
+  });
   it.each(['free_tier_unverified', 'free_model_unverified', 'quota_pending'])(
     'keeps %s out of failed and paused task copy',
     (code) => {
