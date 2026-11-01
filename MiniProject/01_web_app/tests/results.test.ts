@@ -2,7 +2,31 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { ResultView } from '../src/Results';
+import ProviderNotice from '../src/ProviderNotice';
 import type { TaskResult } from '../src/types';
+
+it.each([
+  ['gemini', 'Gemini'],
+  ['ollama', 'AI ในเครื่อง'],
+  ['answer-cache', 'ผลที่บันทึกไว้ (cache)'],
+  ['unknown', 'ยังไม่ทราบผู้ให้บริการ'],
+])('displays observed provider %s without guessing', (provider, expected) => {
+  const html = renderToStaticMarkup(
+    createElement(ProviderNotice, {
+      metadata: {
+        provider,
+        requested_model: 'requested',
+        returned_model: 'actual',
+        latency_ms: 123.4,
+      },
+    }),
+  );
+  expect(html).toContain(expected);
+  expect(html).toContain('actual');
+  if (provider === 'answer-cache') expect(html).not.toContain('123 ms');
+  else expect(html).toContain('123 ms');
+  expect(html).not.toContain('requested');
+});
 
 const result: TaskResult = {
   status: 'insufficient_evidence',

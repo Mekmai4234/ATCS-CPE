@@ -16,7 +16,7 @@ from .models import error
 from .quota import ExecutionBroker
 from .reuse import reuse_configuration
 from .service import AnswerService
-from .timing import timed_stage
+from .timing import measured_operation, timed_stage
 
 
 class RagKnowledge:
@@ -100,6 +100,7 @@ class AnswerAdapters(RagAdapters):
         self.answers = AnswerService(config, gateway, RagKnowledge(self.rag))
         self.answer_reuse = OrderedDict()
 
+    @measured_operation("chat")
     @timed_stage("total")
     async def answer(self, request, sources, history, context):
         from youtube_backend.repository import digest
@@ -210,6 +211,7 @@ class AnswerAdapters(RagAdapters):
             result.coverage.notes.append(video_note)
         return result
 
+    @measured_operation("analysis")
     async def analyze(self, request, sources, context):
         if isinstance(getattr(self.answers.model, "broker", None), ExecutionBroker):
             with self.answers.model.broker.bind(context):

@@ -79,7 +79,12 @@ export interface Answer {
   coverage: Coverage;
   conversation_id?: string;
   sources_available?: boolean;
-  provider_metadata?: { provider: string; requested_model: string; returned_model?: string | null };
+  provider_metadata?: {
+    provider: string;
+    requested_model: string;
+    returned_model?: string | null;
+    latency_ms?: number;
+  };
   mode?: string;
 }
 export interface SourceSnapshot {
