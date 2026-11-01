@@ -24,7 +24,8 @@ class RagAdapters(UnavailableAdapters):
                 "fixture_forbidden", "Fixture embeddings are restricted to development/test"
             )
         self.provider_operations = {
-            "index": "gemini-broker-v1" if config.embedding_provider == "gemini" else "local"
+            name: "gemini-broker-v1" if config.embedding_provider == "gemini" else "local"
+            for name in ("index", "reindex")
         }
         self.rag = RagService(
             config,
@@ -37,6 +38,17 @@ class RagAdapters(UnavailableAdapters):
 
     async def index(self, source, transcript, context):
         return await self.rag.index(source, transcript, BackendExecution(context))
+
+    async def reindex(self, source, transcript, context):
+        execution = BackendExecution(context)
+        job = context.repository.check_execution(context.job_id, context.lease_token)
+        if job["kind"] != "reindex":
+            raise error(
+                "invalid_operation", "Use a dedicated authenticated trial reindex job", status=403
+            )
+        return await self.rag.index(
+            source, transcript, execution, allow_reindex=True, preserve_previous=True
+        )
 
     async def index_media(self, snapshot, context, *, semantic=True):
         return await self.rag.media.index(snapshot, BackendExecution(context), semantic=semantic)
