@@ -569,7 +569,14 @@ test('saved quiz is graded through real API and its score reopens without anothe
   await expect(page.getByText('ค้นจากเอกสารก่อนสร้างคำตอบ', { exact: true })).toBeVisible();
   expect(submissions).toBe(1);
   await page.reload();
-  await page.getByRole('button', { name: 'ดูงานล่าสุด', exact: true }).click();
+  await page.getByRole('button', { name: 'ดูงานทั้งหมด', exact: true }).click();
+  const jobs = page.getByRole('dialog', { name: 'งานของฉัน', exact: true });
+  await jobs.getByRole('tab', { name: 'ประวัติ', exact: true }).click();
+  await jobs
+    .locator('article')
+    .filter({ has: page.getByRole('heading', { name: 'ตรวจแบบทดสอบ', exact: true }) })
+    .getByRole('button', { name: 'ดูผลลัพธ์', exact: true })
+    .click();
   await expect(page.getByText('ถูก 1 ข้อ · ผิด 0 ข้อ', { exact: true })).toBeVisible();
   expect(submissions).toBe(1);
 });
