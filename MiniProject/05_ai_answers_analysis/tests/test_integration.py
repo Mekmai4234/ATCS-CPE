@@ -81,7 +81,7 @@ class ComparisonAgentModel:
 
 
 @pytest.fixture
-async def integrated(tmp_path):
+async def integrated(tmp_path, request):
     settings = Settings(
         _env_file=None,
         app_env="test",
@@ -89,7 +89,7 @@ async def integrated(tmp_path):
         session_cookie_secure=False,
         google_client_id="05-offline-client",
         adapter_mode="custom",
-        adapter_factory="youtube_answers.integration:create_adapters",
+        adapter_factory=getattr(request, "param", "youtube_answers.integration:create_adapters"),
         database_url=f"sqlite:///{(tmp_path / 'app.db').as_posix()}",
         job_lease_seconds=120,
         job_retry_base_seconds=0,
