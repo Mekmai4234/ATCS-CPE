@@ -95,6 +95,7 @@ class LocalInference:
             not enabled
             or (model, digest) != expected
             or not model
+            or "cloud" in model.lower()
             or not re.fullmatch(r"[a-f0-9]{64}", digest)
         ):
             raise AppError("local_configuration", "Pin an enabled local model and digest", 503)
@@ -102,6 +103,7 @@ class LocalInference:
         if forbidden.intersection(payload) or len(json.dumps(payload).encode()) > 256_000:
             raise AppError("local_input_too_large", "Invalid or oversized local request", 422)
         identity = execution_identity(settings)
+        base_url = private_url(settings.local_base_url)
         table = db.v2["reservations"]
         permit = str(uuid4())
         key = hashlib.sha256(call_key.encode()).hexdigest()
@@ -110,6 +112,13 @@ class LocalInference:
         # It never enters a Gemini project's quota/circuit or policy pin.
         with self.repo.db.write() as c:
             job = self.repo._owned(c, self.context.job_id, self.context.lease_token)
+            allowed = {"chat", "analysis", "research", "artifact", "quiz_grade"}
+            if operation == "embed":
+                allowed |= {"import", "enrich"}
+                if settings.embedding_model != model:
+                    raise AppError("local_configuration", "Embedding model pin differs", 503)
+            if job["kind"] not in allowed:
+                raise AppError("invalid_operation", "Local operation exceeds job authority", 403)
             if not job["owner_id"]:
                 raise AppError("authentication_required", "Local execution needs a member", 401)
             if job["payload"].get("execution") != identity:
@@ -130,7 +139,7 @@ class LocalInference:
                 .select_from(table)
                 .where(
                     table.c.project == "local:ollama",
-                    table.c.state == "sent",
+                    table.c.state.in_(["held", "sent", "uncertain"]),
                     table.c.expires_at > now,
                 )
             )
@@ -156,20 +165,20 @@ class LocalInference:
                     job_id=job["job_id"],
                     lease_token=self.context.lease_token,
                     call_key=key,
-                    state="sent",
+                    state="held",
                     tokens=0,
                     created_at=now,
                     expires_at=min(job["deadline_at"], now + settings.llm_timeout_seconds),
                     returned_allowlist=[model],
                 )
             )
-        state = "uncertain"
+        state, dispatched = "uncertain", False
         try:
             async with asyncio.timeout(
                 min(self.context.remaining_seconds, settings.llm_timeout_seconds)
             ):
                 async with httpx.AsyncClient(
-                    base_url=private_url(settings.local_base_url),
+                    base_url=base_url,
                     transport=self.transport,
                     trust_env=False,
                     follow_redirects=False,
@@ -198,6 +207,14 @@ class LocalInference:
                         )
                     else:
                         body["truncate"] = False
+                    with self.repo.db.write() as c:
+                        self.repo._owned(c, self.context.job_id, self.context.lease_token)
+                        c.execute(
+                            table.update()
+                            .where(table.c.reservation_id == permit)
+                            .values(state="sent", created_at=time.time())
+                        )
+                    dispatched = True
                     value = await self._json(client, "POST", "/api/" + operation, json=body)
                     if value.get("model") != model or (
                         operation == "chat"
@@ -228,6 +245,8 @@ class LocalInference:
                 "local_unavailable", "Local model service is unavailable", 503, True
             ) from None
         finally:
+            if not dispatched:
+                state = "cancelled"
             with self.repo.db.write() as c:
                 c.execute(
                     table.update().where(table.c.reservation_id == permit).values(state=state)
