@@ -72,7 +72,16 @@ def resume(repo, job_id, moderation_token=None):
         state = None  # Local capacity is admitted atomically by the local execution broker.
     else:
         state = quota_status(repo)
-    if state is not None:
+    local_readable_chat = (
+        old["kind"] == "chat"
+        and bool(old["payload"].get("sources"))
+        and old["payload"]["request"].get("mode") != "general"
+        and repo.settings.adapter_factory == "youtube_answers.team:create_adapters"
+        and repo.settings.auth_enabled
+    )
+    # The production team can answer from stored transcript evidence even while
+    # generation admission is closed. The worker still brokers every outbound call.
+    if state is not None and not local_readable_chat:
         _require_gemini_budget(repo, old, state)
     with repo.db.write() as c:
         old = row(c, db.jobs, db.jobs.c.job_id == job_id)
