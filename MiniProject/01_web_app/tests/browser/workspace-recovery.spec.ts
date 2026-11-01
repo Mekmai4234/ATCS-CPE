@@ -726,11 +726,14 @@ test('paused chat can read local excerpts after reload without submitting genera
           {
             video_id: video.video_id,
             text: 'ข้อความต้นฉบับ RAG จากคลิป',
+            text_truncated: true,
             start_seconds: 84,
             end_seconds: 90,
           },
         ],
         notice: 'ข้อความจากบทถอดเสียง ไม่ใช่คำตอบ AI',
+        scan_complete: false,
+        inspected_segments: 1000,
       },
     });
   });
@@ -740,6 +743,8 @@ test('paused chat can read local excerpts after reload without submitting genera
   const drawer = page.getByRole('dialog', { name: 'งานของฉัน', exact: true });
   await drawer.getByRole('button', { name: 'อ่านข้อความจากคลิปโดยไม่ใช้ AI', exact: true }).click();
   await expect(drawer.getByText('ข้อความต้นฉบับ RAG จากคลิป', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('แสดงข้อความบางส่วน เปิดคลิปเพื่อดูเนื้อหาต่อ')).toBeVisible();
+  await expect(drawer.getByText(/ค้นเพียงบางส่วนของบทถอดเสียง/)).toContainText('1000');
   await expect(drawer.getByRole('link', { name: 'เปิดคลิปที่ 84 วินาที' })).toHaveAttribute(
     'href',
     /watch\?v=dQw4w9WgXcQ&t=84s/,
