@@ -25,6 +25,29 @@ class LocalModel:
         if context is None or not callable(getattr(context, "local_inference", None)):
             raise error("local_broker_required", "Trusted local execution required", status=503)
         settings = self.settings
+        shape = provider_schema(schema)
+        evidence = payload.get("untrusted_evidence", [])
+        allowed = sorted(
+            {
+                item.get(payload.get("citation_key", "chunk_id"))
+                for item in evidence
+                if isinstance(item, dict)
+            }
+            - {None}
+        )
+
+        def constrain(value):
+            if isinstance(value, dict):
+                for name, field in value.get("properties", {}).items():
+                    if name in {"citations", "citation_ids"} and allowed:
+                        field["items"] = {"type": "string", "enum": allowed}
+                for child in value.values():
+                    constrain(child)
+            elif isinstance(value, list):
+                for child in value:
+                    constrain(child)
+
+        constrain(shape)
         body = {
             "think": False,
             "messages": [
@@ -38,7 +61,7 @@ class LocalModel:
                 },
                 {"role": "user", "content": json_text(payload)},
             ],
-            "format": provider_schema(schema),
+            "format": shape,
         }
         # Conservative byte guard; never claim an exact token count or silently truncate.
         budget = settings.local_context_tokens - settings.local_max_output_tokens - 512
