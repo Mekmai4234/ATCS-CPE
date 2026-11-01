@@ -22,7 +22,7 @@ def retry_seconds(value):
     return seconds if math.isfinite(seconds) and 0 < seconds <= 86400 else None
 
 
-def provider_error(status, *, retry_after=None, retry_delay_seconds=None):
+def provider_error(status, *, retry_after=None, retry_delay_seconds=None, origin="http"):
     code, message, retryable = {
         429: ("provider_rate_limited", "Provider usage is limited", True),
         503: ("provider_unavailable", "Provider is temporarily unavailable", True),
@@ -31,13 +31,21 @@ def provider_error(status, *, retry_after=None, retry_delay_seconds=None):
         408: ("provider_timeout", "Provider request timed out", True),
         504: ("provider_timeout", "Provider request timed out", True),
     }.get(status, ("provider_invalid_response", "Provider response is invalid", False))
+    if type(status) is int and 500 <= status <= 599 and status != 504:
+        code, message, retryable = (
+            "provider_unavailable",
+            "Provider is temporarily unavailable",
+            True,
+        )
     wait = retry_seconds(retry_after) or retry_seconds(retry_delay_seconds)
     return AppError(
         code,
         message,
-        status if status in {429, 503, 504} else 502,
+        503 if code == "provider_unavailable" else status if status in {429, 504} else 502,
         retryable,
         retry_after_seconds=wait,
         retry_time_source="provider" if wait is not None else None,
         pause=status == 429,
+        failure_origin=origin,
+        provider_status=status,
     )

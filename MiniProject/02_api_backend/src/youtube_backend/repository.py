@@ -812,6 +812,14 @@ class Repository(Ownership):
                     )
                 )
             stage = "visual_pending" if visual_pending else "no_transcript" if missing else state
+            payload = dict(job["payload"])
+            payload.pop("provider_failure", None)
+            if getattr(error, "failure_origin", None):
+                payload["provider_failure"] = {
+                    "origin": error.failure_origin,
+                    "http_status": error.provider_status,
+                    "attempt": job["attempt_count"],
+                }
             if error.retry_after_seconds is not None or paused:
                 from sqlalchemy.dialects.sqlite import insert
 
@@ -843,6 +851,7 @@ class Repository(Ownership):
                     lease_until=None,
                     available_at=time.time() + delay,
                     updated_at=time.time(),
+                    payload=payload,
                 )
             )
             self._video_failure(
