@@ -16,7 +16,14 @@ type Quota = {
   status: 'waiting' | 'available' | 'unverified';
   pools: {
     bucket: string;
-    usage: { requests_24h: number; requests_60s: number; tokens_60s: number };
+    daily_timezone?: string;
+    daily_reset_at?: string;
+    usage: {
+      requests_provider_day?: number;
+      requests_24h: number;
+      requests_60s: number;
+      tokens_60s: number;
+    };
     blockers: Blocker[];
   }[];
 };
@@ -30,6 +37,12 @@ const reasons: Record<string, string> = {
   member_counting_limit: 'เพดานนับโทเคนของสมาชิกเต็ม',
   provider_rate_limited: 'Google จำกัดการใช้งาน ยังไม่มีหลักฐานว่าเป็น RPM/TPM/RPD',
   provider_unavailable: 'ผู้ให้บริการประมวลผลยังไม่พร้อม',
+};
+const buckets: Record<string, string> = {
+  embedding: 'การสร้างดัชนี',
+  'embedding-shared': 'Embedding · โควตาร่วมสร้างดัชนี',
+  'flash-shared': 'Gemini Flash · โควตาร่วมสร้างคำตอบ',
+  chat: 'การสร้างคำตอบ',
 };
 export default function QuotaNotice({ api }: { api: Api }) {
   const [data, setData] = useState<Quota | null>(null);
@@ -87,10 +100,29 @@ export default function QuotaNotice({ api }: { api: Api }) {
             {data.pools.map((pool) => (
               <li key={pool.bucket}>
                 <p>
-                  {pool.bucket === 'embedding' ? 'การสร้างดัชนี' : 'การประมวลผล AI'} ·
-                  ยอดภายในย้อนหลัง 24 ชั่วโมง: {pool.usage.requests_24h} คำขอ · 60 วินาที:{' '}
-                  {pool.usage.requests_60s} คำขอ / {pool.usage.tokens_60s} โทเคน
+                  {buckets[pool.bucket] || 'กลุ่มการใช้งานอื่น'} · ยอดภายในย้อนหลัง 24 ชั่วโมง:{' '}
+                  {pool.usage.requests_24h} คำขอ · 60 วินาที: {pool.usage.requests_60s} คำขอ /{' '}
+                  {pool.usage.tokens_60s} โทเคน
                 </p>
+                {pool.daily_timezone === 'America/Los_Angeles' &&
+                  typeof pool.usage.requests_provider_day === 'number' && (
+                    <p>
+                      ยอดบัญชีภายในตามวัน Pacific: {pool.usage.requests_provider_day} คำขอ ·
+                      แยกจากยอดย้อนหลัง 24 ชั่วโมง
+                    </p>
+                  )}
+                {pool.daily_timezone === 'America/Los_Angeles' &&
+                  pool.daily_reset_at &&
+                  Number.isFinite(Date.parse(pool.daily_reset_at)) && (
+                    <p>
+                      รอบวันภายในเริ่มใหม่:{' '}
+                      {new Date(pool.daily_reset_at).toLocaleString('th-TH', {
+                        timeZone: 'America/Los_Angeles',
+                        timeZoneName: 'short',
+                      })}{' '}
+                      Pacific (America/Los_Angeles) · ไม่ยืนยันยอด Google หรือสิทธิ์คำขอถัดไป
+                    </p>
+                  )}
                 {pool.blockers.map((blocker, index) => (
                   <p key={index}>
                     {reasons[blocker.reason] || 'ยังระบุประเภทข้อจำกัดไม่ได้'}
