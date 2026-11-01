@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import dataclass, field
 
+from youtube_backend.errors import AppError
 from youtube_backend.schemas import (
     AnalysisRequest,
     AnswerResult,
@@ -155,6 +156,29 @@ class AnswerService:
             short = await self._bounded(
                 run, lambda _: self.knowledge.short_context(run.sources, run.context)
             )
+        if (
+            not short
+            and expected
+            and expected <= 80
+            and callable(getattr(self.knowledge, "short_context", None))
+        ):
+            # The old 16KB shortcut rejects many Thai clips that fit the real token budget.
+            page = await self._bounded(
+                run,
+                lambda _: self.knowledge.read(
+                    run.sources,
+                    run.context,
+                    limit=80,
+                    cursor=None,
+                ),
+            )
+            if page.next_cursor is None and len(page.items) == expected:
+                candidate = [self._record(run, chunk.evidence()) for chunk in page.items]
+                if (
+                    input_size(payload("answer", request, candidate, history))
+                    <= self.settings.max_context_tokens
+                ):
+                    short = page.items
         if short:
             nodes = [self._record(run, chunk.evidence()) for chunk in short]
             if (
@@ -182,7 +206,16 @@ class AnswerService:
         if hits and not nodes:
             raise error("context_budget_exceeded", "Question/history/evidence exceeds input budget")
         if nodes:
-            output = await self._generate(run, data)
+            while True:
+                try:
+                    output = await self._generate(run, data)
+                    break
+                except AppError as exc:
+                    if exc.code != "context_budget_exceeded" or len(nodes) < 2:
+                        raise
+                    nodes = nodes[: max(1, len(nodes) // 2)]
+                    data = payload("answer", request, nodes, history)
+                    run.notes.append("ปรับหลักฐานตามจำนวนโทเคนจริง บางช่วงยังไม่ได้อ่าน")
             run.processed.update(cid for node in nodes for cid in node["citation_ids"])
         else:
             output = GeneratedAnswer(
@@ -224,8 +257,10 @@ class AnswerService:
                 output = await self._generate(run, payload("answer", request, expanded, history))
                 run.processed.update(included)
                 run.notes.append("ค้นหลักฐานเพิ่มเติมจากบทถอดเสียงเมื่อการค้นครั้งแรกไม่เพียงพอ")
-        run.notes.append("แชตค้นหลักฐานตามคำถาม อาจไม่ได้อ่านครบทุกช่วงของคลิป")
-        return await self._finish(run, output, expected, full=False)
+        complete = expected is not None and len(run.processed) == expected
+        if not complete:
+            run.notes.append("แชตค้นหลักฐานตามคำถาม อาจไม่ได้อ่านครบทุกช่วงของคลิป")
+        return await self._finish(run, output, expected, full=complete)
 
     def _groups(self, task, request, nodes):
         groups, current = [], []

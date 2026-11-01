@@ -17,6 +17,21 @@ def body(question="RAG", videos=None, **extra):
     return {"question": question, "scope": {"video_ids": videos or [VIDEO_A]}, **extra}
 
 
+async def completed_chat(env, client=None, **kwargs):
+    """Follow the durable async acknowledgment before asserting private result content."""
+    client = client or env.client
+    response = await client.post("/api/chat", **kwargs)
+    assert response.status_code in {200, 202}, response.text
+    if response.status_code == 200:
+        return response.json()
+    job_id = response.json()["job_id"]
+    await env.worker.run_once(job_id)
+    response = await client.get(f"/api/jobs/{job_id}")
+    assert response.status_code == 200, response.text
+    assert response.json()["state"] == "completed", response.text
+    return response.json()["result"]
+
+
 async def test_anonymous_and_missing_csrf_never_reach_model(integrated):
     env = integrated
     before = len(env.model.payloads)
@@ -44,11 +59,11 @@ async def test_two_members_same_key_isolated_jobs_history_followups_and_polling(
         assert attached.status_code == 202
         shared = []
         for client in (env.client, b):
-            response = await client.post(
-                "/api/chat", json=body(), headers={"Idempotency-Key": "same-key"}
+            shared.append(
+                await completed_chat(
+                    env, client, json=body(), headers={"Idempotency-Key": "same-key"}
+                )
             )
-            assert response.status_code == 200, response.text
-            shared.append(response.json())
         a_result, b_result = shared
         assert a_result["job_id"] != b_result["job_id"]
         assert a_result["conversation_id"] != b_result["conversation_id"]
@@ -60,14 +75,10 @@ async def test_two_members_same_key_isolated_jobs_history_followups_and_polling(
         denied = await b.post("/api/chat", json=body(conversation_id=a_result["conversation_id"]))
         assert denied.status_code == 404 and len(env.model.payloads) == before
         private = "PRIVATE-A-HISTORY-MARKER"
-        response = await env.client.post(
-            "/api/chat", json=body(private, conversation_id=a_result["conversation_id"])
+        await completed_chat(env, json=body(private, conversation_id=a_result["conversation_id"]))
+        await completed_chat(
+            env, b, json=body("B follow-up", conversation_id=b_result["conversation_id"])
         )
-        assert response.status_code == 200
-        response = await b.post(
-            "/api/chat", json=body("B follow-up", conversation_id=b_result["conversation_id"])
-        )
-        assert response.status_code == 200, response.text
         assert private not in json.dumps(env.model.payloads[-1])
         with env.db.read() as c:
             assert (
@@ -105,8 +116,7 @@ async def test_foreign_scope_denied_before_retrieval_or_generation(integrated, k
 
 async def test_admin_role_does_not_grant_private_content(integrated):
     env = integrated
-    response = await env.client.post("/api/chat", json=body())
-    result = response.json()
+    result = await completed_chat(env, json=body())
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=env.app), base_url="http://test"
     ) as admin:
@@ -175,7 +185,7 @@ async def test_grant_replacement_while_model_awaits_cannot_publish(integrated):
 
 async def test_detach_reimport_new_generation_keeps_old_citations_unavailable(integrated):
     env = integrated
-    result = (await env.client.post("/api/chat", json=body())).json()
+    result = await completed_chat(env, json=body())
     conversation = result["conversation_id"]
     removed = await env.client.delete(f"/api/videos/{VIDEO_A}")
     assert removed.status_code == 202
