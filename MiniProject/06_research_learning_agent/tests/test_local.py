@@ -134,6 +134,9 @@ async def test_explicit_fresh_generation_skips_structured_checkpoint():
     fresh = await model._structured({"task": "สรุป"}, FinishArgs, 1, ctx)
     assert len(ctx.calls) == 2
     assert fresh.metadata.provider == "ollama"
+    resumed = await model._structured({"task": "สรุป"}, FinishArgs, 1, ctx)
+    assert len(ctx.calls) == 2
+    assert resumed.metadata.provider == "ollama-cache"
 
 
 async def test_long_research_uses_relevant_tail_candidates_when_bounded(unit):
