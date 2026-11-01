@@ -52,6 +52,7 @@ def clean_environment():
                 "CHAT_REVIEW_",
                 "MODERATION_",
                 "LOCAL_",
+                "TRIAL_",
                 "GENERATION_",
             )
         ) or key.upper() in {
