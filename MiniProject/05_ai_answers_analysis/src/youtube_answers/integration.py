@@ -106,6 +106,105 @@ class AnswerAdapters(RagAdapters):
     @measured_operation("chat")
     @timed_stage("total")
     async def answer(self, request, sources, history, context):
+        from youtube_backend.errors import AppError
+
+        try:
+            return await self._answer_provider(request, sources, history, context)
+        except AppError as exc:
+            if (
+                exc.code
+                not in {
+                    "quota_wait",
+                    "quota_pending",
+                    "free_tier_unverified",
+                    "free_model_unverified",
+                    "provider_unavailable",
+                    "provider_rate_limited",
+                    "provider_timeout",
+                    "generation_provider_busy",
+                    "generation_rate_limited",
+                    "generation_unavailable",
+                    "generation_timeout",
+                }
+                or not sources
+            ):
+                raise
+            return await self._local_answer(request, sources, history, context)
+
+    async def _local_answer(self, request, sources, history, context):
+        from youtube_backend.schemas import AnswerResult, Citation, Coverage, ProviderMetadata
+        from youtube_rag.manifest import BackendExecution
+
+        context.check()
+        context.authorize_sources(sources)
+        query = request["question"]
+        # Generic follow-ups need their preceding user question to find the topic.
+        for entry in reversed(history):
+            if entry.get("role") == "user":
+                query = (entry["content"] + "\n" + query)[-6000:]
+                break
+        result = await self.rag.evidence_library().search(
+            query,
+            sources,
+            context,
+            kinds=["transcript"],
+            limit=6,
+            neighbors=1,
+        )
+        # Re-read each exported reference under this exact execution before publishing.
+        records = (
+            await self.rag.evidence(
+                sources, [item.evidence_id for item in result.items], BackendExecution(context)
+            )
+            if result.items
+            else []
+        )
+        by_id = {record.chunk_id: record for record in records}
+        selected = [by_id[item.evidence_id] for item in result.items if item.evidence_id in by_id]
+        citations = [
+            Citation(
+                citation_id=str(i + 1),
+                chunk_id=record.chunk_id,
+                video_id=record.video_id,
+                title=record.title,
+                start_seconds=record.start_seconds,
+                end_seconds=record.end_seconds,
+            )
+            for i, record in enumerate(selected)
+        ]
+        notice = (
+            "ขณะนี้ AI สร้างคำอธิบายใหม่ไม่ได้ จึงค้นข้อความจากบทถอดเสียงที่บันทึกไว้ให้โดยอัตโนมัติ "
+            "ข้อความต่อไปนี้เป็นคำพูดจากคลิป ไม่ใช่ตัวอย่างหรือคำสรุปที่ AI สร้างใหม่"
+        )
+        text = (
+            notice
+            + "\n\n"
+            + "\n\n".join(record.text + f" [{i + 1}]" for i, record in enumerate(selected))
+            if selected
+            else (
+                "ขณะนี้ AI สร้างคำตอบใหม่ไม่ได้ และยังไม่พบข้อความที่ตรงคำค้นในขอบเขตที่ตรวจ "
+                "ลองระบุหัวข้อหรือช่วงเวลาให้ชัดขึ้น การค้นไม่พบไม่ยืนยันว่าไม่มีข้อมูลทั้งคลิป"
+            )
+        )
+        context.check()
+        return AnswerResult(
+            status="answered" if selected else "insufficient_evidence",
+            answer=text,
+            citations=citations,
+            coverage=Coverage(
+                expected_videos=len(sources),
+                processed_videos=0,
+                expected_chunks=None,
+                processed_chunks=None,
+                complete=False,
+                notes=["ค้นข้อความในเครื่องเท่านั้น ไม่ได้ส่งหลักฐานให้โมเดลสังเคราะห์", *result.notes],
+            ),
+            provider_metadata=ProviderMetadata(
+                provider="local-evidence", requested_model="none", latency_ms=0
+            ),
+        )
+
+    async def _answer_provider(self, request, sources, history, context):
         from youtube_backend.repository import digest
         from youtube_backend.schemas import AnswerResult
 
