@@ -18,7 +18,7 @@ class SearchArgs(Schema):
 class ReadArgs(Schema):
     video_ids: list[str] = Field(default_factory=list, max_length=100)
     cursor: str | None = Field(default=None, max_length=1000)
-    limit: int = Field(default=30, ge=1, le=200, strict=True)
+    limit: int = Field(default=100, ge=1, le=200, strict=True)
 
 
 class CompareArgs(Schema):

@@ -269,3 +269,36 @@ async def test_preflight_and_generation_share_timeout(make_model):
     with pytest.raises(AppError) as caught:
         await model.decide([{"role": "user", "data": {}}], 0.01)
     assert caught.value.code == "generation_timeout"
+
+
+async def test_grading_uses_structured_marks_and_same_broker_gate(make_model):
+    def handler(request):
+        if request.url.path.endswith(":countTokens"):
+            return httpx.Response(200, json={"totalTokens": 100})
+        body = json.loads(request.content)
+        assert "student answers" in body["systemInstruction"]["parts"][0]["text"]
+        return httpx.Response(
+            200,
+            json=response(
+                [
+                    {
+                        "text": json.dumps(
+                            {"marks": [{"correct": True, "feedback": "ตอบได้ตรงความหมาย"}]}
+                        )
+                    }
+                ]
+            ),
+        )
+
+    model = make_model(handler)
+    context = MockBrokerContext()
+    context.settings = model.settings
+    result = await model.grade_quiz(
+        {
+            "questions": [{"question": "RAG?", "answer": "retrieval"}],
+            "answers": ["retrieve evidence"],
+        },
+        30,
+        context=context,
+    )
+    assert result["marks"][0]["correct"] is True
