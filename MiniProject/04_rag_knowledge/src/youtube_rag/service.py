@@ -257,6 +257,8 @@ class RagService:
         await self.binding.ensure(execution)
         total = sum(row["chunk_count"] for row in rows)
         candidates = []
+        if max_scan < len(rows):
+            raise error("invalid_limit", "Scan budget must cover each selected source", status=422)
         remaining = max_scan
         for index, row in enumerate(rows):
             allocation = min(row["chunk_count"], max(1, remaining // (len(rows) - index)))
