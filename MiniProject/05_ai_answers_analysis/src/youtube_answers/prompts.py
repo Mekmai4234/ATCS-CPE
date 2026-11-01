@@ -62,4 +62,3 @@ def payload(task, request, evidence, history=()):
             if "video_id" in node and "title" in node
         },
     }
-
