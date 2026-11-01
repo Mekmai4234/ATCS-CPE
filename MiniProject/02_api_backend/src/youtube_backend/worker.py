@@ -69,7 +69,12 @@ class Worker:
                 raise AppError(
                     "trial_reindex_disabled", "Reindex is restricted to an opted-in trial", 409
                 )
-            source, transcript = self.repo.import_checkpoint(job_id, token)
+            checkpoint = self.repo.import_checkpoint(job_id, token)
+            if checkpoint is None:
+                raise AppError(
+                    "transcript_unavailable", "Stored transcript is required for trial reindex", 409
+                )
+            source, transcript = checkpoint
             self.repo.stage(job_id, token, "indexing")
             receipt = IndexReceipt.model_validate(
                 await self.adapters.reindex(source, transcript, context)
