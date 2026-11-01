@@ -143,7 +143,7 @@ async def test_factory_closes_model_when_rag_setup_fails(monkeypatch):
     from youtube_agent import integration
 
     gateway = ScriptedModel()
-    monkeypatch.setattr(integration, "GeminiModel", lambda config: gateway)
+    monkeypatch.setattr(integration, "create_model", lambda config: gateway)
 
     def fail(**kwargs):
         raise RuntimeError("setup failure")

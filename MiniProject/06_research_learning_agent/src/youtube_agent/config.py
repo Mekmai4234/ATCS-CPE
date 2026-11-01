@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from youtube_backend.config import PROJECT_ROOT
@@ -11,6 +13,11 @@ class AgentSettings(BaseSettings):
         allow_inf_nan=False,
     )
     gemini_api_key: SecretStr = SecretStr("")
+    generation_provider: Literal["gemini", "ollama"] = "gemini"
+    local_model: str = ""
+    local_model_digest: str = ""
+    local_context_tokens: int = Field(default=4096, ge=512, le=32768)
+    local_max_output_tokens: int = Field(default=1024, ge=64, le=8192)
     llm_model: str = Field(default="gemini-3.5-flash", min_length=1, max_length=200)
     max_context_tokens: int = Field(default=24000, ge=1024, le=1000000)
     agent_max_steps: int = Field(default=8, ge=1, le=100)
