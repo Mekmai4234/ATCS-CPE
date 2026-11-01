@@ -48,6 +48,13 @@ class LocalModel:
                     constrain(child)
 
         constrain(shape)
+        task = payload.get("task")
+        if isinstance(task, dict) and task.get("type") == "study_plan":
+            days = task.get("days")
+            if type(days) is int and 1 <= days <= 90:
+                field = shape.get("properties", {}).get("days")
+                if isinstance(field, dict):
+                    field.update(minItems=days, maxItems=days)
         body = {
             "think": False,
             "messages": [
