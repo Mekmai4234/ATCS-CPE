@@ -17,6 +17,16 @@ export const videoQueryable = (video: Video) =>
   !['deleted', 'deleting'].includes(video.status) &&
   (video.status === 'ready' ||
     !!(video.presentation?.queryable && video.presentation.kinds.length));
+export function retryTime(blocker: NonNullable<Job['wait']>, legacyEstimate?: string) {
+  const provider = blocker.time_source === 'provider' ? blocker.retry_at : undefined;
+  const estimate = blocker.time_source === 'estimate' ? blocker.estimated_retry_at : legacyEstimate;
+  const value = provider || estimate;
+  if (!value || !Number.isFinite(Date.parse(value))) return '';
+  const time = new Date(value).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+  return provider
+    ? `เวลาที่ผู้ให้บริการระบุให้ลองใหม่: ${time} · ต้องตรวจสิทธิ์อีกครั้ง`
+    : `ลองทำต่อได้ประมาณ ${time} · เป็นเวลาประมาณของระบบ ไม่รับประกันว่าจะพร้อม`;
+}
 export function jobStatus(job: Job) {
   // A failed/cancelled job can retain its last processing stage and retry metadata.
   // The durable terminal state must take precedence over that stale progress.
@@ -32,16 +42,8 @@ export function jobStatus(job: Job) {
   const stage = extra
     ? enrichmentLabels[extra.stage]
     : statusLabels[job.stage] || statusLabels[job.state] || 'กำลังตรวจสอบสถานะ';
-  const providerTime =
-    extra?.retryAt || (job.wait?.time_source === 'provider' ? job.wait.retry_at : undefined);
-  const estimate = job.wait?.time_source === 'estimate' ? job.wait.estimated_retry_at : undefined;
-  const when =
-    providerTime && Number.isFinite(Date.parse(providerTime))
-      ? ` · ลองอีกครั้งได้หลัง ${new Date(providerTime).toLocaleString('th-TH')}`
-      : estimate && Number.isFinite(Date.parse(estimate))
-        ? ` · เวลาประมาณการของระบบ ${new Date(estimate).toLocaleString('th-TH')}`
-        : '';
-  return `${stage}${provider ? ` · ${provider}` : ''}${when}`;
+  const when = retryTime(job.wait || {}, extra?.retryAt);
+  return `${stage}${provider ? ` · ${provider}` : ''}${when ? ` · ${when}` : ''}`;
 }
 
 export function jobShouldPark(job: Job): boolean {

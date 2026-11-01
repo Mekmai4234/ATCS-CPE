@@ -3,7 +3,7 @@ import logging
 import pytest
 
 from youtube_answers.review import POLICY_VERSION_V2, review_envelope, review_signals_v2
-from youtube_answers.timing import timed_stage
+from youtube_answers.timing import measured_operation, provider_call, timed_stage
 
 
 @pytest.mark.parametrize(
@@ -51,3 +51,27 @@ async def test_timing_records_duration_and_failure_without_content(caplog):
         await retrieve("PRIVATE_QUESTION")
     assert "stage=retrieval outcome=failed duration_ms=" in caplog.text
     assert "PRIVATE" not in caplog.text
+
+
+async def test_call_measurements_are_isolated_and_redacted(caplog):
+    import asyncio
+
+    caplog.set_level(logging.INFO)
+
+    @measured_operation("chat")
+    async def run(calls):
+        for _ in range(calls):
+            provider_call("count_tokens")
+            await asyncio.sleep(0)
+            provider_call("generate_content")
+
+    await asyncio.gather(run(1), run(2))
+    summaries = [r.message for r in caplog.records if r.message.startswith("answer_operation")]
+    assert len(summaries) == 2
+    assert any("count_tokens_calls=1 generation_calls=1" in r for r in summaries)
+    assert any("count_tokens_calls=2 generation_calls=2" in r for r in summaries)
+
+
+async def test_simple_answer_uses_one_generation_and_no_repair(env):
+    await env.service.answer(env.request, env.sources, [], env.ctx)
+    assert len(env.model.payloads) == 1

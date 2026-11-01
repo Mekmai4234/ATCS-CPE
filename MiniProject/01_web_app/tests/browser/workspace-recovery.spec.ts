@@ -526,6 +526,87 @@ test('a non-quota pause is never labeled as usage exhaustion', async ({ page }) 
   await page.getByRole('button', { name: 'ดูงานทั้งหมด', exact: true }).click();
   const drawer = page.getByRole('dialog', { name: 'งานของฉัน', exact: true });
   await expect(drawer.getByText('ตัวประมวลผลยังไม่พร้อม', { exact: true })).toBeVisible();
-  await expect(drawer.getByText('ใช้งานครบขีดจำกัดแล้ว', { exact: true })).toHaveCount(0);
+  await expect(drawer.getByText('งบการใช้งานภายในเว็บเต็ม', { exact: true })).toHaveCount(0);
   await expect(drawer.getByRole('button', { name: 'ทำต่อ', exact: true })).toBeEnabled();
+});
+
+test('mobile quota details distinguish internal RPD, unknown provider limit and estimated time', async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.setViewportSize({ width: 390, height: 900 });
+  let reads = 0;
+  await page.route('**/api/quota', (route) => {
+    reads++;
+    return route.fulfill({
+      json: {
+        accounting_source: 'local_ledger',
+        provider_balance_verified: false,
+        observed_at: '2026-11-01T07:00:00Z',
+        scope: 'member',
+        status: 'waiting',
+        pools: [
+          {
+            bucket: 'chat',
+            usage: { requests_24h: 2, requests_60s: 1, tokens_60s: 100 },
+            blockers: [
+              {
+                reason: 'local_daily_limit',
+                time_source: 'estimate',
+                estimated_retry_at: '2099-01-01T00:00:00Z',
+              },
+              {
+                reason: 'provider_rate_limited',
+                time_source: 'provider',
+                retry_at: '2099-01-02T00:00:00Z',
+              },
+            ],
+          },
+        ],
+      },
+    });
+  });
+  await page.goto(base);
+  expect(reads).toBe(0);
+  await page.getByRole('button', { name: 'ดูงานทั้งหมด', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: 'งานของฉัน', exact: true });
+  await drawer.getByText('ตรวจยอดใช้งานภายในระบบ', { exact: true }).click();
+  await expect(
+    drawer.getByText('งบที่เว็บตั้งไว้: คำขอต่อวัน (RPD)', { exact: false }),
+  ).toBeVisible();
+  await expect(drawer.getByText(/Google จำกัดการใช้งาน ยังไม่มีหลักฐานว่าเป็น RPM/)).toBeVisible();
+  await expect(drawer.getByText(/ไม่รับประกันว่าจะพร้อม/)).toBeVisible();
+  await expect(drawer.getByText(/เวลาที่ผู้ให้บริการระบุให้ลองใหม่/)).toBeVisible();
+  await expect(drawer.getByText(/ตรวจล่าสุด:/)).toBeVisible();
+  await expect(drawer.getByText(/ยอดภายในเว็บ ไม่ใช่ยอดคงเหลือ Google/)).toBeVisible();
+  expect(await drawer.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(drawer).not.toBeVisible();
+});
+
+test('a failed quota refresh removes the old accounting snapshot', async ({ page }) => {
+  await fixture(page);
+  let reads = 0;
+  await page.route('**/api/quota', (route) => {
+    reads++;
+    if (reads > 1) return route.fulfill({ status: 503, json: { error: { code: 'unavailable' } } });
+    return route.fulfill({
+      json: {
+        accounting_source: 'local_ledger',
+        provider_balance_verified: false,
+        observed_at: '2026-11-01T07:00:00Z',
+        scope: 'member',
+        status: 'available',
+        pools: [],
+      },
+    });
+  });
+  await page.goto(base);
+  await page.getByRole('button', { name: 'ดูงานทั้งหมด', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: 'งานของฉัน', exact: true });
+  await drawer.getByText('ตรวจยอดใช้งานภายในระบบ', { exact: true }).click();
+  await expect(drawer.getByText(/ตรวจล่าสุด:/)).toBeVisible();
+  await drawer.getByRole('button', { name: 'ตรวจยอดอีกครั้ง', exact: true }).click();
+  await expect(drawer.getByText(/ยังตรวจยอดภายในไม่ได้/)).toBeVisible();
+  await expect(drawer.getByText(/ตรวจล่าสุด:/)).toHaveCount(0);
 });
