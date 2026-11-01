@@ -158,22 +158,45 @@ def test_claim_atomic_across_worker_connections(env):
 
 
 async def test_heartbeat_prevents_reclaim_of_slow_operation(env, monkeypatch):
-    env.settings.job_lease_seconds = 0.3
+    # A 300ms real SQLite lease also tests host scheduler/disk jitter on loaded CI.
+    # Keep the adapter blocked beyond its original lease, but coordinate actual
+    # renewals instead of racing two fixed subsecond sleeps.
+    env.settings.job_lease_seconds = 3
     original = env.adapters.ingest
-    entered = asyncio.Event()
+    entered, release, renewed = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    heartbeat = env.repo.heartbeat
+    renewals = []
+
+    def observe_renewal(job_id, token):
+        heartbeat(job_id, token)
+        renewals.append(time.monotonic())
+        renewed.set()
+
+    monkeypatch.setattr(env.repo, "heartbeat", observe_renewal)
 
     async def slow(video_id, context):
         entered.set()
-        await asyncio.sleep(0.7)
+        await release.wait()
         return await original(video_id, context)
 
     monkeypatch.setattr(env.adapters, "ingest", slow)
     job_id = queue_import(env)
     running = asyncio.create_task(env.worker.run_once(job_id))
-    await entered.wait()
-    await asyncio.sleep(0.4)
-    assert env.repo.claim(job_id) is None
-    await running
+    try:
+        await asyncio.wait_for(entered.wait(), 10)
+        original_expiry = env.repo.get_job(job_id)["lease_until"]
+        await asyncio.wait_for(renewed.wait(), 10)
+        await asyncio.sleep(max(0, original_expiry - time.time()) + 0.2)
+        assert renewals
+        assert env.repo.get_job(job_id)["lease_until"] > original_expiry
+        assert env.repo.claim(job_id) is None
+        release.set()
+        await asyncio.wait_for(running, 10)
+    finally:
+        release.set()
+        if not running.done():
+            running.cancel()
+        await asyncio.gather(running, return_exceptions=True)
     assert env.repo.get_job(job_id)["stage"] == "ready"
     assert env.repo.get_job(job_id)["attempt_count"] == 1
 

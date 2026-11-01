@@ -28,6 +28,14 @@ async def maintenance(args):
     )
     if args.command == "config":
         return describe_configuration(settings, config, profile)
+    if args.command == "reindex" and config.embedding_provider == "ollama":
+        raise error(
+            "local_maintenance_unsupported",
+            "Local reindex requires an authenticated execution-bound worker; "
+            "this stopped-maintenance CLI cannot run local inference. "
+            "Keep the current index and use a disposable paired trial store.",
+            status=409,
+        )
     if args.command != "init" and not Path(make_url(settings.database_url).database).is_file():
         raise error("index_schema_missing", "Selected SQLite database does not exist")
     database = Database(settings.database_url)
