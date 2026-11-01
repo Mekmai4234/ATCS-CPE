@@ -9,6 +9,9 @@ it.each([
   ['gemini', 'Gemini'],
   ['ollama', 'AI ในเครื่อง'],
   ['answer-cache', 'ผลที่บันทึกไว้ (cache)'],
+  ['ollama-cache', 'ผลที่บันทึกไว้จาก AI ในเครื่อง (cache)'],
+  ['gemini-cache', 'ผลที่บันทึกไว้จาก Gemini (cache)'],
+  ['ollama,ollama-cache', 'AI ในเครื่อง'],
   ['unknown', 'ยังไม่ทราบผู้ให้บริการ'],
 ])('displays observed provider %s without guessing', (provider, expected) => {
   const html = renderToStaticMarkup(
@@ -23,7 +26,7 @@ it.each([
   );
   expect(html).toContain(expected);
   expect(html).toContain('actual');
-  if (provider === 'answer-cache') expect(html).not.toContain('123 ms');
+  if (provider.includes('-cache')) expect(html).not.toContain('123 ms');
   else expect(html).toContain('123 ms');
   expect(html).not.toContain('requested');
 });
