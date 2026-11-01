@@ -14,7 +14,7 @@ from youtube_backend.schemas import Segment, Source, TranscriptResult
 
 from .binding import StoreBinding
 from .configuration import describe_configuration, load_configuration
-from .embeddings import FixtureEmbedder, GeminiEmbedder
+from .embeddings import create_embedder
 from .errors import error
 from .evaluation import evaluate
 from .maintenance import MaintenanceExecution
@@ -48,13 +48,7 @@ async def maintenance(args):
         binding.check()
         if manifest.all_runs():
             await binding.ensure(execution)
-        embedder = (
-            None
-            if args.command == "gc"
-            else FixtureEmbedder(config)
-            if config.embedding_provider == "fixture"
-            else GeminiEmbedder(config)
-        )
+        embedder = None if args.command == "gc" else create_embedder(config)
         service = RagService(config, manifest, embedder)
         if args.command == "gc":
             await service.cleanup(execution, include_staging=True)
