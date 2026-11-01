@@ -231,6 +231,7 @@ test('completed learning artifacts can reopen from member history', async ({ pag
   await page.getByRole('button', { name: 'ดูงานทั้งหมด', exact: true }).click();
   const drawer = page.getByRole('dialog', { name: 'งานของฉัน', exact: true });
   await drawer.getByRole('tab', { name: 'ประวัติ', exact: true }).click();
+  await expect(drawer.getByRole('button', { name: 'สร้างใหม่', exact: true })).toHaveCount(0);
   await drawer.getByRole('button', { name: 'ดูผลลัพธ์', exact: true }).click();
   await expect(page.getByText('1. คำถามที่กู้คืน', { exact: true })).toBeVisible();
   await expect(drawer).not.toBeVisible();
@@ -547,8 +548,10 @@ test('mobile quota details distinguish internal RPD, unknown provider limit and 
         status: 'waiting',
         pools: [
           {
-            bucket: 'chat',
-            usage: { requests_24h: 2, requests_60s: 1, tokens_60s: 100 },
+            bucket: 'flash-shared',
+            daily_timezone: 'America/Los_Angeles',
+            daily_reset_at: '2026-11-02T08:00:00Z',
+            usage: { requests_provider_day: 1, requests_24h: 2, requests_60s: 1, tokens_60s: 100 },
             blockers: [
               {
                 reason: 'local_daily_limit',
@@ -561,6 +564,12 @@ test('mobile quota details distinguish internal RPD, unknown provider limit and 
                 retry_at: '2099-01-02T00:00:00Z',
               },
             ],
+          },
+          {
+            bucket: 'embedding-shared',
+            usage: { requests_provider_day: 3, requests_24h: 5, requests_60s: 0, tokens_60s: 0 },
+            daily_timezone: 'America/Los_Angeles',
+            blockers: [],
           },
         ],
       },
@@ -578,10 +587,82 @@ test('mobile quota details distinguish internal RPD, unknown provider limit and 
   await expect(drawer.getByText(/ไม่รับประกันว่าจะพร้อม/)).toBeVisible();
   await expect(drawer.getByText(/เวลาที่ผู้ให้บริการระบุให้ลองใหม่/)).toBeVisible();
   await expect(drawer.getByText(/ตรวจล่าสุด:/)).toBeVisible();
+  await expect(drawer.getByText(/Gemini Flash · โควตาร่วมสร้างคำตอบ/)).toBeVisible();
+  await expect(drawer.getByText(/Embedding · โควตาร่วมสร้างดัชนี/)).toBeVisible();
+  await expect(drawer.getByText(/ยอดบัญชีภายในตามวัน Pacific: 1 คำขอ/)).toBeVisible();
+  await expect(drawer.getByText(/รอบวันภายในเริ่มใหม่:/)).toContainText('America/Los_Angeles');
   await expect(drawer.getByText(/ยอดภายในเว็บ ไม่ใช่ยอดคงเหลือ Google/)).toBeVisible();
   expect(await drawer.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   await page.keyboard.press('Escape');
   await expect(drawer).not.toBeVisible();
+});
+
+test('advertised regeneration uses its endpoint and preserves an idempotency key after failure', async ({
+  page,
+}) => {
+  await fixture(page);
+  const artifact = (question: string) => ({
+    artifact_id: 'quiz',
+    type: 'quiz',
+    citations: [],
+    content: { questions: [{ question, answer: 'answer', explanation: 'fixture', citations: [] }] },
+  });
+  const old = {
+    job_id: 'regenerate-original',
+    kind: 'artifact',
+    state: 'completed',
+    stage: 'completed',
+    request: { type: 'quiz', topic: 'original topic', scope },
+    sources: [],
+    result: { artifacts: [artifact('OLD QUESTION')] },
+  };
+  await page.route('**/api/member/jobs?*', (route) =>
+    route.fulfill({ json: { items: [old], total: 1 } }),
+  );
+  await page.route('**/api/providers', (route) =>
+    route.fulfill({
+      json: {
+        selection: 'server_configuration',
+        observed_at: '2026-11-01T08:00:00Z',
+        execution: { provider: 'ollama', model: 'configured' },
+        local: { state: 'busy', reason: 'local_busy' },
+        synthetic: true,
+        loading_observed: false,
+        regenerate: ['artifact'],
+      },
+    }),
+  );
+  const keys: string[] = [];
+  await page.route('**/api/jobs/regenerate-original/regenerate', (route) => {
+    keys.push(route.request().headers()['idempotency-key']);
+    expect(route.request().postDataJSON()).toEqual({});
+    return keys.length === 1
+      ? route.fulfill({ status: 503, json: { error: { code: 'network_error' } } })
+      : route.fulfill({ status: 202, json: { job_id: 'regenerated' } });
+  });
+  await page.route('**/api/jobs/regenerated', (route) =>
+    route.fulfill({
+      json: {
+        ...old,
+        job_id: 'regenerated',
+        result: { artifacts: [artifact('FRESH QUESTION')] },
+      },
+    }),
+  );
+  await page.goto(`${base}/learning`);
+  await page.getByRole('button', { name: 'ดูงานทั้งหมด', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: 'งานของฉัน', exact: true });
+  await expect(drawer.getByRole('region', { name: 'สถานะผู้ให้บริการ' })).toContainText(
+    'คิว AI ในเครื่องเต็ม',
+  );
+  await drawer.getByRole('tab', { name: 'ประวัติ', exact: true }).click();
+  await drawer.getByRole('button', { name: 'สร้างใหม่', exact: true }).click();
+  await expect(drawer.getByRole('alert')).toContainText('ผลเดิมยังอยู่');
+  await drawer.getByRole('button', { name: 'สร้างใหม่', exact: true }).click();
+  await expect(page.getByText('1. FRESH QUESTION', { exact: true })).toBeVisible();
+  expect(keys).toHaveLength(2);
+  expect(keys[0]).toBeTruthy();
+  expect(keys[1]).toBe(keys[0]);
 });
 
 test('a failed quota refresh removes the old accounting snapshot', async ({ page }) => {

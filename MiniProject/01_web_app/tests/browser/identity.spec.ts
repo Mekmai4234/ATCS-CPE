@@ -33,6 +33,31 @@ async function importOne(page: Page) {
   await expect.poll(async () => page.locator('input[type="checkbox"]:enabled').count()).toBe(1);
 }
 
+test('provider status uses the advertised contract and stays compatible with older APIs', async ({
+  page,
+}) => {
+  await signIn(page, 'fixture-provider-status');
+  const received = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/api/providers',
+  );
+  await page.getByRole('button', { name: 'ดูงานทั้งหมด', exact: true }).click();
+  const response = await received;
+  const drawer = page.getByRole('dialog', { name: 'งานของฉัน', exact: true });
+  if (response.status() === 404) {
+    await expect(drawer.getByRole('region', { name: 'สถานะผู้ให้บริการ' })).toHaveCount(0);
+  } else {
+    expect(response.ok()).toBe(true);
+    const data = await response.json();
+    expect(data.selection).toBe('server_configuration');
+    expect(data.admission_guaranteed).toBe(false);
+    expect(data.synthetic).toBe(true);
+    await expect(drawer.getByRole('region', { name: 'สถานะผู้ให้บริการ' })).toContainText(
+      'สถานะจำลองสำหรับทดสอบ',
+    );
+  }
+  await expect(drawer.getByRole('button', { name: 'สร้างใหม่', exact: true })).toHaveCount(0);
+});
+
 test('real HTTP quota reports an internal ledger without a Google balance claim', async ({
   page,
 }) => {
@@ -46,7 +71,7 @@ test('real HTTP quota reports an internal ledger without a Google balance claim'
   expect(data.provider_balance_verified).toBe(false);
   const drawer = page.getByRole('dialog', { name: 'งานของฉัน', exact: true });
   await drawer.getByText('ตรวจยอดใช้งานภายในระบบ', { exact: true }).click();
-  await expect(drawer.getByText(/ตรวจล่าสุด:/)).toBeVisible();
+  await expect(drawer.locator('details.job-quota').getByText(/ตรวจล่าสุด:/)).toBeVisible();
   await expect(drawer.getByText(/ยอดภายในเว็บ ไม่ใช่ยอดคงเหลือ Google/)).toBeVisible();
 });
 
