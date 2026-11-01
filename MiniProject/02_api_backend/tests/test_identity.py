@@ -25,14 +25,20 @@ ORIGIN = "http://localhost:3000"
 
 
 @pytest.fixture
-def identity(tmp_path):
+def identity(tmp_path, request):
     settings = Settings(
         _env_file=None,
         app_env="test",
         auth_enabled=True,
         session_cookie_secure=False,
         google_client_id="test-client",
-        adapter_mode="fixture",
+        adapter_mode=getattr(request, "param", "fixture"),
+        adapter_factory="youtube_backend.team:create_adapters"
+        if getattr(request, "param", "fixture") == "custom"
+        else None,
+        backend_integration_profile="offline"
+        if getattr(request, "param", "fixture") == "custom"
+        else "live",
         job_retry_base_seconds=0,
         database_url=f"sqlite:///{(tmp_path / 'app.db').as_posix()}",
         chroma_persist_dir=str(tmp_path / "chroma"),
@@ -494,3 +500,48 @@ def test_unowned_development_data_cannot_be_implicitly_adopted(identity):
     response = client.post("/api/videos/import", json={"urls": [f"https://youtu.be/{VIDEO}"]})
     assert response.json()["jobs"][0]["outcome"] == "rejected"
     assert client.get("/api/videos").json()["total"] == 0
+
+
+def test_general_history_and_quiz_grading_remain_private(identity):
+    env = identity
+    a, _ = login(env, "general-owner")
+    ready(env, a)
+    chat = a.post("/api/chat", json={"question": "ทำอะไรอยู่", "mode": "general"})
+    assert chat.status_code == 200, chat.text
+    conversation = chat.json()["conversation_id"]
+    artifact_job = a.post(
+        "/api/learning-artifacts", json={"type": "quiz", "scope": {"video_ids": [VIDEO]}}
+    ).json()["job_id"]
+    asyncio.run(env.worker.run_once(artifact_job))
+    artifact = a.get("/api/jobs/" + artifact_job).json()["result"]["artifact_ids"][0]
+    b, _ = login(env, "general-outsider")
+    assert b.get("/api/conversations/" + conversation).status_code == 404
+    assert (
+        b.post(
+            "/api/learning-artifacts/" + artifact + "/submit", json={"answers": ["fake"]}
+        ).status_code
+        == 404
+    )
+    assert (
+        a.post(
+            "/api/learning-artifacts/" + artifact + "/submit", json={"answers": ["หลักฐาน"]}
+        ).status_code
+        == 202
+    )
+
+
+@pytest.mark.parametrize("identity", ["custom"], indirect=True)
+def test_member_chat_acknowledges_before_running_provider(identity):
+    env = identity
+    a, _ = login(env, "async-chat")
+    calls = []
+
+    async def should_not_run(*args):
+        calls.append(True)
+        raise AssertionError("API must not execute long model work")
+
+    env.app.state.adapters.adapter.companion = should_not_run
+    response = a.post("/api/chat", json={"mode": "general", "question": "อยากคุยเรื่องต้นไม้"})
+    assert response.status_code == 202, response.text
+    assert a.get("/api/jobs/" + response.json()["job_id"]).json()["state"] == "queued"
+    assert not calls

@@ -32,6 +32,7 @@ from .schemas import (
     ImportRequest,
     ImportResponse,
     JobResponse,
+    QuizSubmission,
     ResearchRequest,
     ResumeRequest,
     TranscriptResponse,
@@ -256,8 +257,18 @@ def create_app(settings=None, database=None, adapters=None):
 
     @app.post("/api/chat", response_model=ChatResponse, responses={202: {"model": Accepted}})
     async def chat(body: ChatRequest, request: Request, idempotency_key: IdempotencyKey = None):
-        await runtime.require("answer", "evidence", "inventory")
+        await runtime.require(
+            *(["answer"] if body.mode == "general" else ["answer", "evidence", "inventory"])
+        )
         job = repository.enqueue("chat", body.model_dump(mode="json"), idempotency_key)
+        if (
+            settings.auth_enabled
+            and settings.adapter_mode != "fixture"
+            and job["state"] in {"queued", "running", "paused"}
+        ):
+            # The dedicated worker owns long provider work. A quick durable acknowledgment
+            # gives clients a job ID immediately and keeps cancellation available.
+            return accepted(job)
         if job["state"] == "queued":
             await worker.run_once(job["job_id"])
         job = repository.get_job(job["job_id"])
@@ -265,7 +276,7 @@ def create_app(settings=None, database=None, adapters=None):
             return dict(
                 repository.chat_result(job), sources_available=repository.sources_available(job)
             )
-        if job["state"] in {"queued", "running"}:
+        if job["state"] in {"queued", "running", "paused"}:
             return accepted(job)
         code = job["error_code"] or "task_failed"
         status = (
@@ -467,6 +478,15 @@ def create_app(settings=None, database=None, adapters=None):
         return accepted(
             repository.enqueue("artifact", body.model_dump(mode="json"), idempotency_key)
         )
+
+    @app.post(
+        "/api/learning-artifacts/{artifact_id}/submit", response_model=Accepted, status_code=202
+    )
+    async def submit_quiz(
+        artifact_id: str, body: QuizSubmission, idempotency_key: IdempotencyKey = None
+    ):
+        await runtime.require("artifact")
+        return accepted(repository.enqueue_quiz(artifact_id, body.answers, idempotency_key))
 
     @app.get("/api/learning-artifacts/{artifact_id}")
     def get_artifact(artifact_id: str):
