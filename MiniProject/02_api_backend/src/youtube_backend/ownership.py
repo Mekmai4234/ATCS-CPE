@@ -81,6 +81,15 @@ class Ownership:
                 .limit(1)
             ):
                 raise AppError("cancelled", "No library authorizes this import", 409)
+        elif job["kind"] == "reindex":
+            if (
+                not self.settings.trial_reindex_enabled
+                or self.settings.app_env not in {"test", "development"}
+                or connection.scalar(sa.select(db.users.c.role).where(db.users.c.user_id == owner))
+                != "admin"
+            ):
+                raise AppError("cancelled", "Trial administrator no longer authorizes reindex", 409)
+            self._check_sources(connection, job["payload"].get("sources", []), owner=owner)
         elif job["kind"] in {"attach", "enrich"}:
             self._require_video(connection, job["video_id"], owner)
         else:

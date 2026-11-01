@@ -45,6 +45,15 @@ class ExecutionContext:
         """Trusted durable owner, never a client-supplied request/payload field."""
         return self.repository.check_execution(self.job_id, self.lease_token)["owner_id"]
 
+    @property
+    def cache_bypass(self):
+        return (
+            self.repository.check_execution(self.job_id, self.lease_token)["payload"].get(
+                "bypass_cache"
+            )
+            is True
+        )
+
     def authorize_sources(self, sources):
         job = self.repository.check_execution(self.job_id, self.lease_token)
         allowed = job["payload"].get("sources", [])

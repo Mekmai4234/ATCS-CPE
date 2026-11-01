@@ -111,6 +111,7 @@ class ManagedAdapters:
             return
         if name not in {
             "index",
+            "reindex",
             "answer",
             "analyze",
             "research",
@@ -125,8 +126,12 @@ class ManagedAdapters:
             return
         from .quota import QuotaBroker
 
-        model = self.settings.embedding_model if name == "index" else self.settings.llm_model
-        endpoint = "embedContent" if name == "index" else "generateContent"
+        model = (
+            self.settings.embedding_model
+            if name in {"index", "reindex"}
+            else self.settings.llm_model
+        )
+        endpoint = "embedContent" if name in {"index", "reindex"} else "generateContent"
         QuotaBroker(self.repository).access(model, endpoint)
         raise AppError(
             "gemini_broker_required",
@@ -146,7 +151,7 @@ class ManagedAdapters:
                 await close_adapter(self.adapter)
 
     def __getattr__(self, name):
-        if name not in METHODS and name not in {"enrich", "companion", "grade_quiz"}:
+        if name not in METHODS and name not in {"enrich", "companion", "grade_quiz", "reindex"}:
             raise AttributeError(name)
 
         async def invoke(*args, **kwargs):

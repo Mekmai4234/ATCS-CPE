@@ -197,6 +197,13 @@ class QuotaBroker:
         from .local_inference import execution_identity
 
         pinned = binding["payload"].get("execution")
+        if not pinned and (
+            self.settings.generation_provider == "ollama"
+            or self.settings.embedding_provider == "ollama"
+        ):
+            raise AppError(
+                "legacy_execution_unpinned", "Create new work with explicit provider identity", 409
+            )
         if pinned and pinned != execution_identity(self.settings):
             raise AppError(
                 "execution_changed", "Provider configuration changed; create new work", 409
@@ -210,7 +217,7 @@ class QuotaBroker:
             )
         default_role = (
             "embedding"
-            if endpoint == "embedContent" or binding["kind"] == "import"
+            if endpoint == "embedContent" or binding["kind"] in {"import", "reindex"}
             else "vision"
             if binding["kind"] == "enrich"
             else "agent"
@@ -222,7 +229,7 @@ class QuotaBroker:
             {"vision", "embedding"}
             if binding["kind"] == "enrich"
             else {"embedding"}
-            if binding["kind"] == "import"
+            if binding["kind"] in {"import", "reindex"}
             else {default_role, "vision", "embedding"}
             if binding["kind"] in {"chat", "analysis", "research", "artifact", "quiz_grade"}
             else set()

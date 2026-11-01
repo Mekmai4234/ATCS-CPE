@@ -48,6 +48,23 @@ def private_url(value):
     return value.rstrip("/")
 
 
+def public_execution(identity):
+    """Allowlist model identities; never expose arbitrary private payload fields."""
+    result = {}
+    for field in (
+        "provider",
+        "model",
+        "version",
+        "embedding_provider",
+        "embedding_model",
+        "embedding_version",
+    ):
+        value = identity.get(field)
+        pattern = r"[a-f0-9]{64}" if "version" in field else r"[\w./:-]{1,150}"
+        result[field] = value if isinstance(value, str) and re.fullmatch(pattern, value) else None
+    return result
+
+
 class LocalInference:
     def __init__(self, context, *, transport=None):
         self.context = context
@@ -114,7 +131,7 @@ class LocalInference:
             job = self.repo._owned(c, self.context.job_id, self.context.lease_token)
             allowed = {"chat", "analysis", "research", "artifact", "quiz_grade"}
             if operation == "embed":
-                allowed |= {"import", "enrich"}
+                allowed |= {"import", "enrich", "reindex"}
                 if settings.embedding_model != model:
                     raise AppError("local_configuration", "Embedding model pin differs", 503)
             if job["kind"] not in allowed:
@@ -247,7 +264,11 @@ class LocalInference:
         finally:
             if not dispatched:
                 state = "cancelled"
+            values = {"state": state}
+            if dispatched and state == "uncertain":
+                # A closed client socket is not proof the model stopped computing.
+                # Keep capacity fenced through the original job deadline, not just
+                # the shorter per-call timeout; never refund the sent ledger entry.
+                values["expires_at"] = job["deadline_at"]
             with self.repo.db.write() as c:
-                c.execute(
-                    table.update().where(table.c.reservation_id == permit).values(state=state)
-                )
+                c.execute(table.update().where(table.c.reservation_id == permit).values(**values))
