@@ -184,3 +184,11 @@ def test_checkpoint_is_private_bounded_and_lease_fenced(budget):
         actor_id.reset(token)
     with pytest.raises(AppError):
         budget.context.checkpoint("result")
+
+
+def test_checkpoint_rejects_changed_provider_even_without_outbound_call(budget):
+    budget.context.checkpoint("result", {"answer": "synthetic"})
+    budget.settings.generation_provider = "ollama"
+    with pytest.raises(AppError) as caught:
+        budget.context.checkpoint("result")
+    assert caught.value.code == "execution_changed"
