@@ -109,14 +109,13 @@ class LocalModel:
             settings.local_context_tokens,
             settings.local_max_output_tokens,
             body,
+            getattr(context, "job_id", "explicit-fresh")
+            if getattr(context, "cache_bypass", False)
+            else None,
         ]
         key = "06-" + hashlib.sha256(json_text(binding).encode()).hexdigest()
         checkpoint = getattr(context, "checkpoint", None)
-        cached = (
-            checkpoint(key)
-            if callable(checkpoint) and not getattr(context, "cache_bypass", False)
-            else None
-        )
+        cached = checkpoint(key) if callable(checkpoint) else None
         context.check()
         if cached is not None:
             try:
