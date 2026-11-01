@@ -56,6 +56,8 @@ def wire_evidence(item):
 
 
 class GeminiModel:
+    requires_context = True
+
     def __init__(self, settings, *, client=None):
         self.settings = settings
         if client is None and not settings.gemini_api_key.get_secret_value():

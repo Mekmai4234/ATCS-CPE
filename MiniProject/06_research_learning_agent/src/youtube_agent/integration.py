@@ -6,7 +6,7 @@ from youtube_rag.manifest import BackendExecution
 
 from .authorization import MemberAgentService
 from .config import AgentSettings
-from .gemini import GeminiModel
+from .local import create_model
 from .service import AgentService
 
 
@@ -42,13 +42,19 @@ class AgentAdapters(RagAdapters):
     ):
         # Construct the model first so missing generation configuration cannot leak RAG resources.
         config = agent_settings or AgentSettings.from_backend(settings)
-        gateway = model or GeminiModel(config)
+        gateway = model or create_model(config)
         rag_settings = rag_settings or RagSettings(
             _env_file=None,
             **{name: getattr(settings, name) for name in RagSettings.model_fields},
         )
         super().__init__(
             settings=settings, repository=repository, rag_settings=rag_settings, embedder=embedder
+        )
+        self.provider_operations.update(
+            {
+                name: "local" if config.generation_provider == "ollama" else "gemini-broker-v1"
+                for name in ("research", "artifact", "grade_quiz")
+            }
         )
         self.agent = AgentService(config, gateway, RagKnowledge(self.rag), analyzer=analyzer)
         if member_authority is not None:
@@ -81,7 +87,7 @@ class AgentAdapters(RagAdapters):
 async def create_adapters(*, settings, repository):
     """Trusted ADAPTER_FACTORY entrypoint. Live ingestion and module 05 are not supplied."""
     config = AgentSettings.from_backend(settings)
-    gateway = GeminiModel(config)
+    gateway = create_model(config)
     try:
         return AgentAdapters(
             settings=settings, repository=repository, agent_settings=config, model=gateway
@@ -99,7 +105,7 @@ async def create_member_adapters(*, settings, repository):
     if authority is None:
         raise error("member_authority_unavailable", "Backend member authority required", status=503)
     config = AgentSettings.from_backend(settings)
-    gateway = GeminiModel(config)
+    gateway = create_model(config)
     try:
         return AgentAdapters(
             settings=settings,
