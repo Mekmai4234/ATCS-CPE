@@ -169,7 +169,11 @@ class GeminiEmbedder:
                                 ]
                             )
                         except (ValueError, KeyError, TypeError):
-                            raise provider_error(502) from None
+                            raise error(
+                                "provider_invalid_response",
+                                "Embedding response is malformed",
+                                status=502,
+                            ) from None
                         usage = tokens
                     return ProviderReply(response, usage, getattr(response, "model_version", None))
                 except errors.APIError as exc:
