@@ -97,6 +97,7 @@ async def execute(repo, runtime, cases, run_key):
             "state": saved["state"],
             "state_after_cleanup": final["state"],
             "error_code": saved.get("error_code"),
+            "failure_diagnostic": saved["payload"].get("provider_failure"),
             "total_worker_ms": (time.monotonic() - started) * 1000,
             "same_job_on_replay": replay["job_id"] == job["job_id"],
             "result": saved.get("result"),
