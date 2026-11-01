@@ -126,6 +126,53 @@ async def test_local_schema_constrains_citations_to_supplied_ids():
     assert shape["properties"]["citation_ids"]["items"]["enum"] == ["chunk-1"]
 
 
+async def test_explicit_fresh_generation_skips_structured_checkpoint():
+    ctx = LocalContext()
+    model = LocalModel(settings())
+    await model._structured({"task": "สรุป"}, FinishArgs, 1, ctx)
+    ctx.cache_bypass = True
+    fresh = await model._structured({"task": "สรุป"}, FinishArgs, 1, ctx)
+    assert len(ctx.calls) == 2
+    assert fresh.metadata.provider == "ollama"
+    resumed = await model._structured({"task": "สรุป"}, FinishArgs, 1, ctx)
+    assert len(ctx.calls) == 2
+    assert resumed.metadata.provider == "ollama-cache"
+
+
+async def test_long_research_uses_relevant_tail_candidates_when_bounded(unit):
+    from types import SimpleNamespace
+
+    unit.knowledge.records = [evidence(cid=f"chunk-{i}", text="Basics") for i in range(74)]
+    unit.knowledge.records[-1] = evidence(
+        cid="chunk-73", text="Kubernetes reconciles desired state."
+    )
+
+    async def select(question, sources, execution, **options):
+        assert question == "Explain Kubernetes"
+        values = [unit.knowledge.records[-1], *unit.knowledge.records[:8]]
+        return {
+            "items": [SimpleNamespace(evidence=lambda record=record: record) for record in values],
+            "retrieved_chunks": len(values),
+            "inspected_chunks": 74,
+            "indexed_chunks": 74,
+        }
+
+    unit.knowledge.rag = SimpleNamespace(select_context=select)
+    config = settings().model_copy(update={"local_context_tokens": 32768})
+    unit.service.settings = config
+    unit.service.model = LocalModel(config)
+    ctx = LocalContext()
+    ctx.result["citation_ids"] = ["chunk-73"]
+    request = dict(unit.request, goal="Explain Kubernetes")
+    result = await unit.service.research(request, unit.sources, ctx)
+    supplied = json.loads(ctx.calls[0]["payload"]["messages"][-1]["content"])["untrusted_evidence"]
+    assert supplied[0]["chunk_id"] == "chunk-73"
+    assert result.state == "partial" and result.coverage.processed_chunks == 9
+    assert result.provider_metadata.usage["indexed_chunks"] == 74
+    assert result.provider_metadata.usage["supplied_chunks"] == 9
+    assert len(ctx.calls) == 1
+
+
 @pytest.mark.parametrize(
     "count,window,complete", [(32, 32768, True), (74, 32768, False), (32, 4096, False)]
 )
