@@ -24,7 +24,7 @@ from youtube_rag.manifest import Manifest
 from youtube_rag.service import RagService
 
 
-async def run(url, generation, embedding):
+async def run(url, generation, embedding, research_chunks=0):
     url = private_url(url)
     async with httpx.AsyncClient(base_url=url, trust_env=False, timeout=5) as http:
         tags = (await http.get("/api/tags")).json()["models"]
@@ -36,6 +36,20 @@ async def run(url, generation, embedding):
     )
     domain = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(domain)
+    if research_chunks:
+
+        async def captions(self, video_id, languages, timeout):
+            return dict(
+                video_id=video_id,
+                language="en",
+                is_generated=False,
+                segments=[
+                    dict(text=f"Fact {i}: RAG uses evidence.", start=i * 3.0, duration=3.0)
+                    for i in range(research_chunks)
+                ],
+            )
+
+        domain.CaptionProvider.fetch = captions
     results, apps = [], []
     with tempfile.TemporaryDirectory(prefix="video-buddy-local-probe-") as directory:
         async with domain.system(
@@ -63,6 +77,11 @@ async def run(url, generation, embedding):
                     "local_embedding_model": embedding,
                     "local_embedding_digest": models[embedding],
                     "embedding_dimensions": 1024,
+                    **(
+                        {"chunk_target_tokens": 32, "chunk_overlap_tokens": 0}
+                        if research_chunks
+                        else {}
+                    ),
                 },
             )
             old = worker.adapters.answers.rag
@@ -109,7 +128,32 @@ async def run(url, generation, embedding):
                 }
             )
             if status["state"] == "completed":
-                for kind in ("flashcards", "quiz", "study_plan"):
+                if research_chunks:
+                    settings.local_context_tokens = 32768
+                    worker.adapters.agent.settings = AgentSettings.from_backend(settings)
+                    worker.adapters.agent.model = LocalModel(worker.adapters.agent.settings)
+                    start = time.monotonic()
+                    response = await client.post(
+                        "/api/research",
+                        json={"goal": "Summarize RAG facts", "scope": {"video_ids": [domain.A]}},
+                        headers={"Idempotency-Key": "probe-multipage-research"},
+                    )
+                    response.raise_for_status()
+                    job_id = response.json()["run_id"]
+                    await worker.run_once(job_id)
+                    research = (await client.get("/api/jobs/" + job_id)).json()
+                    results.append(
+                        {
+                            "operation": "multi_page_local_research",
+                            "state": research["state"],
+                            "elapsed_ms": (time.monotonic() - start) * 1000,
+                            "error_code": research.get("error_code"),
+                            "result": research.get("result"),
+                            "default_model_call_budget": config.agent_max_model_calls,
+                            "default_step_budget": worker.adapters.agent.settings.agent_max_steps,
+                        }
+                    )
+                for kind in () if research_chunks else ("flashcards", "quiz", "study_plan"):
                     started = time.monotonic()
                     body = {
                         "type": kind,
@@ -174,8 +218,11 @@ def main():
     parser.add_argument("--generation-model", required=True)
     parser.add_argument("--embedding-model", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--research-chunks", type=int, choices=range(32, 129), default=0)
     args = parser.parse_args()
-    report = asyncio.run(run(args.url, args.generation_model, args.embedding_model))
+    report = asyncio.run(
+        run(args.url, args.generation_model, args.embedding_model, args.research_chunks)
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False))
