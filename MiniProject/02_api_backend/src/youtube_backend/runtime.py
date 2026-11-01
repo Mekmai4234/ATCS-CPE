@@ -109,7 +109,16 @@ class ManagedAdapters:
             or self.settings.backend_integration_profile == "offline"
         ):
             return
-        if name not in {"index", "answer", "analyze", "research", "artifact", "enrich"}:
+        if name not in {
+            "index",
+            "answer",
+            "analyze",
+            "research",
+            "artifact",
+            "enrich",
+            "companion",
+            "grade_quiz",
+        }:
             return
         declared = getattr(self.adapter, "provider_operations", {})
         if isinstance(declared, dict) and declared.get(name) in {"local", "gemini-broker-v1"}:
@@ -137,7 +146,7 @@ class ManagedAdapters:
                 await close_adapter(self.adapter)
 
     def __getattr__(self, name):
-        if name not in METHODS and name != "enrich":
+        if name not in METHODS and name not in {"enrich", "companion", "grade_quiz"}:
             raise AttributeError(name)
 
         async def invoke(*args, **kwargs):

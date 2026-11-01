@@ -37,7 +37,8 @@ export function readPosition(storage: Pick<Storage, 'getItem'> | undefined, view
   }
   return cornerPoint('bottom-right', view);
 }
-export function scopeFingerprint(scope: Scope) {
+export function scopeFingerprint(scope: Scope | null) {
+  if (!scope) return 'general';
   return JSON.stringify([
     [...scope.video_ids].sort(),
     [...scope.channel_ids].sort(),
