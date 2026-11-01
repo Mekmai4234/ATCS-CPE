@@ -39,7 +39,12 @@ class TeamAdapters(UnavailableAdapters):
             else "unverified"
         )
         self.provider_operations.update(
-            answer=answer_mode, analyze=answer_mode, research=agent_mode, artifact=agent_mode
+            answer=answer_mode,
+            analyze=answer_mode,
+            research=agent_mode,
+            artifact=agent_mode,
+            companion=answer_mode,
+            grade_quiz=agent_mode,
         )
         declared = getattr(type(self), "provider_operations", None)
         if isinstance(declared, dict):
@@ -63,6 +68,19 @@ class TeamAdapters(UnavailableAdapters):
 
     async def answer(self, *args):
         return await self.answers.answer(*args)
+
+    async def companion(self, request, sources, history, context):
+        from .companion import reply
+
+        return await reply(self.answers, request, sources, history, context)
+
+    async def grade_quiz(self, request, context):
+        context.check()
+        result = await self.agent.model.grade_quiz(
+            request, min(60, context.remaining_seconds), context=context
+        )
+        context.check()
+        return result
 
     async def analyze(self, *args):
         return await self.answers.analyze(*args)
