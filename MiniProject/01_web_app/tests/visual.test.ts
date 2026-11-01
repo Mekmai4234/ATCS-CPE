@@ -157,7 +157,7 @@ describe('visual integration boundary', () => {
       stage: 'queued',
       error_code: 'generation_rate_limited',
     } as Job;
-    expect(jobStatus(quota)).toContain('มีคำขอจำนวนมาก');
+    expect(jobStatus(quota)).toContain('ผู้ให้บริการจำกัดการใช้งาน');
     expect(jobStatus(quota)).not.toMatch(/Gemini|429|โควตา/);
     expect(jobStatus(quota)).not.toContain('ลองอีกครั้งได้หลัง');
     expect(jobStatus({ ...quota, error_code: 'generation_provider_busy' })).toContain(
@@ -168,7 +168,7 @@ describe('visual integration boundary', () => {
         ...quota,
         presentation: { stage: 'quota_paused', retryAt: '2026-10-25T06:00:00Z' },
       }),
-    ).toContain('ลองอีกครั้งได้หลัง');
+    ).toContain('เป็นเวลาประมาณของระบบ');
   });
   it('rejects invalid frame identity, times and generations', () => {
     expect(validFrame(frame)).toBe(true);
@@ -184,13 +184,14 @@ describe('visual integration boundary', () => {
       wait: { time_source: 'estimate', estimated_retry_at: '2026-10-25T06:00:00Z' },
     } as Job;
     expect(jobShouldPark(native)).toBe(false);
-    expect(jobStatus(native)).toContain('เวลาประมาณการของระบบ');
+    expect(jobStatus(native)).toContain('เป็นเวลาประมาณของระบบ');
     expect(jobStatus(native)).not.toContain('ลองอีกครั้งได้หลัง');
     const known = {
       ...native,
       wait: { time_source: 'provider' as const, retry_at: '2026-10-25T06:00:00Z' },
     };
-    expect(jobStatus(known)).toContain('ลองอีกครั้งได้หลัง');
+    expect(jobStatus(known)).toContain('เวลาที่ผู้ให้บริการระบุให้ลองใหม่');
+    expect(jobStatus(known)).not.toContain('เป็นเวลาประมาณของระบบ');
   });
   it('keeps observing transient provider retries and honors terminal state over stale pause metadata', () => {
     for (const code of [
