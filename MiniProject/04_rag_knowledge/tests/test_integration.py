@@ -31,8 +31,36 @@ async def test_real_backend_worker_marks_ready_only_after_verified_chroma_invent
     assert citation.start_seconds == hits[0].chunk.start_seconds
 
 
-async def test_worker_heartbeat_renews_during_real_chroma_startup(env):
-    env.settings.job_lease_seconds = 0.3
+async def test_worker_heartbeat_renews_during_real_chroma_startup(env, monkeypatch):
+    # Hold the first real vector request until a renewal is observed. Do not rely
+    # on Chroma startup being slower than an unrealistically short 300 ms lease.
+    env.settings.job_lease_seconds = 3
+    renewed = asyncio.Event()
+    heartbeat = env.repo.heartbeat
+    call = env.rag.vectors.call
+    first = True
+
+    def observe(*args):
+        value = heartbeat(*args)
+        renewed.set()
+        return value
+
+    async def pending(*args, **kwargs):
+        nonlocal first
+        if not first:
+            return await call(*args, **kwargs)
+        first = False
+        task = asyncio.create_task(call(*args, **kwargs))
+        try:
+            await asyncio.wait_for(renewed.wait(), 10)
+            return await task
+        finally:
+            if not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+
+    monkeypatch.setattr(env.repo, "heartbeat", observe)
+    monkeypatch.setattr(env.rag.vectors, "call", pending)
     pipeline = ReferencePipeline(env.repo, env.settings, env.adapters, [transcript()])
     worker = Worker(env.repo, pipeline, env.settings)
     item = env.repo.import_urls([f"https://youtu.be/{VIDEO_A}"])[0]
@@ -40,6 +68,7 @@ async def test_worker_heartbeat_renews_during_real_chroma_startup(env):
     job = env.repo.get_job(item["job_id"])
     assert job["stage"] == "ready"
     assert job["attempt_count"] == 1
+    assert renewed.is_set()
 
 
 async def test_replaced_transcript_retires_and_removes_old_vectors(env):
