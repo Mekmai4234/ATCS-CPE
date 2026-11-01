@@ -107,6 +107,32 @@ class AnswerAdapters(RagAdapters):
     @timed_stage("total")
     async def answer(self, request, sources, history, context):
         from youtube_backend.repository import digest
+        from youtube_backend.schemas import AnswerResult
+
+        durable = getattr(context, "saved_answer", None)
+        if callable(durable) and context.settings.auth_enabled and sources:
+            signature = digest(
+                [
+                    "durable-answer-v1",
+                    reuse_configuration(self.answers.settings, self.rag.settings),
+                    [s.model_dump() for s in sources],
+                    {k: v for k, v in request.items() if k != "conversation_id"},
+                    history,
+                ]
+            )
+            saved = durable(signature)
+            if saved:
+                from youtube_backend.validation import validate_result
+
+                result = AnswerResult.model_validate(
+                    {name: saved[name] for name in AnswerResult.model_fields if name in saved}
+                )
+                await validate_result(result, sources, self, context)
+                metadata = result.provider_metadata
+                metadata.provider = "saved-answer-cache"
+                metadata.usage = {}
+                metadata.latency_ms = 0
+                return result
 
         key = None
         broker = getattr(self.answers.model, "broker", None)
