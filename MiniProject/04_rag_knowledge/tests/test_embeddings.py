@@ -128,6 +128,8 @@ async def test_provider_errors_are_redacted_classified_and_not_retried(status, r
         with pytest.raises(AppError) as caught:
             await adapter.embed(["test"], 5, execution=SDKExecution())
         assert caught.value.retryable is retryable
+        assert caught.value.failure_origin == "http"
+        assert caught.value.provider_status == status
         assert "LEAK" not in str(caught.value) and "secret" not in str(caught.value)
         assert calls == 1
     finally:
@@ -143,6 +145,8 @@ async def test_transport_error_is_retryable_without_raw_exception():
         with pytest.raises(AppError) as caught:
             await adapter.embed(["test"], 5, execution=SDKExecution())
         assert caught.value.retryable
+        assert caught.value.failure_origin == "transport"
+        assert caught.value.provider_status is None
         assert "secret" not in str(caught.value)
     finally:
         await adapter.close()
