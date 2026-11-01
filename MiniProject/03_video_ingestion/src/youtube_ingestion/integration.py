@@ -52,15 +52,28 @@ async def create_adapters(*, settings, repository):
     if settings.backend_integration_profile != "live":
         raise failure("ingestion_configuration", "Live ingestion requires the live profile", 503)
     config = IngestionSettings()
-    rag_config = RagSettings(
-        _env_file=(
-            PROJECT_ROOT / ".env",
-            PROJECT_ROOT / "04_rag_knowledge" / ".env",
-            PROJECT_ROOT / "03_video_ingestion" / ".env",
+    rag_config = (
+        RagSettings(
+            _env_file=None,
+            **{
+                name: getattr(settings, name)
+                for name in RagSettings.model_fields
+                if hasattr(settings, name)
+            },
+        )
+        if settings.embedding_provider == "ollama"
+        else RagSettings(
+            _env_file=(
+                PROJECT_ROOT / ".env",
+                PROJECT_ROOT / "04_rag_knowledge" / ".env",
+                PROJECT_ROOT / "03_video_ingestion" / ".env",
+            )
         )
     )
-    if rag_config.embedding_provider != "gemini":
-        raise failure("ingestion_configuration", "Live ingestion requires Gemini embeddings", 503)
+    if rag_config.embedding_provider not in {"gemini", "ollama"}:
+        raise failure(
+            "ingestion_configuration", "Live ingestion requires a production embedder", 503
+        )
     knowledge = RagAdapters(settings=settings, repository=repository, rag_settings=rag_config)
     # Ingestion owns one metadata client, constructed only after RAG initialized successfully.
     try:
