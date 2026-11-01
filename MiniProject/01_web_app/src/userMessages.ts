@@ -21,6 +21,14 @@ export function serviceMessage(code: string | null | undefined, status?: number)
   if (code === 'local_unavailable')
     return 'AI ในเครื่องยังไม่พร้อม กรุณาตรวจบริการในเครื่องก่อนทำต่อ';
   if (code === 'local_timeout') return 'AI ในเครื่องใช้เวลานานเกินกำหนด งานนี้ยังไม่สำเร็จ';
+  if (code === 'local_busy') return 'คิว AI ในเครื่องเต็ม กรุณาติดตามงานเดิมก่อนส่งซ้ำ';
+  if (code === 'local_model_changed')
+    return 'โมเดล AI ในเครื่องไม่ตรงกับรุ่นที่กำหนด กรุณาให้ผู้ดูแลตรวจสอบ';
+  if (code === 'execution_changed')
+    return 'ผู้ให้บริการหรือรุ่นข้อมูลเปลี่ยนไป กรุณาตรวจผลเดิมก่อนเริ่มงานใหม่';
+  if (code === 'local_unsupported')
+    return 'AI ในเครื่องรองรับข้อความเท่านั้น ยังตรวจภาพและเสียงคลิปไม่ได้';
+  if (code === 'local_invalid_response') return 'AI ในเครื่องส่งผลไม่สมบูรณ์ งานนี้ยังไม่สำเร็จ';
   if (status === 429) return userMessages.busy;
   if (
     ['generation_provider_busy', 'provider_unavailable', 'generation_provider_error'].includes(
