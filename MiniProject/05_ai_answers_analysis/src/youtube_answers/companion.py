@@ -1,5 +1,7 @@
 """General conversation has no video evidence; identity and persistence remain backend-owned."""
 
+from contextlib import nullcontext
+
 from pydantic import Field
 from youtube_backend.schemas import AnswerResult, Coverage, Schema
 
@@ -35,13 +37,15 @@ async def reply(adapter, request, sources, history, context):
             break
         recent.insert(0, message)
     model = adapter.answers.model
-    with model.broker.bind(context):
+    local = getattr(model, "requires_context", False)
+    with nullcontext() if local else model.broker.bind(context):
         generated = await model.generate(
             {"message": request["question"], "history": recent},
             min(45, context.remaining_seconds),
             schema=CompanionText,
             policy=POLICY,
             output_limit=1024,
+            **({"context": context} if local else {}),
         )
     content = CompanionText.model_validate(generated.content)
     context.check()

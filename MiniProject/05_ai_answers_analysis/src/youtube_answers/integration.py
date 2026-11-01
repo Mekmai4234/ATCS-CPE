@@ -17,6 +17,7 @@ from .quota import ExecutionBroker
 from .reuse import reuse_configuration
 from .service import AnswerService
 from .timing import measured_operation, timed_stage
+from .trusted_local import TrustedLocalModel
 
 
 class RagKnowledge:
@@ -98,6 +99,8 @@ class AnswerAdapters(RagAdapters):
             settings=settings, repository=repository, rag_settings=rag_settings, embedder=embedder
         )
         self.answers = AnswerService(config, gateway, RagKnowledge(self.rag))
+        if isinstance(gateway, TrustedLocalModel):
+            self.provider_operations.update(answer="local", analyze="local")
         self.answer_reuse = OrderedDict()
 
     @measured_operation("chat")
@@ -137,7 +140,7 @@ class AnswerAdapters(RagAdapters):
                         cached[1].provider_metadata.requested_model, "generateContent", "vision"
                     )
                 result = cached[1].model_copy(deep=True)
-                result.provider_metadata.provider = "answer-cache"
+                result.provider_metadata.provider = "gemini-cache"
                 result.provider_metadata.usage = {}
                 result.provider_metadata.latency_ms = 0
                 return result
@@ -160,6 +163,12 @@ class AnswerAdapters(RagAdapters):
         from .video import NativeVideoAnswers, needs_video
 
         use_video = needs_video(request["question"])
+        if use_video and isinstance(self.answers.model, TrustedLocalModel):
+            raise error(
+                "local_unsupported",
+                "Text-only local cannot inspect video; ask about the available transcript",
+                status=409,
+            )
         video_note = None
         native_insufficient = None
         if use_video and isinstance(self.answers.model, GeminiModel):
@@ -233,7 +242,11 @@ async def create_adapters(*, settings, repository):
 
     config = resolved_service(settings, AnswerSettings)
     rag_config = resolved_service(settings, RagSettings)
-    gateway = GeminiModel(config, broker=ExecutionBroker(repository, config))
+    gateway = (
+        TrustedLocalModel(config)
+        if config.generation_provider == "ollama"
+        else GeminiModel(config, broker=ExecutionBroker(repository, config))
+    )
     try:
         return AnswerAdapters(
             settings=settings,
