@@ -7,6 +7,7 @@ from .gemini import GeminiModel
 from .integration import AnswerAdapters, RagKnowledge
 from .models import error
 from .quota import ExecutionBroker
+from .trusted_local import TrustedLocalModel
 
 
 class TeamAdapters(UnavailableAdapters):
@@ -29,12 +30,16 @@ class TeamAdapters(UnavailableAdapters):
         self.answers, self.ingestion, self.agent = answers, ingestion, agent
         self.provider_operations = dict(answers.provider_operations)
         answer_mode = (
-            "gemini-broker-v1"
+            "local"
+            if isinstance(answers.answers.model, TrustedLocalModel)
+            else "gemini-broker-v1"
             if isinstance(getattr(answers.answers.model, "broker", None), ExecutionBroker)
             else "unverified"
         )
         agent_mode = (
-            "gemini-broker-v1"
+            "local"
+            if type(agent.model).__module__ == "youtube_agent.local"
+            else "gemini-broker-v1"
             if type(agent.model).__module__ == "youtube_agent.gemini"
             else "unverified"
         )
@@ -114,7 +119,12 @@ async def create_adapters(*, settings, repository):
             "integration_not_installed", "Install module 05 with --extra team", status=503
         ) from None
     config = load_team_configuration(settings)
-    gateway = GeminiModel(config.answers, broker=ExecutionBroker(repository, config.answers))
+    local = config.answers.generation_provider == "ollama"
+    gateway = (
+        TrustedLocalModel(config.answers)
+        if local
+        else GeminiModel(config.answers, broker=ExecutionBroker(repository, config.answers))
+    )
     try:
         answers = AnswerAdapters(
             settings=settings,
@@ -129,7 +139,12 @@ async def create_adapters(*, settings, repository):
     ingestion, agent_model = None, None
     try:
         ingestion = IngestionService(config.ingestion)
-        agent_model = AgentModel(config.agent)
+        if local:
+            from youtube_agent.local import LocalModel
+
+            agent_model = LocalModel(config.agent)
+        else:
+            agent_model = AgentModel(config.agent)
         from .video import NativeVideoAnswers, needs_video
 
         native = NativeVideoAnswers(gateway, config.answers)
@@ -138,8 +153,8 @@ async def create_adapters(*, settings, repository):
             agent_model,
             RagKnowledge(answers.rag),
             analyzer=answers.analyze,
-            media_answerer=native.answer,
-            media_selector=needs_video,
+            media_answerer=None if local else native.answer,
+            media_selector=None if local else needs_video,
         )
         return TeamAdapters(answers, ingestion, agent)
     except BaseException:

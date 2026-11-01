@@ -96,7 +96,10 @@ class AnswerService:
         if run.calls >= self.settings.answer_max_model_calls:
             raise error("analysis_budget_exceeded", "Answer model call budget exhausted")
         run.calls += 1
-        generated = await self._bounded(run, lambda timeout: self.model.generate(data, timeout))
+        options = {"context": run.context} if getattr(self.model, "requires_context", False) else {}
+        generated = await self._bounded(
+            run, lambda timeout: self.model.generate(data, timeout, **options)
+        )
         try:
             result = GeneratedAnswer.model_validate(generated.content)
             metadata = ProviderMetadata.model_validate(generated.metadata)
