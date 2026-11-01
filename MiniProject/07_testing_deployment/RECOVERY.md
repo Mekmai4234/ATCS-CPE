@@ -43,3 +43,32 @@ validate any external referenced assets as a separate reviewed migration step be
 release. Do not run a v2 migration against real data for a test fixture. Quota usage
 and policy state must remain in the shared SQLite backup; never reset usage to obtain
 more requests. See FREE_TIER_ACCEPTANCE.md for the incomplete integration gates.
+
+## External media and a new SQLite URL
+
+Module 02 resolves image assets under a namespace derived from the exact normalized
+database URL. Copying an external media directory without relocating that namespace
+does not make images readable after restoring SQLite to a different path.
+
+With all writers stopped, obtain the namespace from
+`youtube_backend.media.asset_root(settings)` using the actual resolved settings. If
+the database references assets, include that existing namespace explicitly:
+
+```powershell
+python 07_testing_deployment/scripts/recovery.py backup STATE BUNDLE --services-stopped --media-source EXACT_ASSET_NAMESPACE --database-url ORIGINAL_NORMALIZED_SQLITE_URL
+python 07_testing_deployment/scripts/recovery.py restore BUNDLE NEW_STATE --database-url NEW_NORMALIZED_SQLITE_URL
+```
+
+The utility verifies that the URL identifies the selected SQLite file, checksums the
+external images with the pair, and maps their namespace to the new URL on restore.
+Point the restored configuration's `media_asset_dir` at `NEW_STATE/media-assets`.
+The original state is retained. An external-media bundle refuses restore without
+the destination URL; older v1/v2 bundles without this metadata remain supported.
+If the original database has zero image records and no asset directory, omit
+`--media-source`. Never substitute another database's namespace.
+
+Retain a separate nonsecret configuration snapshot (models, dimensions, chunking,
+factory, origins and source/lock hashes). Keep credentials outside the bundle.
+Verify pair markers, source versions, inventories, history, permissions and image
+bytes before cutover. A restored test copy must not dispatch providers against a
+second copy of the production quota ledger.

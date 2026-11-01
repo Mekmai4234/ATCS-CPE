@@ -10,13 +10,16 @@ behavior through supported interfaces rather than mock removed module attributes
 | K04-ENV | Selected FullSettings snapshot exported to runtime and the actual maintenance resolver; stale module dotenv values cannot override it. |
 | K04-STORE | Wrong-store reindex and GC must raise index_store_mismatch before changing active/runs/chunks metadata or creating the wrong directory. |
 
-No xfail/skips mask these checks. Current measured results and exact base/overlay refs
-are in REVIEW_FIX_REPORT.md. PR13 removes 05's old ENV_FILES constant; preflight now
-uses FullSettings and the new loader when available, with an exported legacy-loader
-compatibility check on develop. PR16 updates 02 full tests for that new 05 interface.
-The 07 PR does not merge pending PR11/13/16 implementation changes.
+No xfail/skips mask these checks. REVIEW_FIX_REPORT.md retains historical candidate
+results; its pending-PR descriptions are not current integration blockers. The merged
+factory uses resolved backend configuration rather than 05's removed ENV_FILES constant.
 
-Remaining dependencies: active CI still needs a repository-root workflow outside 07;
-frontend checks await integration of 01 (PR15 is separate). Live semantic review,
-production hosting/restore/rollback and browser acceptance remain separate gates.
-Offline and isolated startup checks do not establish provider availability or AI quality.
+As of develop d06321e (1 November 2026), repository-root CI and module 01 integration
+exist. Develop run 41309549549 completed successfully on Linux and Windows, together
+with frontend, packaging and local-media-tools. A later release must verify its own
+exact source; this result does not certify future commits.
+
+Remaining release evidence includes real-provider feature/quality review, measured
+capacity and paired operational recovery. Public Google/origin/TLS acceptance applies
+when deploying publicly. Offline and isolated startup checks do not establish provider
+availability or AI quality; a localhost release does not require public hosting.
