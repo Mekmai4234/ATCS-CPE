@@ -11,7 +11,7 @@ attestation) remain in force. No 01/03/05 source files were edited.
 |---|---:|---:|
 | 02 backend | 221 passed | 221 passed |
 | 04 RAG | 178 passed, 1 live opt-in skipped | 178 passed, 1 live opt-in skipped |
-| 06 agent | 161 passed before citation enum increment | 161 passed before final metadata/enum increments |
+| 06 agent | 162 passed on citation enum increment | 161 passed before final metadata/enum increments |
 | 06 final local boundary | 9 passed | 9 passed |
 | 07 complete suite | 136 passed | 136 passed |
 
@@ -51,7 +51,19 @@ real embedding request; flashcards/quiz/study plan were correctly rejected for
 invalid citations (22.71/14.48/12.79 s), three real generation requests, zero Gemini.
 Idempotent retries returned the same job. This failure caused a module-06 fix:
 constrain JSON citation arrays to actual supplied IDs without relaxing publication
-validation. Follow-up results are recorded in the final PR evidence.
+validation. Second probe exposed an old fixture RAG reference during final
+publication and a generated study plan with the wrong number of days. Fixed the
+probe's shared RAG binding and constrained local study-plan schema to requested
+day count; production publication checks were preserved.
+
+Final real-model probe: local index **6.80 s**, flashcards **14.69 s**, quiz
+**11.07 s**, two-day study plan **14.86 s**. All completed and were saved through
+the actual authenticated API/worker. All idempotent replays returned the same job.
+Exactly one embedding and three generation attempts, zero Gemini. Returned model
+digest and actual provider prompt/evaluation/load timing are recorded in result
+metadata. The first generation loaded in 3.90 s; subsequent load times were about
+1.2–1.5 ms. This is a small warm-reuse observation, not a controlled latency/capacity
+benchmark or proof of output correctness. No real user data was sent to the models.
 
 Raw reports live under ignored `runtime/local-*.json`. `local_model_probe.py`
 reproduces the experiment with actual models but synthetic identity/captions and
