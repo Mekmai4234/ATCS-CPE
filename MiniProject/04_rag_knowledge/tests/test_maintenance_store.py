@@ -54,6 +54,30 @@ def config_file(path, env, store):
     return path
 
 
+async def test_cli_local_reindex_rejected_before_any_index_or_store_change(env, tmp_path):
+    await env.ready()
+    before = snapshot(env)
+    trial = tmp_path / "untouched-local-store"
+    file = config_file(tmp_path / "local.env", env, trial)
+    text = file.read_text(encoding="utf-8").replace(
+        "EMBEDDING_PROVIDER=fixture", "EMBEDDING_PROVIDER=ollama"
+    )
+    text = text.replace("EMBEDDING_MODEL=fixture-hash-v1", "EMBEDDING_MODEL=trial:embed")
+    file.write_text(
+        text + "\nLOCAL_EMBEDDING_MODEL=trial:embed\nLOCAL_EMBEDDING_DIGEST=" + "a" * 64,
+        encoding="utf-8",
+    )
+    args = build_parser().parse_args(
+        ["reindex", "--workers-stopped", "--env-file", str(file), "--video-id", VIDEO_A]
+    )
+    with pytest.raises(AppError) as caught:
+        await maintenance(args)
+    assert caught.value.code == "local_maintenance_unsupported"
+    assert "authenticated execution-bound worker" in caught.value.message
+    assert snapshot(env) == before
+    assert not trial.exists()
+
+
 @pytest.mark.parametrize("operation", ["reindex", "gc", "delete"])
 async def test_wrong_store_rejected_before_any_manifest_mutation(env, tmp_path, operation):
     source = await env.ready()
