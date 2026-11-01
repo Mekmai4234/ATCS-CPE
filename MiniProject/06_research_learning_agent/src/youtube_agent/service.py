@@ -343,6 +343,9 @@ class AgentService:
                             "sources": [s.model_dump() for s in run.sources],
                             "evidence": [e.model_dump(mode="json") for e in records.values()],
                             "schema": schema.model_json_schema(),
+                            "fresh_job": getattr(run.context, "job_id", "explicit-fresh")
+                            if getattr(run.context, "cache_bypass", False)
+                            else None,
                             "settings": self.settings.model_dump(
                                 mode="json", exclude={"gemini_api_key"}
                             ),
@@ -350,11 +353,7 @@ class AgentService:
                     ).encode()
                 ).hexdigest()
             )
-            cached = (
-                checkpoint(key)
-                if callable(checkpoint) and not getattr(run.context, "cache_bypass", False)
-                else None
-            )
+            cached = checkpoint(key) if callable(checkpoint) else None
             if cached is not None:
                 run.context.check()
                 metadata = ProviderMetadata.model_validate(cached["metadata"]).model_copy(
