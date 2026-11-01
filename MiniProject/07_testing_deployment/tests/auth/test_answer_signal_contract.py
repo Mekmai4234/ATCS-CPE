@@ -141,6 +141,9 @@ async def test_producer_contract_across_publication_paths(tmp_path, path):
             accepted = await client.post("/api/chat", json=request)
             assert accepted.status_code == 202, accepted.text
             job_id = accepted.json()["job_id"]
+            await worker.run_once(job_id)
+            first = (await client.get(f"/api/jobs/{job_id}")).json()
+            assert first["state"] == "queued" and first["error_code"] == "provider_unavailable"
             with worker.repo.db.write() as c:
                 # Advance this synthetic queued attempt without waiting for the
                 # provider backoff floor; no real request or retry budget is used.
