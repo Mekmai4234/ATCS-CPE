@@ -183,10 +183,17 @@ test('reload discovers the existing job and follows GET without another POST', a
   await expect.poll(() => reads).toBeGreaterThan(0);
   await expect(page.getByText(/ตัวประมวลผลยังไม่พร้อม/)).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('button', { name: 'ติดตามงานเดิม', exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole('region', { name: 'ติดตามงาน', exact: true })
+      .getByRole('button', { name: 'ดูงาน', exact: true }),
+  ).toBeVisible();
   await expect(page.getByText(/ตัวประมวลผลยังไม่พร้อม/)).toBeVisible();
   finished = true;
-  await page.getByRole('button', { name: 'ติดตามงานเดิม', exact: true }).click();
+  await page
+    .getByRole('region', { name: 'ติดตามงาน', exact: true })
+    .getByRole('button', { name: 'ดูงาน', exact: true })
+    .click();
   await expect(page.getByText('ผลจากงานเดิม', { exact: true })).toBeVisible();
   expect(posts).toBe(1);
 });
@@ -281,4 +288,57 @@ test('real v2 media path loads authorized images without a fixture bridge', asyn
   await panel.locator('summary').click();
   await expect(panel.getByRole('alert')).toBeVisible();
   await expect(panel.locator('.frame-evidence img')).toHaveCount(0);
+});
+
+test('work strip reports running, queued and paused jobs without counting a paused job as running', async ({
+  page,
+}) => {
+  await fixture(page);
+  const jobs = [
+    {
+      job_id: 'working',
+      kind: 'research',
+      state: 'running',
+      stage: 'running',
+      request: { goal: 'ค้นคว้าที่กำลังทำ' },
+      sources: [],
+      created_at: '2026-11-01T01:00:00Z',
+    },
+    {
+      job_id: 'waiting',
+      kind: 'artifact',
+      state: 'queued',
+      stage: 'queued',
+      request: { topic: 'แฟลชการ์ดในคิว' },
+      sources: [],
+      created_at: '2026-11-01T01:01:00Z',
+    },
+    {
+      job_id: 'paused',
+      kind: 'artifact',
+      state: 'paused',
+      stage: 'paused',
+      error_code: 'quota_wait',
+      retryable: true,
+      request: { topic: 'แผนเรียนรอโควตา' },
+      sources: [],
+      created_at: '2026-11-01T01:02:00Z',
+      wait: { estimated_retry_at: '2026-11-01T13:10:58Z', reason: 'quota_wait' },
+    },
+  ];
+  await page.route('**/api/member/jobs?*', (route) =>
+    route.fulfill({ json: { items: jobs, total: 3, limit: 50, offset: 0 } }),
+  );
+  await page.goto(base);
+  const strip = page.getByRole('region', { name: 'ติดตามงาน', exact: true });
+  await expect(strip).toContainText('กำลังทำ 1 · รอคิว 1 · พักรอ 1');
+  await expect(strip.getByText('ค้นคว้าที่กำลังทำ', { exact: false })).toBeVisible();
+  await page.getByRole('region', { name: 'งานของฉัน', exact: true }).locator('summary').click();
+  await expect(page.getByRole('region', { name: 'งานของฉัน', exact: true })).toContainText(
+    'พร้อมประมาณ',
+  );
+  await expect(strip.getByRole('button', { name: 'ดูงาน', exact: true })).toHaveCount(1);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await strip.screenshot({ path: 'runtime/screenshots/work-queue-20261101.png' });
 });
