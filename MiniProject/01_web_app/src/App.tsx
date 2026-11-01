@@ -31,6 +31,7 @@ import ChatHistory from './ChatHistory';
 import { BuddyArt } from './BuddyArt';
 import JobRecovery from './JobRecovery';
 import MediaEvidence from './MediaEvidence';
+import LocalEvidenceSearch from './LocalEvidenceSearch';
 
 type WorkspaceView = 'home' | 'library' | 'chat' | 'learn' | 'history';
 interface WorkspaceProps {
@@ -1948,6 +1949,14 @@ export default function App({
                 {deferred.map((item) => (
                   <article key={item.jobId}>
                     <strong>{item.label}</strong>
+                    {item.type === 'chat' &&
+                      (item.payload as { scope?: import('./types').Scope }).scope && (
+                        <LocalEvidenceSearch
+                          api={api}
+                          question={(item.payload as { question: string }).question}
+                          scope={(item.payload as { scope: import('./types').Scope }).scope}
+                        />
+                      )}
                     <p role="status">
                       {jobs[item.jobId!] ? jobStatus(jobs[item.jobId!]) : 'กำลังตรวจสอบสถานะคำขอ'}
                     </p>
