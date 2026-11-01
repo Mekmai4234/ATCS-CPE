@@ -24,7 +24,8 @@ class RagAdapters(UnavailableAdapters):
                 "fixture_forbidden", "Fixture embeddings are restricted to development/test"
             )
         self.provider_operations = {
-            "index": "gemini-broker-v1" if config.embedding_provider == "gemini" else "local"
+            name: "gemini-broker-v1" if config.embedding_provider == "gemini" else "local"
+            for name in ("index", "reindex")
         }
         self.rag = RagService(
             config,
