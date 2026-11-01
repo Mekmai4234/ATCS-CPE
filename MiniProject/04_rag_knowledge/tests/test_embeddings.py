@@ -268,3 +268,22 @@ async def test_transient_embedding_error_after_successful_token_count():
 @pytest.mark.live
 async def test_live_gemini_embeddings_query_document_and_normalization():
     pytest.skip("Live embedding acceptance requires an approved durable 02 execution")
+
+
+async def test_malformed_success_is_terminal_not_an_http_502_retry():
+    def handler(request):
+        if request.url.path.endswith(":countTokens"):
+            return httpx.Response(200, json={"totalTokens": 9})
+        return httpx.Response(200, json={"unexpected": "no embedding"})
+
+    adapter = GeminiEmbedder(
+        RagSettings(_env_file=None, embedding_dimensions=128), client=client_for(handler)
+    )
+    try:
+        with pytest.raises(AppError) as caught:
+            await adapter.embed(["test"], 5, execution=SDKExecution())
+        assert caught.value.code == "provider_invalid_response"
+        assert not caught.value.retryable
+        assert caught.value.provider_status is None
+    finally:
+        await adapter.close()
