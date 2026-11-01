@@ -154,13 +154,15 @@ async def test_unbound_or_unverified_never_reaches_google(native):
     assert not env.requests
 
 
-@pytest.mark.parametrize("status", [429, 503])
+@pytest.mark.parametrize("status", [429, 500, 503])
 async def test_actual_provider_failure_updates_shared_circuit_without_retry(native, status):
     env = native
     env.remote_status = status
     with env.bridge.bind(execution(env, "chat")), pytest.raises(AppError) as caught:
         await env.gateway.generate({}, 10)
     assert len(env.requests) == 2 and "PRIVATE" not in str(caught.value)
+    assert caught.value.failure_origin == "http"
+    assert caught.value.provider_status == status
     with env.db.read() as c:
         circuit = c.execute(sa.select(db.v2["circuits"])).mappings().one()
     assert circuit["blocked_until"] > datetime.now(UTC).timestamp()
