@@ -15,6 +15,11 @@ attestation) remain in force. No 01/03/05 source files were edited.
 | 06 final local boundary | 9 passed | 9 passed |
 | 07 complete suite | 136 passed | 136 passed |
 
+Additional actual combined-source full-composition host suite: **38 passed** after
+retaining module-04's embedding constructor injection used by existing consumers.
+Initial fixture setup failed when that injection name disappeared; fixed in 04,
+without editing another owner's tests or weakening provider admission.
+
 Warnings are errors. Docker uses installed locked test images with current source
 mounted read-only and explicit PYTHONPATH, network disabled, memory/CPU/PID limits.
 These source-mount tests do not replace building the new dependency lock in CI.
