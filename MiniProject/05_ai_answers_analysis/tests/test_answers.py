@@ -428,3 +428,4 @@ async def test_complete_short_thai_clip_avoids_remote_search_and_credits_all_chu
     result = await env.service.answer(env.request, env.sources, [], env.ctx)
     assert result.coverage.complete and result.coverage.processed_chunks == 74
     assert not env.knowledge.queries
+    assert "Limitations:" not in result.answer
