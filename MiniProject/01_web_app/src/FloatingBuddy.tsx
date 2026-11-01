@@ -1,3 +1,4 @@
+import { smallTalkReply } from './smallTalk';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -32,6 +33,7 @@ interface Props {
   turns: BuddyTurn[];
   locked: boolean;
   busy: boolean;
+  pending?: { id: string; label: string };
   status: string;
   error: string;
   waiting?: {
@@ -87,6 +89,7 @@ export default function FloatingBuddy(props: Props) {
   const launcher = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const scopePanel = useRef<HTMLDetailsElement>(null);
   const atBottom = useRef(true);
   const savedScroll = useRef(0);
   const observedCount = useRef(0);
@@ -212,7 +215,7 @@ export default function FloatingBuddy(props: Props) {
       scroller.current.scrollTop = savedScroll.current;
       if (incoming) setNewMessage(true);
     }
-  }, [props.turns.length, props.status, open]);
+  }, [props.turns.length, props.status, props.pending?.id, open]);
   const width = Math.min(440, view.width - 24);
   const height = Math.min(700, view.height - (mobile ? 24 : 112));
   const x = mobile
@@ -388,7 +391,7 @@ export default function FloatingBuddy(props: Props) {
                 เริ่มบทสนทนาใหม่
               </button>
             </div>
-            <details className="buddy-scope" open>
+            <details className="buddy-scope" ref={scopePanel}>
               <summary>คลิปที่เลือก {props.selected.length} คลิป</summary>
               <fieldset disabled={props.locked}>
                 <legend>ใช้เฉพาะคลิปที่พร้อมถามตอบ</legend>
@@ -426,27 +429,31 @@ export default function FloatingBuddy(props: Props) {
                 if (atBottom.current) setNewMessage(false);
               }}
             >
-              <div className="buddy-v5-welcome">
-                <BuddyArt pose="buddy" />
-                <h3>
-                  ถามได้เลย<span>.</span>
-                </h3>
-              </div>
+              {!props.turns.length && !props.pending && (
+                <div className="buddy-v5-welcome">
+                  <BuddyArt pose="buddy" />
+                  <h3>
+                    ถามได้เลย<span>.</span>
+                  </h3>
+                </div>
+              )}
               {props.turns.map((turn) => (
                 <article className="buddy-message" key={turn.id}>
                   <div className="buddy-question">{turn.label}</div>
-                  <details className="buddy-v5-sources">
-                    <summary>แหล่งข้อมูล · {turn.sources.length} คลิป</summary>
-                    <p>
-                      {turn.sources
-                        .map(
-                          (source) =>
-                            props.videos.find((video) => video.video_id === source.video_id)
-                              ?.title || source.video_id,
-                        )
-                        .join(' · ')}
-                    </p>
-                  </details>
+                  {turn.sources.length > 0 && (
+                    <details className="buddy-v5-sources">
+                      <summary>แหล่งข้อมูล · {turn.sources.length} คลิป</summary>
+                      <p>
+                        {turn.sources
+                          .map(
+                            (source) =>
+                              props.videos.find((video) => video.video_id === source.video_id)
+                                ?.title || source.video_id,
+                          )
+                          .join(' · ')}
+                      </p>
+                    </details>
+                  )}
                   <div className="buddy-reply-heading">
                     <InteractiveBuddy headOnly active={false} decorative />
                     <strong>Buddy AI</strong>
@@ -460,6 +467,18 @@ export default function FloatingBuddy(props: Props) {
                   )}
                 </article>
               ))}
+              {props.pending && (
+                <article className="buddy-message" key={props.pending.id}>
+                  <div className="buddy-question">{props.pending.label}</div>
+                  <div className="buddy-reply-heading">
+                    <InteractiveBuddy headOnly active={props.busy} decorative />
+                    <strong>Buddy AI</strong>
+                  </div>
+                  <p role="status">
+                    {props.busy ? 'Buddy กำลังพิมพ์คำตอบ…' : 'คำถามนี้ยังรอคำตอบ'}
+                  </p>
+                </article>
+              )}
               {props.historyAvailable && (
                 <button
                   className="text-button"
@@ -469,7 +488,7 @@ export default function FloatingBuddy(props: Props) {
                   {props.historyPending ? 'กำลังโหลดประวัติ…' : 'โหลดประวัติบทสนทนานี้'}
                 </button>
               )}
-              {props.status && (
+              {props.status && !props.pending && (
                 <p role="status" className="buddy-job-status">
                   {props.status}
                 </p>
@@ -519,7 +538,13 @@ export default function FloatingBuddy(props: Props) {
                 </button>
               ))}
             </div>
-            <form className="buddy-composer" onSubmit={props.submit}>
+            <form
+              className="buddy-composer"
+              onSubmit={(event) => {
+                if (scopePanel.current) scopePanel.current.open = false;
+                props.submit(event);
+              }}
+            >
               <label className="visually-hidden" htmlFor="buddy-question">
                 ข้อความถึง Buddy
               </label>
@@ -541,21 +566,25 @@ export default function FloatingBuddy(props: Props) {
                     event.preventDefault();
                     if (
                       !props.locked &&
-                      !props.scopeHelp &&
-                      props.selected.length &&
+                      (!props.scopeHelp || smallTalkReply(props.question)) &&
+                      (props.selected.length || smallTalkReply(props.question)) &&
                       props.question.trim()
                     )
                       event.currentTarget.form?.requestSubmit();
                   }
                 }}
-                placeholder="ถาม Buddy เกี่ยวกับคลิป…"
+                placeholder={
+                  props.selected.length
+                    ? 'ถาม Buddy เกี่ยวกับคลิป…'
+                    : 'ทักทายหรือถามเกี่ยวกับ Buddy…'
+                }
               />
               <button
                 className="primary"
                 disabled={
                   props.locked ||
-                  !!props.scopeHelp ||
-                  !props.selected.length ||
+                  (!!props.scopeHelp && !smallTalkReply(props.question)) ||
+                  (!props.selected.length && !smallTalkReply(props.question)) ||
                   !props.question.trim()
                 }
                 aria-label="ส่งข้อความถึง Buddy"
@@ -565,8 +594,9 @@ export default function FloatingBuddy(props: Props) {
               </button>
             </form>
             <small id="buddy-scope-help" className="buddy-scope-help" role="status">
-              {props.scopeHelp ||
-                (!props.selected.length ? 'เลือกคลิปอย่างน้อย 1 คลิปก่อนส่งคำถาม' : '')}
+              {smallTalkReply(props.question) || (!props.selected.length && !props.question.trim())
+                ? 'ทักทาย Buddy ได้เลย · เลือกคลิปเมื่อถามเนื้อหา'
+                : props.scopeHelp}
             </small>
           </section>
         </>

@@ -359,7 +359,9 @@ body .buddy-v5 .buddy-reply-heading {
   color: #00866e;
 }
 body .buddy-v5 .buddy-reply-heading .buddy-rig {
-  display: none;
+  display: block;
+  width: 36px;
+  height: 36px;
 }
 body .buddy-v5 .buddy-message .answer-text {
   font-size: 16px;
@@ -594,4 +596,20 @@ body .login-v5 summary:focus-visible {
     scroll-behavior: auto;
     transition: none;
   }
+}
+
+body .buddy-v5 .buddy-question {
+  margin-left: auto;
+  max-width: 85%;
+  background: #d5f5e9;
+  border-radius: 18px 18px 4px 18px;
+  padding: 12px 16px;
+}
+body .buddy-v5 .buddy-message {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+body .buddy-v5 .buddy-reply-heading {
+  align-self: flex-start;
 }

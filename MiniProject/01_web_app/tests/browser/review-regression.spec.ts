@@ -85,10 +85,27 @@ test('distinct cases sharing one message keep separate rows and details', async 
 test('liked answers have a dedicated admin view', async ({ page }) => {
   await page.goto('/tests/review-regression.html?admin=1');
   await page.getByRole('button', { name: 'คำตอบที่ถูกใจ', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'คำตอบที่ถูกใจ', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(
+    page.getByRole('button', { name: 'แชทที่บันทึกทั้งหมด', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByText('ผู้ใช้กดถูกใจ', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'คำตอบที่ถูกใจ', exact: true }).click();
   await expect(page.getByRole('button', { name: 'เปิดดู', exact: true })).toHaveCount(1);
   await page.getByRole('button', { name: 'คิวตรวจ', exact: true }).click();
   await page.getByLabel('คะแนน', { exact: true }).selectOption('like');
   await expect(page.getByText('ผู้ใช้กดถูกใจ', { exact: true })).toBeVisible();
+});
+
+test('an empty review queue is hidden and saved messages remain accessible', async ({ page }) => {
+  await page.goto('/tests/review-regression.html?admin=1&empty=1');
+  await expect(page.getByRole('button', { name: 'คิวตรวจ', exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'แชทที่บันทึกทั้งหมด', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'เปิดดู', exact: true }).click();
+  await expect(page.getByText('normal answer', { exact: true })).toBeVisible();
 });
