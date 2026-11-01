@@ -51,6 +51,8 @@ def clean_environment():
                 "MEDIA_",
                 "CHAT_REVIEW_",
                 "MODERATION_",
+                "LOCAL_",
+                "GENERATION_",
             )
         ) or key.upper() in {
             "DATABASE_URL",
