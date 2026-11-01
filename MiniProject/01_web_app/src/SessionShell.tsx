@@ -85,7 +85,6 @@ function MemberArea({
   }
   return (
     <FeedbackApi.Provider key={session.sessionId} value={api}>
-      <ChatPolicyNotice api={api} />
       <App
         api={api}
         member={session.member}
@@ -95,6 +94,7 @@ function MemberArea({
         onLogout={logout}
         adminEnabled={session.member.role === 'admin' && !!session.adminSections.length}
       />
+      <ChatPolicyNotice api={api} />
     </FeedbackApi.Provider>
   );
 }
