@@ -193,3 +193,59 @@ async def test_library_rejects_unbounded_or_invalid_requests(accounts, extra):
     task = query(accounts, "a", VIDEO_A)
     with pytest.raises(AppError):
         await accounts.rag.evidence_library().search("card", task.sources, task.ctx, **extra)
+
+
+@pytest.mark.parametrize("start,end,expected", [(0, 40, True), (40, 50, False), (600, 610, False)])
+async def test_transcript_time_window_requires_positive_overlap(accounts, start, end, expected):
+    task = query(accounts, "a", VIDEO_A)
+    result = await accounts.rag.evidence_library().search(
+        "RAG",
+        task.sources,
+        task.ctx,
+        kinds=["transcript"],
+        start_seconds=start,
+        end_seconds=end,
+        neighbors=2,
+    )
+    assert bool(result.items) is expected
+    assert all(r.end_seconds > start and r.start_seconds < end for r in result.items)
+    assert any("full original intervals" in note for note in result.notes)
+
+
+@pytest.mark.parametrize("start,end,expected", [(4, 8, False), (0, 2, False), (3, 4, True)])
+async def test_video_observation_time_boundary_and_original_citation(
+    accounts, start, end, expected
+):
+    seed(accounts, accounts.source_a)
+    task = query(accounts, "a", VIDEO_A)
+    result = await accounts.rag.evidence_library().search(
+        "red card",
+        task.sources,
+        task.ctx,
+        kinds=["video"],
+        start_seconds=start,
+        end_seconds=end,
+        neighbors=1,
+    )
+    assert bool(result.items) is expected
+    if result.items:
+        assert (result.items[0].start_seconds, result.items[0].end_seconds) == (2, 4)
+
+
+@pytest.mark.parametrize("lower,upper,expected", [(2, 4, True), (0, 2, False), (3, 4, False)])
+async def test_ocr_point_uses_half_open_time_window(accounts, lower, upper, expected):
+    # Pure boundary contract for instant observations; source/owner lifecycle covered above.
+    from youtube_rag.library import overlaps
+
+    assert overlaps(2, 2, lower, upper) is expected
+
+
+async def test_current_question_alone_does_not_match_unrelated_topic(accounts):
+    task = query(accounts, "a", VIDEO_A)
+    library = accounts.rag.evidence_library()
+    assert (await library.search("RAG", task.sources, task.ctx, kinds=["transcript"])).items
+    assert not (
+        await library.search(
+            "photosynthesis", task.sources, task.ctx, kinds=["transcript"], neighbors=1
+        )
+    ).items
