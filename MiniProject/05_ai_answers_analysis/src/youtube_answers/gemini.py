@@ -67,6 +67,7 @@ class GeminiModel:
         images=(),
         purpose="chat",
         model=None,
+        output_limit=None,
     ):
         model = model or self.settings.llm_model
         grant = self.grant(model, purpose)
@@ -79,7 +80,11 @@ class GeminiModel:
         config = types.GenerateContentConfig(
             http_options=types.HttpOptions(retry_options=types.HttpRetryOptions(attempts=1)),
             system_instruction=policy,
-            max_output_tokens=min(self.settings.answer_max_output_tokens, grant.max_output_tokens),
+            max_output_tokens=min(
+                self.settings.answer_max_output_tokens,
+                grant.max_output_tokens,
+                output_limit or self.settings.answer_max_output_tokens,
+            ),
             response_mime_type="application/json",
             response_json_schema=provider_response_schema(schema),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
