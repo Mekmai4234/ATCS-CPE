@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from conftest import Context
+from conftest import Context, evidence
 from youtube_backend.errors import AppError, LeaseLost
 
 from youtube_agent.config import AgentSettings
@@ -82,9 +82,9 @@ async def test_local_does_not_publish_unknown_citations(unit):
     ctx = LocalContext()
     ctx.result["citation_ids"] = ["invented"]
     unit.service.model = LocalModel(settings())
-    result = await unit.service.research(unit.request, unit.sources, ctx)
-    assert result.state == "partial"
-    assert all(c.chunk_id != "invented" for c in result.citations)
+    with pytest.raises(AppError) as caught:
+        await unit.service.research(unit.request, unit.sources, ctx)
+    assert caught.value.code == "invalid_citation"
 
 
 async def test_empty_corpus_yields_no_model_call(unit):
@@ -124,3 +124,33 @@ async def test_local_schema_constrains_citations_to_supplied_ids():
     )
     shape = ctx.calls[0]["payload"]["format"]
     assert shape["properties"]["citation_ids"]["items"]["enum"] == ["chunk-1"]
+
+
+@pytest.mark.parametrize(
+    "count,window,complete", [(32, 32768, True), (74, 32768, False), (32, 4096, False)]
+)
+async def test_multi_page_research_reserves_synthesis_with_default_call_and_step_budgets(
+    unit, count, window, complete
+):
+    unit.knowledge.records = [
+        evidence(cid=f"chunk-{i}", text="RAG uses evidence.") for i in range(count)
+    ]
+    config = settings().model_copy(update={"local_context_tokens": window})
+    unit.service.settings = config
+    unit.service.model = LocalModel(config)
+    ctx = LocalContext()
+    ctx.result["citation_ids"] = ["chunk-0"]
+    result = await unit.service.research(unit.request, unit.sources, ctx)
+    assert len(ctx.calls) == 1
+    assert result.coverage.complete is complete
+    assert result.state == ("completed" if complete else "partial")
+    supplied = json.loads(ctx.calls[0]["payload"]["messages"][-1]["content"])["untrusted_evidence"]
+    assert result.coverage.processed_chunks == len(supplied)
+    assert result.coverage.expected_chunks == count
+    assert "model_calls=1" in ctx.events[-1].summary
+    if complete:
+        assert len(supplied) == count
+        assert len(unit.knowledge.calls) == 4
+    else:
+        assert 0 < len(supplied) < count
+        assert any("bounded subset" in note for note in result.coverage.notes)
