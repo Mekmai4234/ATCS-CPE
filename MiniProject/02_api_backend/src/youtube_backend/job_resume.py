@@ -59,6 +59,13 @@ def resume(repo, job_id, moderation_token=None):
     from .local_inference import execution_identity
 
     execution = old["payload"].get("execution")
+    if not execution and (
+        repo.settings.generation_provider == "ollama"
+        or repo.settings.embedding_provider == "ollama"
+    ):
+        raise AppError(
+            "legacy_execution_unpinned", "Create new work with explicit provider identity", 409
+        )
     if execution and execution != execution_identity(repo.settings):
         raise AppError("execution_changed", "Provider configuration changed; create new work", 409)
     if (execution or {}).get("provider") == "ollama":

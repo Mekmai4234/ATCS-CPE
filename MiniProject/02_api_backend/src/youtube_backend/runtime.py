@@ -146,7 +146,7 @@ class ManagedAdapters:
                 await close_adapter(self.adapter)
 
     def __getattr__(self, name):
-        if name not in METHODS and name not in {"enrich", "companion", "grade_quiz"}:
+        if name not in METHODS and name not in {"enrich", "companion", "grade_quiz", "reindex"}:
             raise AttributeError(name)
 
         async def invoke(*args, **kwargs):
