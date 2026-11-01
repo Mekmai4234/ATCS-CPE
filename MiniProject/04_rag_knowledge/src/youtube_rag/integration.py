@@ -7,7 +7,7 @@ Ingest/generation methods deliberately retain module 02's dependency_unavailable
 from youtube_backend.integrations import UnavailableAdapters
 
 from .config import RagSettings
-from .embeddings import FixtureEmbedder, GeminiEmbedder
+from .embeddings import FixtureEmbedder, GeminiEmbedder, OllamaEmbedder
 from .errors import error
 from .manifest import BackendExecution, Manifest
 from .service import RagService
@@ -24,17 +24,15 @@ class RagAdapters(UnavailableAdapters):
                 "fixture_forbidden", "Fixture embeddings are restricted to development/test"
             )
         self.provider_operations = {
-            "index": "local" if config.embedding_provider == "fixture" else "gemini-broker-v1"
+            "index": "gemini-broker-v1" if config.embedding_provider == "gemini" else "local"
         }
         self.rag = RagService(
             config,
             Manifest(repository.db),
             embedder
-            or (
-                FixtureEmbedder(config)
-                if config.embedding_provider == "fixture"
-                else GeminiEmbedder(config)
-            ),
+            or {"fixture": FixtureEmbedder, "gemini": GeminiEmbedder, "ollama": OllamaEmbedder}[
+                config.embedding_provider
+            ](config),
         )
 
     async def index(self, source, transcript, context):
