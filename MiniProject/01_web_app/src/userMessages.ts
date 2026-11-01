@@ -15,9 +15,13 @@ export function serviceMessage(code: string | null | undefined, status?: number)
   if (['free_tier_unverified', 'free_model_unverified', 'quota_pending'].includes(code || ''))
     return userMessages.aiUnavailable;
   if (code === 'quota_wait') return userMessages.quotaWait;
-  if (code === 'provider_rate_limited') return userMessages.providerLimited;
+  if (['provider_rate_limited', 'generation_rate_limited'].includes(code || ''))
+    return userMessages.providerLimited;
   if (code === 'worker_unavailable') return userMessages.workerUnavailable;
-  if (['generation_rate_limited'].includes(code || '') || status === 429) return userMessages.busy;
+  if (code === 'local_unavailable')
+    return 'AI ในเครื่องยังไม่พร้อม กรุณาตรวจบริการในเครื่องก่อนทำต่อ';
+  if (code === 'local_timeout') return 'AI ในเครื่องใช้เวลานานเกินกำหนด งานนี้ยังไม่สำเร็จ';
+  if (status === 429) return userMessages.busy;
   if (
     ['generation_provider_busy', 'provider_unavailable', 'generation_provider_error'].includes(
       code || '',
@@ -48,6 +52,17 @@ export function importMessage(code: string): string {
     return 'ยังไม่มีบทถอดเสียงที่ระบบเข้าถึงได้ ลองคลิปที่มีคำบรรยาย';
   if (code === 'video_unavailable')
     return 'ระบบยังเข้าถึงคลิปนี้ไม่ได้ กรุณาตรวจสอบว่าเปิดดูบน YouTube ได้';
+  if (['youtube_access_blocked', 'video_restricted'].includes(code))
+    return 'YouTube จำกัดการเข้าถึงคลิปจากระบบนี้ ไม่สามารถดึงข้อมูลได้ในขณะนี้';
+  if (
+    [
+      'ingest_timeout',
+      'ingest_unavailable',
+      'youtube_rate_limited',
+      'caption_provider_transient',
+    ].includes(code)
+  )
+    return 'เครือข่ายหรือบริการคำบรรยายยังไม่พร้อม กรุณาติดตามงานเดิมก่อนลองใหม่';
   if (['invalid_youtube_url', 'invalid_url'].includes(code))
     return 'กรุณาใช้ลิงก์วิดีโอ YouTube แบบ https://www.youtube.com/watch?v=… หรือ https://youtu.be/…';
   if (code === 'video_deleting') return 'คลิปนี้กำลังถูกลบ กรุณารอให้เสร็จแล้วนำเข้าใหม่';
