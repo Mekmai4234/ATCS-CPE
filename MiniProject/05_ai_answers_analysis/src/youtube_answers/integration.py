@@ -129,7 +129,12 @@ class AnswerAdapters(RagAdapters):
                 )
                 await validate_result(result, sources, self, context)
                 metadata = result.provider_metadata
-                metadata.provider = "saved-answer-cache"
+                metadata.provider = {
+                    "gemini": "gemini-cache",
+                    "gemini-cache": "gemini-cache",
+                    "ollama": "ollama-cache",
+                    "ollama-cache": "ollama-cache",
+                }.get(metadata.provider, "answer-cache")
                 metadata.usage = {}
                 metadata.latency_ms = 0
                 return result
