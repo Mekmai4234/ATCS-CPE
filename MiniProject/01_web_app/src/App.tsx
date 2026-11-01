@@ -1215,6 +1215,11 @@ export default function App({
                     return;
                   }
                   if (job.kind === 'import' || job.kind === 'enrich') {
+                    setChannel('');
+                    setFrom('');
+                    setTo('');
+                    navigateTab('library');
+                    if (job.video_id) setSelected([job.video_id]);
                     void watchImport(job.job_id);
                     return;
                   }
