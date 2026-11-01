@@ -196,7 +196,6 @@ class AnswerService:
             nodes = [self._record(run, hit.chunk.evidence()) for hit in hits]
         else:
             hits = short
-            run.notes.append("ใช้บทถอดเสียงครบในงบข้อมูลโดยไม่เรียกค้นเวกเตอร์ซ้ำ")
         data = payload("answer", request, nodes, history)
         while nodes and input_size(data) > self.settings.max_context_tokens:
             nodes.pop()
