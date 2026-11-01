@@ -44,6 +44,10 @@ export function serviceMessage(code: string | null | undefined, status?: number)
 }
 
 export function importMessage(code: string): string {
+  if (['no_transcript', 'transcript_unavailable'].includes(code))
+    return 'ยังไม่มีบทถอดเสียงที่ระบบเข้าถึงได้ ลองคลิปที่มีคำบรรยาย';
+  if (code === 'video_unavailable')
+    return 'ระบบยังเข้าถึงคลิปนี้ไม่ได้ กรุณาตรวจสอบว่าเปิดดูบน YouTube ได้';
   if (['invalid_youtube_url', 'invalid_url'].includes(code))
     return 'กรุณาใช้ลิงก์วิดีโอ YouTube แบบ https://www.youtube.com/watch?v=… หรือ https://youtu.be/…';
   if (code === 'video_deleting') return 'คลิปนี้กำลังถูกลบ กรุณารอให้เสร็จแล้วนำเข้าใหม่';

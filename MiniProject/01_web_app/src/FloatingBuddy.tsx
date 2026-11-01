@@ -566,25 +566,25 @@ export default function FloatingBuddy(props: Props) {
                     event.preventDefault();
                     if (
                       !props.locked &&
-                      (!props.scopeHelp || smallTalkReply(props.question)) &&
-                      (props.selected.length || smallTalkReply(props.question)) &&
+                      (!props.scopeHelp ||
+                        !props.selected.length ||
+                        smallTalkReply(props.question)) &&
                       props.question.trim()
                     )
                       event.currentTarget.form?.requestSubmit();
                   }
                 }}
                 placeholder={
-                  props.selected.length
-                    ? 'ถาม Buddy เกี่ยวกับคลิป…'
-                    : 'ทักทายหรือถามเกี่ยวกับ Buddy…'
+                  props.selected.length ? 'ถาม Buddy เกี่ยวกับคลิป…' : 'คุยกับ Buddy ได้เลย…'
                 }
               />
               <button
                 className="primary"
                 disabled={
                   props.locked ||
-                  (!!props.scopeHelp && !smallTalkReply(props.question)) ||
-                  (!props.selected.length && !smallTalkReply(props.question)) ||
+                  (!!props.scopeHelp &&
+                    props.selected.length > 0 &&
+                    !smallTalkReply(props.question)) ||
                   !props.question.trim()
                 }
                 aria-label="ส่งข้อความถึง Buddy"
@@ -594,9 +594,7 @@ export default function FloatingBuddy(props: Props) {
               </button>
             </form>
             <small id="buddy-scope-help" className="buddy-scope-help" role="status">
-              {smallTalkReply(props.question) || (!props.selected.length && !props.question.trim())
-                ? 'ทักทาย Buddy ได้เลย · เลือกคลิปเมื่อถามเนื้อหา'
-                : props.scopeHelp}
+              {!props.selected.length ? 'คุยทั่วไป · เลือกคลิปเมื่อถามเนื้อหา' : props.scopeHelp}
             </small>
           </section>
         </>

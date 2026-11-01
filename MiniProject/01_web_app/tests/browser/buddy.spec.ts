@@ -378,10 +378,10 @@ test('greetings need no clip, the picker stays collapsed, and no chat API is cal
   await open(page);
   await expect(dialog(page).locator('.buddy-scope')).not.toHaveAttribute('open', '');
   await expect(
-    dialog(page).getByText('ทักทาย Buddy ได้เลย · เลือกคลิปเมื่อถามเนื้อหา', { exact: true }),
+    dialog(page).getByText('คุยทั่วไป · เลือกคลิปเมื่อถามเนื้อหา', { exact: true }),
   ).toBeVisible();
   const input = dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true });
-  await expect(input).toHaveAttribute('placeholder', 'ทักทายหรือถามเกี่ยวกับ Buddy…');
+  await expect(input).toHaveAttribute('placeholder', 'คุยกับ Buddy ได้เลย…');
   await input.fill('สวัสดี');
   await input.press('Enter');
   await expect(
@@ -397,7 +397,7 @@ test('greetings need no clip, the picker stays collapsed, and no chat API is cal
   await dialog(page).screenshot({ path: 'runtime/screenshots/buddy-greetings-20261101.png' });
   expect(calls).toBe(0);
   await input.fill('คลิปนี้เกี่ยวกับอะไร');
-  await expect(dialog(page).getByRole('button', { name: 'ส่งข้อความถึง Buddy' })).toBeDisabled();
+  await expect(dialog(page).getByRole('button', { name: 'ส่งข้อความถึง Buddy' })).toBeEnabled();
 });
 
 test('sending moves the question right and shows mascot typing before the answer', async ({
@@ -425,4 +425,12 @@ test('sending moves the question right and shows mascot typing before the answer
   ).toBeVisible();
   await expect(dialog(page).locator('.buddy-question')).toHaveCount(1);
   await expect(dialog(page).getByText('Buddy กำลังพิมพ์คำตอบ…', { exact: true })).toHaveCount(0);
+});
+
+test('general conversation is enabled without a selected clip', async ({ page }) => {
+  await login(page);
+  await open(page);
+  const input = dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true });
+  await input.fill('ฉันชอบปลูกต้นไม้ อยากคุยเรื่องนี้');
+  await expect(dialog(page).getByRole('button', { name: 'ส่งข้อความถึง Buddy' })).toBeEnabled();
 });
