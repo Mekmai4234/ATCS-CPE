@@ -5,6 +5,7 @@ import type { Job, RecoverableJob } from './types';
 import { UiIcon } from './Visuals';
 import QuotaNotice from './QuotaNotice';
 import ProviderStatus, { type ProviderState } from './ProviderStatus';
+import LocalEvidenceSearch from './LocalEvidenceSearch';
 
 function WorkIcon({ name }: { name: 'list' | 'pause' | 'close' | 'check' | 'clock' }) {
   const paths = {
@@ -560,6 +561,15 @@ export default function JobRecovery({
                     ) : (
                       <p className="job-card-description">{jobStatus(job)}</p>
                     )}
+                    {job.kind === 'chat' &&
+                      job.request.question &&
+                      job.request.scope?.video_ids.length && (
+                        <LocalEvidenceSearch
+                          api={api}
+                          question={job.request.question}
+                          scope={job.request.scope}
+                        />
+                      )}
                     <div className="job-card-bottom">
                       <span className="job-card-status" data-state={job.state}>
                         <WorkIcon name={statusIcon(job.state)} />
