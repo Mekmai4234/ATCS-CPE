@@ -1,7 +1,82 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Api, ApiError } from './api';
 import { jobStatus, terminal } from './domain';
 import type { Job, RecoverableJob } from './types';
+import { UiIcon } from './Visuals';
+
+function WorkIcon({ name }: { name: 'list' | 'pause' | 'close' | 'check' | 'clock' }) {
+  const paths = {
+    list: 'm3 5 2 2 3-4 M11 6h10 M3 12h4 M11 12h10 M3 18h4 M11 18h10',
+    pause: 'M9 8v8 M15 8v8',
+    close: 'm6 6 12 12 M6 18 18 6',
+    check: 'm7 12 3 3 7-7',
+    clock: 'M12 7v6l4 2',
+  };
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {!['list', 'close'].includes(name) && <circle cx="12" cy="12" r="9" />}
+      <path d={paths[name]} />
+    </svg>
+  );
+}
+const stateNames: Record<string, string> = {
+  running: 'กำลังทำ',
+  queued: 'รอคิว',
+  paused: 'พักรอ',
+  completed: 'เสร็จแล้ว',
+  partial: 'ได้ผลบางส่วน',
+  failed: 'ไม่สำเร็จ',
+  cancelled: 'ยกเลิกแล้ว',
+};
+function typeName(job: RecoverableJob) {
+  const task = {
+    summary: 'สรุปวิดีโอ',
+    compare: 'เปรียบเทียบคลิป',
+    quiz: 'แบบทดสอบ',
+    flashcards: 'แฟลชการ์ด',
+    study_plan: 'แผนเรียน',
+  };
+  return (
+    (job.request.type && task[job.request.type as keyof typeof task]) ||
+    {
+      chat: 'แชทกับ Buddy',
+      analysis: 'สรุปและเปรียบเทียบ',
+      research: 'ค้นคว้า',
+      artifact: 'แบบฝึกหัด',
+      import: 'นำเข้าวิดีโอ',
+      enrich: 'ภาพและ OCR',
+      quiz_grade: 'ตรวจแบบทดสอบ',
+    }[job.kind] ||
+    'งานที่บันทึกไว้'
+  );
+}
+function waitMessage(job: RecoverableJob) {
+  const providerTime =
+    job.presentation?.retryAt ||
+    (job.wait?.time_source === 'provider' ? job.wait.retry_at : undefined);
+  const estimate = job.wait?.time_source === 'estimate' ? job.wait.estimated_retry_at : undefined;
+  const time = providerTime || estimate;
+  if (!time || !Number.isFinite(Date.parse(time))) return '';
+  return `${providerTime ? 'ลองทำต่อได้หลัง' : 'ลองทำต่อได้ประมาณ'} ${new Date(time).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}`;
+}
+function quotaPaused(job: RecoverableJob) {
+  return (
+    job.state === 'paused' &&
+    (job.error_code === 'quota_wait' ||
+      job.wait?.reason === 'quota_wait' ||
+      job.presentation?.stage === 'quota_paused')
+  );
+}
 
 export default function JobRecovery({
   api,
@@ -21,6 +96,14 @@ export default function JobRecovery({
   const [jobs, setJobs] = useState<RecoverableJob[]>([]);
   const current = useRef(jobs);
   current.current = jobs;
+  const id = useId();
+  const dialog = useRef<HTMLDialogElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [historyRevision, setHistoryRevision] = useState(0);
+  const [resumeError, setResumeError] = useState('');
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   const [older, setOlder] = useState(false);
@@ -71,7 +154,7 @@ export default function JobRecovery({
         cursor += data.items.length;
         if (!data.items.length || cursor >= data.total) break;
       } while (!c.signal.aborted);
-      const recent = await api.memberJobs(true, older ? offset : 0, c.signal, older ? 50 : 5);
+      const recent = await api.memberJobs(true, 0, c.signal, 5);
       const ids = new Set([...active, ...recent.items].map((job) => job.job_id));
       const stale = current.current.filter((job) => !terminal(job.state) && !ids.has(job.job_id));
       const updated = await Promise.all(
@@ -83,7 +166,6 @@ export default function JobRecovery({
           [...previous, ...active, ...recent.items, ...updated].map((job) => [job.job_id, job]),
         ).values(),
       ]);
-      setHasMore(older && offset + recent.items.length < recent.total);
     })()
       .catch((reason) => {
         if (
@@ -96,7 +178,37 @@ export default function JobRecovery({
         if (!c.signal.aborted) setLoading(false);
       });
     return () => c.abort();
-  }, [api, revision, older, offset]);
+  }, [api, revision]);
+  useEffect(() => {
+    if (!drawerOpen || !older) return;
+    const c = new AbortController();
+    setHistoryLoading(true);
+    setHistoryError('');
+    void api
+      .memberJobs(true, offset, c.signal, 50)
+      .then((page) => {
+        if (c.signal.aborted) return;
+        setJobs((previous) => [
+          ...new Map([...previous, ...page.items].map((job) => [job.job_id, job])).values(),
+        ]);
+        setHasMore(offset + page.items.length < page.total && page.items.length > 0);
+      })
+      .catch(() => {
+        if (!c.signal.aborted) setHistoryError('โหลดประวัติไม่ได้ กรุณาลองอีกครั้ง');
+      })
+      .finally(() => {
+        if (!c.signal.aborted) setHistoryLoading(false);
+      });
+    return () => c.abort();
+  }, [api, drawerOpen, older, offset, historyRevision]);
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [drawerOpen]);
   const visible = [...jobs]
     .sort((a, b) => Date.parse(b.created_at || '') - Date.parse(a.created_at || ''))
     .filter((job) =>
@@ -142,7 +254,7 @@ export default function JobRecovery({
   }, [api]);
   async function resume(job: RecoverableJob) {
     setResuming(job.job_id);
-    setError('');
+    setResumeError('');
     try {
       const accepted =
         job.kind === 'import' || job.kind === 'enrich'
@@ -158,11 +270,13 @@ export default function JobRecovery({
       if (!accepted) return;
       const fresh = await api.job(accepted.job_id);
       setJobs((previous) => previous.filter((item) => item.job_id !== job.job_id));
+      closeDrawer();
       restore({ ...job, ...fresh });
       setRevision((n) => n + 1);
     } catch (reason) {
-      setError(
-        reason instanceof ApiError && reason.code === 'quota_unavailable'
+      setResumeError(
+        reason instanceof ApiError &&
+          ['quota_unavailable', 'quota_wait'].includes(reason.code || '')
           ? 'ยังรอโควตา งานเดิมถูกเก็บไว้แล้ว กรุณารอเวลาที่แจ้ง'
           : 'ยังทำงานต่อไม่ได้ กรุณาลองใหม่ภายหลัง',
       );
@@ -170,114 +284,295 @@ export default function JobRecovery({
       setResuming(null);
     }
   }
-  const open = (job: RecoverableJob) => {
-    if (job.state === 'paused') {
-      setOlder(true);
-      return;
-    }
+  function closeDrawer() {
+    dialog.current?.close();
+    setDrawerOpen(false);
+  }
+  function openDrawer() {
+    setOlder(false);
+    setOffset(0);
+    setDrawerOpen(true);
+    dialog.current?.showModal();
+  }
+  function selectTab(history: boolean, focus = false) {
+    setOlder(history);
+    if (focus) document.getElementById(`${id}-${history ? 'history' : 'active'}`)?.focus();
+  }
+  function tabKeys(event: KeyboardEvent<HTMLDivElement>) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    selectTab(event.key === 'Home' ? false : event.key === 'End' ? true : !older, true);
+  }
+  function open(job: RecoverableJob) {
+    closeDrawer();
     restore(job);
-  };
+  }
+  const history = visible.filter((job) => terminal(job.state));
+  const list = older ? history : active;
+  const quotaJobs = paused.filter(quotaPaused);
+  const allQuota = active.length > 0 && quotaJobs.length === active.length;
+  const quotaTimes = [...new Set(quotaJobs.map(waitMessage).filter(Boolean))];
+  const statusIcon = (state: string) =>
+    state === 'paused' ? 'pause' : state === 'completed' ? 'check' : 'clock';
   return (
-    <section className="recovery-panel" aria-label="งานของฉัน">
-      <div className="work-status-strip" role="region" aria-label="ติดตามงาน">
-        <div role="status">
-          <strong>
-            {running.length
-              ? 'กำลังทำงาน'
-              : queued.length
-                ? 'มีงานรอคิว'
-                : paused.length
-                  ? 'มีงานพักรอ'
-                  : hasPending
-                    ? 'กำลังส่งงาน'
-                    : 'พร้อมเรียนรู้'}
-          </strong>
-          <span>
-            กำลังทำ {running.length} · รอคิว {queued.length} · พักรอ {paused.length}
-          </span>
+    <section className="job-recovery" aria-label="งานของฉัน">
+      <div className="job-status-strip" role="region" aria-label="ติดตามงาน">
+        <div className="job-strip-icon">
+          <WorkIcon name="list" />
         </div>
-        {!!(running.length || queued.length || hasPending) && (
-          <progress aria-label="งานกำลังประมวลผล" />
-        )}
-        {active.slice(0, 1).map((job) => (
-          <div className="work-status-item" key={job.job_id}>
-            <span>
-              {label(job)}
-              <small>{jobStatus(job)}</small>
-            </span>
-            <button className="secondary" disabled={locked} onClick={() => open(job)}>
-              ดูงาน
-            </button>
-          </div>
-        ))}
-        {!active.length && latestDone && (
-          <div className="work-status-item">
-            <span>
-              ล่าสุด · {label(latestDone)}
-              <small>{jobStatus(latestDone)}</small>
-            </span>
-            <button className="secondary" disabled={locked} onClick={() => restore(latestDone)}>
-              ดูงานล่าสุด
-            </button>
-          </div>
-        )}
-      </div>
-      <div className="recovery-tools">
-        <button
-          className="text-button"
-          disabled={loading || locked}
-          onClick={() => {
-            setOlder(true);
-            setOffset(0);
-            setRevision((n) => n + 1);
-          }}
-        >
-          งานที่ผ่านมา
-        </button>
-        {loading && <small role="status">กำลังตรวจงานเดิม…</small>}
-      </div>
-      {error && (
-        <p role="alert">
-          {error} <button onClick={() => setRevision((n) => n + 1)}>ลองโหลดงานอีกครั้ง</button>
-        </p>
-      )}
-      {worker === false && (hasPending || active.length > 0) && (
-        <p className="notice warning" role="status">
-          ตัวประมวลผลยังไม่พร้อม งานถูกเก็บไว้แล้ว กรุณารอก่อนส่งซ้ำ
-        </p>
-      )}
-      {(older || active.length > 0) && visible.length > 0 && (
-        <details>
-          <summary>งานที่บันทึกไว้ {visible.length} รายการ</summary>
-          <div className="recovered-jobs">
-            {(older ? visible : active).map((job) => (
-              <article key={job.job_id}>
-                <div>
-                  <strong>{label(job)}</strong>
-                  <p>{jobStatus(job)}</p>
-                </div>
-                {job.retryable && ['failed', 'paused'].includes(job.state) && (
-                  <button
-                    className="primary"
-                    disabled={locked || !!resuming}
-                    onClick={() => void resume(job)}
-                  >
-                    {resuming === job.job_id ? 'กำลังทำต่อ…' : 'ทำงานนี้ต่อ'}
-                  </button>
+        <div className="job-strip-copy">
+          <h2>งานของฉัน</h2>
+          <div className="job-strip-summary" role="status" aria-atomic="true">
+            {error ? (
+              <span className="job-status-badge is-failed">ตรวจสถานะงานไม่ได้</span>
+            ) : (
+              <>
+                {[
+                  [running, 'running'],
+                  [queued, 'queued'],
+                  [paused, 'paused'],
+                ].map(([items, state]) => {
+                  const count = (items as RecoverableJob[]).length;
+                  return (
+                    count > 0 && (
+                      <span
+                        className="job-status-badge"
+                        data-state={state as string}
+                        key={state as string}
+                      >
+                        <WorkIcon name={statusIcon(state as string)} />
+                        {stateNames[state as string]} {count}
+                        {active.length === count ? ' งาน' : ''}
+                      </span>
+                    )
+                  );
+                })}
+                {!active.length && (
+                  <span className="job-status-badge">
+                    {loading && !jobs.length
+                      ? 'กำลังตรวจสถานะ…'
+                      : hasPending
+                        ? 'กำลังส่งงาน…'
+                        : latestDone
+                          ? 'มีผลลัพธ์พร้อมดู'
+                          : 'ไม่มีงานค้าง'}
+                  </span>
                 )}
-                <button className="secondary" disabled={locked} onClick={() => open(job)}>
-                  {terminal(job.state) ? 'เปิดผลลัพธ์' : 'ติดตามงานเดิม'}
-                </button>
-              </article>
-            ))}
+                {paused.length > 0 && !running.length && !queued.length && (
+                  <span className="job-strip-hint">บันทึกงานไว้แล้ว</span>
+                )}
+              </>
+            )}
           </div>
-          {hasMore && (
-            <button disabled={loading} onClick={() => setOffset((n) => n + 50)}>
-              โหลดงานเพิ่มเติม
+        </div>
+        <button
+          className="job-open-button"
+          ref={trigger}
+          aria-haspopup="dialog"
+          onClick={openDrawer}
+        >
+          ดูงานทั้งหมด
+          <UiIcon name="arrow" />
+        </button>
+      </div>
+      <dialog
+        className="job-drawer"
+        ref={dialog}
+        aria-labelledby={`${id}-title`}
+        onClose={() => {
+          setDrawerOpen(false);
+          trigger.current?.focus();
+        }}
+        onClick={(event) => {
+          if (
+            event.target === event.currentTarget &&
+            event.clientX < event.currentTarget.getBoundingClientRect().left
+          )
+            closeDrawer();
+        }}
+      >
+        <div className="job-drawer-layout">
+          <header className="job-drawer-header">
+            <div>
+              <h2 id={`${id}-title`}>งานของฉัน</h2>
+              <p>ติดตามงานและเปิดผลลัพธ์ได้ที่นี่</p>
+            </div>
+            <button className="job-drawer-close" aria-label="ปิดงานของฉัน" onClick={closeDrawer}>
+              <WorkIcon name="close" />
             </button>
-          )}
-        </details>
-      )}
+          </header>
+          <div
+            className="job-drawer-tabs"
+            role="tablist"
+            aria-label="รายการงาน"
+            onKeyDown={tabKeys}
+          >
+            <button
+              id={`${id}-active`}
+              role="tab"
+              aria-selected={!older}
+              aria-controls={`${id}-panel`}
+              tabIndex={older ? -1 : 0}
+              onClick={() => selectTab(false)}
+            >
+              กำลังดำเนินการ {active.length > 0 && <span>{active.length}</span>}
+            </button>
+            <button
+              id={`${id}-history`}
+              role="tab"
+              aria-selected={older}
+              aria-controls={`${id}-panel`}
+              tabIndex={older ? 0 : -1}
+              onClick={() => selectTab(true)}
+            >
+              ประวัติ
+            </button>
+          </div>
+          <div
+            className="job-drawer-body"
+            id={`${id}-panel`}
+            role="tabpanel"
+            aria-labelledby={`${id}-${older ? 'history' : 'active'}`}
+            tabIndex={0}
+          >
+            {(error || (older && historyError) || resumeError) && (
+              <div className="job-drawer-notice is-error" role="alert">
+                <div>
+                  <strong>{resumeError || (older && historyError) || error}</strong>
+                  {!resumeError && (
+                    <button
+                      className="job-card-action"
+                      onClick={() => {
+                        setRevision((n) => n + 1);
+                        setHistoryRevision((n) => n + 1);
+                      }}
+                    >
+                      ลองอีกครั้ง
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            {!older && worker === false && (hasPending || active.length > 0) && (
+              <div className="job-drawer-notice" role="status">
+                <WorkIcon name="clock" />
+                <div>
+                  <strong>ตัวประมวลผลยังไม่พร้อม</strong>
+                  <p>บันทึกงานไว้แล้ว กรุณารอก่อนส่งซ้ำ</p>
+                </div>
+              </div>
+            )}
+            {!older && allQuota && (
+              <div className="job-drawer-notice">
+                <WorkIcon name="clock" />
+                <div>
+                  <strong>ใช้งานครบขีดจำกัดแล้ว</strong>
+                  <p>
+                    {quotaTimes.length === 1
+                      ? quotaTimes[0]
+                      : 'รอระบบพร้อม แล้วกดทำต่อที่งานของคุณ'}
+                    <br />
+                    งานและคำตอบของคุณยังอยู่ครบ
+                  </p>
+                </div>
+              </div>
+            )}
+            {older && historyLoading && (
+              <p role="status" className="job-card-description">
+                กำลังโหลดประวัติ…
+              </p>
+            )}
+            <div className="job-list">
+              {list.map((job) => {
+                const quota = quotaPaused(job);
+                const providerAt =
+                  job.presentation?.retryAt ||
+                  (job.wait?.time_source === 'provider' ? job.wait.retry_at : undefined);
+                const notYet = !!providerAt && Date.parse(providerAt) > Date.now();
+                const canRestore = ['completed', 'partial', 'running', 'queued'].includes(
+                  job.state,
+                );
+                const canResume = job.retryable && ['failed', 'paused'].includes(job.state);
+                return (
+                  <article key={job.job_id} className="job-card">
+                    <div className="job-card-type">
+                      <UiIcon
+                        name={
+                          job.kind === 'chat'
+                            ? 'chat'
+                            : job.kind === 'quiz_grade' || job.kind === 'artifact'
+                              ? 'learn'
+                              : 'library'
+                        }
+                      />
+                      {typeName(job)}
+                    </div>
+                    <h3 className="job-card-title">{label(job)}</h3>
+                    {quota ? (
+                      <p className="job-card-description">
+                        {allQuota && quotaTimes.length === 1
+                          ? 'บันทึกงานไว้แล้ว'
+                          : `รอสิทธิ์ใช้งานเพิ่มเติม${waitMessage(job) ? ' · ' + waitMessage(job) : ''}`}
+                      </p>
+                    ) : (
+                      <p className="job-card-description">{jobStatus(job)}</p>
+                    )}
+                    <div className="job-card-bottom">
+                      <span className="job-card-status" data-state={job.state}>
+                        <WorkIcon name={statusIcon(job.state)} />
+                        {stateNames[job.state]}
+                      </span>
+                      <div className="job-card-actions">
+                        {canResume && (
+                          <button
+                            className="job-card-action"
+                            disabled={locked || !!resuming || notYet}
+                            onClick={() => void resume(job)}
+                          >
+                            {resuming === job.job_id
+                              ? 'กำลังทำต่อ…'
+                              : notYet
+                                ? 'ทำต่อเมื่อพร้อม'
+                                : job.state === 'failed'
+                                  ? 'ลองใหม่'
+                                  : 'ทำต่อ'}
+                          </button>
+                        )}
+                        {canRestore && (
+                          <button
+                            className="job-card-action"
+                            disabled={locked || !!resuming}
+                            onClick={() => open(job)}
+                          >
+                            {terminal(job.state) ? 'ดูผลลัพธ์' : 'ติดตามงาน'}
+                            <UiIcon name="arrow" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            {!list.length && !(older ? historyLoading || historyError : loading || error) && (
+              <div className="job-empty">
+                <WorkIcon name="check" />
+                {older ? 'ยังไม่มีประวัติงาน' : 'ไม่มีงานค้าง'}
+                {!older && history.length > 0 && <p>ดูงานที่เสร็จแล้วได้ในประวัติ</p>}
+              </div>
+            )}
+            {older && hasMore && (
+              <button
+                className="job-load-more"
+                disabled={historyLoading}
+                onClick={() => setOffset((n) => n + 50)}
+              >
+                โหลดงานเพิ่มเติม
+              </button>
+            )}
+          </div>
+        </div>
+      </dialog>
     </section>
   );
 }

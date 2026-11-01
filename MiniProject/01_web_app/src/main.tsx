@@ -15,5 +15,6 @@ import './v5.css';
 import './results-v5.css';
 import './secondary-v5.css';
 import './auth-v5.css';
+import './job-recovery.css';
 
 createRoot(document.getElementById('root')!).render(<SessionShell />);
