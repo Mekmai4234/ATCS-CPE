@@ -1,7 +1,7 @@
 """Project-wide durable budgets and an operator-attested, fail-closed Free Tier gate.
 
-Local rolling 60s/24h accounting is conservative admission control, NOT Google's
-remaining balance or reset clock. Consumers must wrap EVERY outbound request,
+Local rolling 60s / Pacific calendar-day accounting is conservative admission
+control, NOT Google's remaining balance. Consumers must wrap EVERY outbound request,
 including countTokens and embedding, through call(). No key rotation/fallback.
 Token counting has its own project-wide request budget, not inference RPM/TPM/RPD.
 """
