@@ -6,6 +6,7 @@ import sqlalchemy as sa
 from pydantic import Field
 
 from . import database as db
+from .errors import AppError
 from .schemas import Schema, Scope
 from .urls import canonical_url
 
@@ -21,10 +22,13 @@ def search(repo, request):
     for word in list(terms):
         if re.search(r"[\u0e00-\u0e7f]", word):
             terms.update(word[i : i + 2] for i in range(len(word) - 1))
+    terms = sorted(terms)[:64]
     items, inspected, scanned = [], 0, []
     with repo.db.read() as c:
         owner = repo._actor(c)
         sources = repo._sources(c, request.scope.model_dump(mode="json"))
+        if len(sources) > 10:
+            raise AppError("invalid_scope", "Search at most ten selected clips", 422)
         for source in sources:
             rows = (
                 c.execute(
@@ -51,7 +55,8 @@ def search(repo, request):
                 items.append(
                     dict(
                         video_id=source["video_id"],
-                        text=row["text"],
+                        text=row["text"][:4000],
+                        text_truncated=len(row["text"]) > 4000,
                         start_seconds=row["start_seconds"],
                         end_seconds=row["start_seconds"] + row["duration_seconds"],
                         transcript_version=source["transcript_version"],
