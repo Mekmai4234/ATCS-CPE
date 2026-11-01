@@ -111,6 +111,57 @@ class ExecutionContext:
             )
             return value
 
+    def saved_answer(self, key):
+        """Reuse only committed, published answers of this member and frozen sources.
+
+        Jobs already persist results, so no second result store or copied history is
+        necessary. Lookup is bounded to one day; old history is retained independently.
+        """
+        import sqlalchemy as sa
+
+        from . import database as db
+
+        if not isinstance(key, str) or len(key) != 64:
+            raise AppError("invalid_cache_key", "Invalid answer reuse key", 422)
+        self.check()
+        with self.repository.db.write() as c:
+            job = self.repository._owned(c, self.job_id, self.lease_token)
+            if job["kind"] != "chat" or not self.settings.auth_enabled:
+                return None
+            self.repository._check_sources(c, job["payload"]["sources"], owner=job["owner_id"])
+            c.execute(
+                db.jobs.update()
+                .where(db.jobs.c.job_id == self.job_id)
+                .values(payload=dict(job["payload"], answer_reuse_key=key))
+            )
+            if job["payload"].get("bypass_cache"):
+                return None
+            rows = c.execute(
+                sa.select(db.jobs)
+                .where(
+                    db.jobs.c.owner_id == job["owner_id"],
+                    db.jobs.c.kind == "chat",
+                    db.jobs.c.state == "completed",
+                    db.jobs.c.updated_at >= time.time() - 86400,
+                )
+                .order_by(db.jobs.c.updated_at.desc())
+                .limit(100)
+            ).mappings()
+            for previous in rows:
+                result = previous["result"] or {}
+                if (
+                    previous["payload"].get("answer_reuse_key") == key
+                    and previous["payload"]["sources"] == job["payload"]["sources"]
+                    and result.get("status") == "answered"
+                    and result.get("visibility", "published") == "published"
+                    and result.get("citations")
+                    and all(
+                        x.get("kind", "transcript") == "transcript" for x in result["citations"]
+                    )
+                ):
+                    return result
+        return None
+
 
 class Adapters(Protocol):
     """All methods must be async, cancellable, bounded, and idempotent where mutating.
