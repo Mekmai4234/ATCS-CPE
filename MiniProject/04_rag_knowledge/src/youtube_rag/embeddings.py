@@ -247,6 +247,62 @@ class GeminiEmbedder:
                 await self._http_client.aclose()
 
 
+class OllamaEmbedder:
+    """Execution-bound local vectors, never admitted through the Gemini budget."""
+
+    requires_execution = True
+
+    def __init__(self, settings):
+        if settings.embedding_provider != "ollama":
+            raise ValueError("OllamaEmbedder requires an explicit local configuration")
+        self.settings = settings
+
+    def policy_identity(self, execution):
+        execution.check()
+        context = execution.context
+        settings = context.settings
+        if (
+            settings.embedding_provider != "ollama"
+            or settings.local_embedding_model != self.settings.embedding_model
+            or settings.local_embedding_digest != self.settings.local_embedding_digest
+        ):
+            raise error("index_configuration_mismatch", "Local embedding identity differs")
+        return self.settings.fingerprint
+
+    async def embed(self, texts, timeout, *, purpose="document", titles=None, execution=None):
+        if execution is None or not callable(getattr(execution, "local_inference", None)):
+            raise error(
+                "local_broker_required", "Trusted local execution broker required", status=503
+            )
+        self.policy_identity(execution)
+        prepared = prepare_inputs(texts, purpose=purpose, titles=titles)
+        if len(prepared) > self.settings.embedding_batch_size:
+            raise error(
+                "invalid_embedding_input", "Local batch exceeds configured limit", status=422
+            )
+        async with asyncio.timeout(timeout):
+            response = await execution.local_inference(
+                model=self.settings.embedding_model,
+                digest=self.settings.local_embedding_digest,
+                operation="embed",
+                payload={"input": prepared},
+                call_key=f"04-local-{uuid4().hex}",
+            )
+        execution.check()
+        return validate_vectors(
+            response.get("embeddings"), len(texts), self.settings.embedding_dimensions
+        )
+
+    async def close(self):
+        pass
+
+
+def create_embedder(settings):
+    return {"fixture": FixtureEmbedder, "gemini": GeminiEmbedder, "ollama": OllamaEmbedder}[
+        settings.embedding_provider
+    ](settings)
+
+
 class FixtureEmbedder:
     """Deterministic token hashing for offline mechanism checks, not semantic quality."""
 

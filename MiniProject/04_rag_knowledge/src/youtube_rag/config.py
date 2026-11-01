@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from pydantic import Field, SecretStr, model_validator
@@ -17,6 +18,8 @@ class RagSettings(BaseSettings):
     embedding_model: str = "gemini-embedding-2"
     embedding_dimensions: int = Field(default=1536, ge=1, le=3072)
     embedding_tokenizer: str = "utf8-byte-budget-v1"
+    local_embedding_model: str = ""
+    local_embedding_digest: str = ""
     gemini_api_key: SecretStr = SecretStr("")
     chroma_persist_dir: Path = Path("runtime/chroma")
     chunk_target_tokens: int = Field(default=600, ge=8, le=7000)
@@ -29,7 +32,7 @@ class RagSettings(BaseSettings):
     def validate_configuration(self):
         if self.chunk_overlap_tokens >= self.chunk_target_tokens:
             raise ValueError("Chunk overlap must be smaller than the target")
-        if self.embedding_provider not in {"gemini", "fixture"}:
+        if self.embedding_provider not in {"gemini", "fixture", "ollama"}:
             raise ValueError("Unsupported embedding provider")
         if self.embedding_tokenizer != "utf8-byte-budget-v1":
             raise ValueError("Use utf8-byte-budget-v1; Gemini counts are validated by the provider")
@@ -38,6 +41,11 @@ class RagSettings(BaseSettings):
                 raise ValueError("This adapter supports gemini-embedding-2 only")
             if self.embedding_dimensions < 128:
                 raise ValueError("Gemini embedding dimensions must be 128-3072")
+        elif self.embedding_provider == "ollama":
+            if self.embedding_model != self.local_embedding_model or not re.fullmatch(
+                r"[a-f0-9]{64}", self.local_embedding_digest
+            ):
+                raise ValueError("Local embeddings require an exact model and SHA256 digest")
         elif self.embedding_model != "fixture-hash-v1":
             raise ValueError("Fixture mode requires fixture-hash-v1")
         if not self.chroma_persist_dir.is_absolute():
@@ -61,6 +69,8 @@ class RagSettings(BaseSettings):
             "query_format": "task: search result | query: {text}",
             "provider_token_limit": 8192,
         }
+        if self.embedding_provider == "ollama":
+            config["model_digest"] = self.local_embedding_digest
         return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
 
     @property
