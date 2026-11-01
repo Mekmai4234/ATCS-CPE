@@ -10,6 +10,12 @@ export type VideoStatus =
   | 'deleting'
   | 'deleted';
 export interface Video {
+  import_job?: {
+    job_id: string;
+    state: string;
+    error_code: string | null;
+    retryable: boolean;
+  } | null;
   presentation?: SourcePresentation;
   generation?: number;
   indexed_version?: string | null;
@@ -83,7 +89,17 @@ export interface SourceSnapshot {
   generation?: number;
   indexed_version?: string | null;
 }
+export interface QuizGrade {
+  artifact_id: string;
+  marks: { correct: boolean; feedback: string }[];
+  correct: number;
+  total: number;
+  answers: string[];
+}
 export interface Artifact {
+  grading?: QuizGrade;
+  grading_job_id?: string;
+  submitted_answers?: string[];
   artifact_id?: string;
   type: 'quiz' | 'flashcards' | 'study_plan';
   content: {
@@ -102,6 +118,8 @@ export interface TaskResult extends Partial<Answer> {
   artifact_ids?: string[];
 }
 export interface Job {
+  created_at?: string;
+  updated_at?: string;
   wait?: {
     reason?: string;
     time_source?: 'provider' | 'estimate';
@@ -167,7 +185,10 @@ export interface RecoverableJob extends Job {
     instruction?: string;
     goal?: string;
     topic?: string;
-    scope?: Scope;
+    scope?: Scope | null;
+    mode?: 'video' | 'general';
+    artifact_id?: string;
+    answers?: string[];
   };
   sources: { video_id: string; generation?: number; transcript_version?: string }[];
 }
