@@ -236,6 +236,34 @@ test('completed learning artifacts can reopen from member history', async ({ pag
   await expect(drawer).not.toBeVisible();
 });
 
+test('completed import result opens its video in the library', async ({ page }) => {
+  await fixture(page);
+  const job = {
+    job_id: 'saved-import',
+    kind: 'import',
+    video_id: video.video_id,
+    state: 'completed',
+    stage: 'ready',
+    request: {},
+    sources: [],
+  };
+  await page.route('**/api/member/jobs?*', (route) => {
+    const all = new URL(route.request().url()).searchParams.get('include_completed') === 'true';
+    return route.fulfill({
+      json: { items: all ? [job] : [], total: all ? 1 : 0, offset: 0, limit: 50 },
+    });
+  });
+  await page.route('**/api/jobs/saved-import', (route) => route.fulfill({ json: job }));
+  await page.goto(`${base}/learning`);
+  await page.getByRole('button', { name: 'ดูงานทั้งหมด', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: 'งานของฉัน', exact: true });
+  await drawer.getByRole('tab', { name: 'ประวัติ', exact: true }).click();
+  await drawer.getByRole('button', { name: 'ดูผลลัพธ์', exact: true }).click();
+  await expect(page).toHaveURL(`${base}/library`);
+  await expect(page.getByRole('checkbox')).toBeChecked();
+  await expect(drawer).not.toBeVisible();
+});
+
 test('real v2 media path loads authorized images without a fixture bridge', async ({ page }) => {
   await fixture(page);
   const hash = 'a'.repeat(64),
