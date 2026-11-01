@@ -44,6 +44,8 @@ def load_team_configuration(settings):
         ingestion=resolved_service(settings, IngestionSettings),
         agent=resolved_service(settings, AgentSettings),
     )
-    if result.rag.embedding_provider != "gemini":
-        raise error("integration_configuration", "Live team requires Gemini embeddings", status=503)
+    if result.rag.embedding_provider not in {"gemini", "ollama"}:
+        raise error(
+            "integration_configuration", "Live team requires a production embedder", status=503
+        )
     return result
