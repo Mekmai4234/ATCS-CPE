@@ -161,7 +161,7 @@ async def test_structured_artifact_uses_schema_and_known_chunk_ids(make_model):
         (401, False),
         (403, False),
         (429, True),
-        (500, False),
+        (500, True),
         (503, True),
     ],
 )
@@ -178,6 +178,8 @@ async def test_errors_redacted_and_sdk_does_not_retry(make_model, status, retrya
     with pytest.raises(AppError) as caught:
         await model.decide([{"role": "user", "data": {}}], 5)
     assert caught.value.retryable is retryable
+    assert caught.value.failure_origin == "http"
+    assert caught.value.provider_status == status
     assert "LEAK" not in str(caught.value) and "secret" not in str(caught.value)
     assert len(requests) == 1
     if status in {429, 503}:
@@ -257,6 +259,8 @@ async def test_transport_failure_is_safe(make_model):
     with pytest.raises(AppError) as caught:
         await model.decide([{"role": "user", "data": {}}], 5)
     assert caught.value.code == "provider_unavailable"
+    assert caught.value.failure_origin == "transport"
+    assert caught.value.provider_status is None
     assert "secret" not in str(caught.value)
 
 
