@@ -159,9 +159,7 @@ class GeminiEmbedder:
                         )
                         if raw.status_code >= 400:
                             raise provider_error(
-                                503
-                                if raw.status_code >= 500 and raw.status_code != 504
-                                else raw.status_code,
+                                raw.status_code,
                                 retry_after=raw.headers.get("retry-after"),
                             )
                         try:
@@ -175,15 +173,11 @@ class GeminiEmbedder:
                         usage = tokens
                     return ProviderReply(response, usage, getattr(response, "model_version", None))
                 except errors.APIError as exc:
-                    raise provider_error(
-                        503
-                        if isinstance(exc.code, int) and exc.code >= 500 and exc.code != 504
-                        else exc.code
-                    ) from None
+                    raise provider_error(exc.code) from None
                 except (httpx.TimeoutException, TimeoutError):
-                    raise provider_error(504) from None
+                    raise provider_error(504, origin="timeout") from None
                 except httpx.TransportError:
-                    raise provider_error(503) from None
+                    raise provider_error(503, origin="transport") from None
 
             # One content per HTTP request: never account an SDK batch as one
             # embedContent reservation. No SDK retries or alternate provider.
