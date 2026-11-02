@@ -16,13 +16,22 @@ class LocalEvidenceRequest(Schema):
     scope: Scope
 
 
-def search(repo, request):
-    from youtube_rag.document_lookup import authorized_search, query_phrases
-
-    local = authorized_search(
+def document_search(repo, request):
+    """04's document index when installed; 02 alone keeps the segment search below."""
+    try:
+        from youtube_rag.document_lookup import authorized_search, query_phrases
+    except ModuleNotFoundError as exc:
+        if exc.name != "youtube_rag":
+            raise
+        return None
+    return authorized_search(
         repo, request.scope.model_dump(mode="json"), query_phrases(request.question)
     )
-    if local["document_count"]:
+
+
+def search(repo, request):
+    local = document_search(repo, request)
+    if local and local["document_count"]:
         return dict(
             local,
             kind="transcript_excerpts",
