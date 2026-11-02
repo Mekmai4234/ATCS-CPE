@@ -12,7 +12,7 @@ class Passage(BaseModel):
     model_config = ConfigDict(extra="forbid")
     segment_id: str
     line: int
-    text: str
+    text: str = Field(min_length=1)
     start_seconds: float
     end_seconds: float | None
     end_method: str
@@ -20,7 +20,7 @@ class Passage(BaseModel):
 
 class Document(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    document_id: str
+    document_id: str = Field(min_length=1, max_length=200)
     relative_path: str
     video_id: str = Field(pattern=r"^[A-Za-z0-9_-]{11}$")
     language: str

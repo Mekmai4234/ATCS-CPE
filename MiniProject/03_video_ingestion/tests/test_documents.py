@@ -47,6 +47,7 @@ def test_bom_crlf_metadata_and_unknown_end(tmp_path):
     "text",
     [
         "[00:60] - [01:02] invalid",
+        "[00:01] - [00:03]   ",
         "[00:03] - [00:01] reversed",
         "[00:01] - [00:04] A\n[00:03] - [00:05] overlap",
         "[00:01] - [ไม่ระบุ] A\n[00:03] - [00:05] nonfinal",
