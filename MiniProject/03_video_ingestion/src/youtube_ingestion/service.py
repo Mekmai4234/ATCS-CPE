@@ -13,6 +13,7 @@ from .errors import failure
 from .metadata import YouTubeMetadata
 from .models import Metadata
 from .normalize import normalize
+from .timing import ingestion_stage, timed_ingestion
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ class IngestionService:
             self.media = MediaPreparation()
         return await self.media.prepare(path, context)
 
+    @timed_ingestion("total")
     async def ingest(self, video_id: str, context: ExecutionContext) -> TranscriptResult:
         context.check()
         if not isinstance(video_id, str) or not VIDEO_ID.fullmatch(video_id):
@@ -53,22 +55,25 @@ class IngestionService:
                 # Metadata has a small separate budget; failure must not discard usable captions.
                 metadata_timeout = min(self.settings.metadata_timeout_seconds, timeout / 4)
                 try:
-                    async with asyncio.timeout(metadata_timeout):
-                        metadata = await self.metadata.fetch(video_id, metadata_timeout)
+                    with ingestion_stage("metadata"):
+                        async with asyncio.timeout(metadata_timeout):
+                            metadata = await self.metadata.fetch(video_id, metadata_timeout)
                 except (AppError, TimeoutError):
                     logger.warning("ingestion_metadata_unavailable video_id=%s", video_id)
                     metadata = Metadata()
                 context.check()
-                task = asyncio.create_task(
-                    self.captions.fetch(video_id, self.settings.languages, timeout)
-                )
-                while not task.done():
-                    await asyncio.wait({task}, timeout=0.1)
+                with ingestion_stage("captions"):
+                    task = asyncio.create_task(
+                        self.captions.fetch(video_id, self.settings.languages, timeout)
+                    )
+                    while not task.done():
+                        await asyncio.wait({task}, timeout=0.1)
+                        context.check()
+                    track = await task
                     context.check()
-                track = await task
-                context.check()
-                result = normalize(video_id, track, metadata)
-                coverage = caption_coverage(result.segments)
+                with ingestion_stage("normalization"):
+                    result = normalize(video_id, track, metadata)
+                    coverage = caption_coverage(result.segments)
                 logger.info(
                     "caption_timing segments=%s duplicates=%s overlaps=%s covered_seconds=%.3f "
                     "duration_known=false speech_completeness_verified=false",
