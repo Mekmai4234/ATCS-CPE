@@ -49,7 +49,12 @@ DESCRIPTIONS = {
     "read_video_chunks": "Read a page of transcript chunks; follow next_cursor for coverage.",
     "compare_videos": "Ask module 05 to compare at least two authorized videos.",
     "create_learning_artifact": "Create a cited study plan, quiz or flashcards from evidence.",
-    "finish_research": "Return a grounded result with known evidence IDs as citation_ids.",
+    "finish_research": (
+        "Return the final answer to the goal as plain text without Markdown (no ** or #). "
+        "Give concrete points taken from the evidence and put every evidence ID you rely on "
+        "in citation_ids. If a learning artifact was created, mention it in one sentence "
+        "instead of repeating its content."
+    ),
 }
 
 

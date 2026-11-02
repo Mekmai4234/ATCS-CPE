@@ -217,3 +217,41 @@ it.each([undefined, null])('shows no fallback notice when the primary answered (
   );
   expect(html).not.toContain('รุ่นสำรอง');
 });
+
+it('renders model **bold** as bold text without raw asterisks', () => {
+  const html = renderToStaticMarkup(
+    createElement(ResultView, {
+      result: { ...result, status: 'answered', answer: 'แผน\n- **วันที่ 1:** RAG <b>x</b>' },
+    }),
+  );
+  expect(html).toContain('<strong>วันที่ 1:</strong>');
+  expect(html).not.toContain('**');
+  expect(html).toContain('&lt;b&gt;x&lt;/b&gt;');
+});
+
+it('says how much of the clip a finished partial research answer read', () => {
+  const coverage = {
+    expected_videos: 1,
+    processed_videos: 1,
+    expected_chunks: 370,
+    processed_chunks: 194,
+    complete: false,
+    notes: [],
+  };
+  const finished = renderToStaticMarkup(
+    createElement(ResultView, {
+      result: { ...result, status: 'answered', answer: 'คำตอบ', coverage },
+      partial: true,
+      kind: 'research',
+    }),
+  );
+  expect(finished).toContain('ได้คำตอบแล้ว — อ้างอิงเนื้อหาคลิป 194/370 ช่วง');
+  const stopped = renderToStaticMarkup(
+    createElement(ResultView, {
+      result: { ...result, answer: 'การค้นคว้าหยุดก่อนเสร็จ ได้ผลเพียงบางส่วน (x)', coverage },
+      partial: true,
+      kind: 'research',
+    }),
+  );
+  expect(stopped).toContain('ได้ผลบางส่วน — งานนี้ยังไม่สำเร็จครบถ้วน');
+});
