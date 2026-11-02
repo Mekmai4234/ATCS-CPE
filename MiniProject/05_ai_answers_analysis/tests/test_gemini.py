@@ -606,3 +606,58 @@ async def test_non_quota_failure_does_not_try_another_model():
         await http.aclose()
     assert caught.value.code == "invalid_model_output"
     assert all("gemini-3.5-flash" in path for path in paths)
+
+
+def test_whole_video_document_batches_fit_gemini_admission_with_citation_enum():
+    """Regression: 370 transcript passages packed into one batch exceeded admission.
+
+    Gemini admission adds the serialized config (system policy + citation enum) to the
+    counted prompt. Batches must leave room for it, even with bytes/3 prompt estimates.
+    """
+    from pathlib import Path
+
+    from youtube_ingestion.documents import load
+
+    from youtube_answers.gemini import provider_response_schema
+    from youtube_answers.models import GeneratedAnswer
+    from youtube_answers.prompts import POLICY, json_text, payload
+    from youtube_answers.service import AnswerService
+
+    document = next(
+        d
+        for d in load(Path(__file__).resolve().parents[2] / "Transcript")
+        if d.video_id == "cWVse_LuFO0"
+    )
+    nodes = [
+        {
+            "text": segment.text,
+            "video_id": document.video_id,
+            "title": document.relative_path,
+            "citation_ids": [segment.segment_id],
+            "start_seconds": segment.start_seconds,
+            "end_seconds": segment.end_seconds,
+        }
+        for segment in document.segments
+    ]
+    settings = AnswerSettings(_env_file=None)
+    service = AnswerService(settings, model=None, knowledge=None)
+    request = {"type": "summary", "instruction": ""}
+    groups = service._groups("summarize_batch", request, nodes)
+    assert len(groups) > 1
+    assert sum(len(group) for group in groups) == len(nodes)
+    for group in groups:
+        data = payload("summarize_batch", request, group)
+        ids = [cid for item in data["untrusted_evidence"] for cid in item["citation_ids"]]
+        # Mirror GeminiModel._attempt's actual config, including SDK option fields.
+        config = types.GenerateContentConfig(
+            http_options=types.HttpOptions(retry_options=types.HttpRetryOptions(attempts=1)),
+            system_instruction=POLICY,
+            max_output_tokens=settings.answer_max_output_tokens,
+            response_mime_type="application/json",
+            response_json_schema=provider_response_schema(GeneratedAnswer, citation_ids=ids),
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+            thinking_config=types.ThinkingConfig(thinking_level="LOW"),
+        )
+        allowance = len(config.model_dump_json(exclude_none=True).encode("utf-8")) + 256
+        estimated_prompt = (len(json_text(data).encode("utf-8")) + 2) // 3
+        assert estimated_prompt + allowance <= settings.max_context_tokens
