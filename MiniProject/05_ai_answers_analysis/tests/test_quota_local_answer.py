@@ -40,14 +40,31 @@ async def test_out_of_range_fallback_never_returns_early_clip_citations(fallback
     assert result["citations"] == []
 
 
-@pytest.mark.parametrize("followup", ["Explain more", "ขยายความหน่อย", "ยกตัวอย่างเรื่องนั้น"])
+@pytest.mark.parametrize(
+    "followup",
+    [
+        "Explain more",
+        "ขยายความหน่อย",
+        "ยกตัวอย่างเรื่องนั้น",
+        "ช่วยยกตัวอย่างให้เข้าใจง่าย",
+        "ขยายความหน่อยครับ",
+        "ช่วยยกตัวอย่างให้เข้าใจง่ายหน่อยค่ะ",
+        "ขอช่วยอธิบายเพิ่มเติมหน่อยนะครับ",
+    ],
+)
 async def test_explicit_followup_retains_only_the_current_authorized_topic(fallback, followup):
-    first = await local_chat(fallback, "RAG")
+    first = await local_chat(fallback, "RAG คืออะไร")
     result = await local_chat(fallback, followup, first["conversation_id"])
     assert result["status"] == "answered" and result["citations"]
     assert all(c["video_id"] == "dQw4w9WgXcQ" for c in result["citations"])
     assert result["provider_metadata"]["latency_ms"] > 0
     assert result["provider_metadata"]["usage"]["generate_requests"] == 0
+    assert fallback.model.payloads == []
+    changed = await local_chat(
+        fallback, "ช่วยอธิบาย photosynthesis หน่อยครับ", result["conversation_id"]
+    )
+    assert changed["status"] == "insufficient_evidence" and not changed["citations"]
+    assert fallback.model.payloads == []
 
 
 @pytest.mark.parametrize("question", ["Explain more", "ขยายความหน่อย", "ในภาพมี RAG อะไรบ้าง"])
