@@ -95,5 +95,8 @@ services:
     restart: unless-stopped
 
 volumes:
-  # Existing local data volume (video-buddy_state); never recreated by this file.
+  # Existing local data volume; external so `down -v` can never delete it.
+  # First run on a new machine: docker volume create video-buddy_state
   state:
+    name: video-buddy_state
+    external: true
