@@ -23,3 +23,13 @@ def test_secret_does_not_change_configuration_identity():
     other = AnswerSettings(_env_file=None, gemini_api_key="secret-two")
     rag = SimpleNamespace(fingerprint="index-a")
     assert reuse_configuration(settings, rag) == reuse_configuration(other, rag)
+
+
+def test_old_retrieval_policy_cannot_reuse_generated_results(monkeypatch):
+    import youtube_answers.reuse as reuse
+
+    settings = AnswerSettings(_env_file=None)
+    rag = SimpleNamespace(fingerprint="index-a")
+    current = reuse.reuse_configuration(settings, rag)
+    monkeypatch.setattr(reuse, "RETRIEVAL_VERSION", "old-unbounded-history-and-time")
+    assert reuse.reuse_configuration(settings, rag) != current

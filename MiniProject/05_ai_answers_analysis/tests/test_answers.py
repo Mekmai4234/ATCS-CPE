@@ -75,6 +75,7 @@ async def test_request_scope_must_match_sources(env):
 
 async def test_history_is_bounded_and_followup_retrieval_preserves_scope(env):
     env.config.answer_max_history_messages = 2
+    env.request["question"] = "Explain more"
     history = [
         {"role": "user", "content": "old"},
         {"role": "user", "content": "Explain embeddings"},
@@ -85,6 +86,27 @@ async def test_history_is_bounded_and_followup_retrieval_preserves_scope(env):
     data = env.model.payloads[0]
     assert len(data["untrusted_history"]) == 2
     assert data["request"]["scope"]["video_ids"] == [VIDEO_A]
+
+
+async def test_independent_question_does_not_search_previous_topic(env):
+    env.request["question"] = "photosynthesis"
+    await env.service.answer(
+        env.request, env.sources, [{"role": "user", "content": "RAG"}], env.ctx
+    )
+    assert env.knowledge.queries == ["photosynthesis"]
+
+
+@pytest.mark.parametrize(
+    "clock,answered", [("00:00-00:05", True), ("10:00-10:10", False), ("00:10-00:20", False)]
+)
+async def test_normal_answer_sends_only_evidence_overlapping_the_requested_time(
+    env, clock, answered
+):
+    env.request["question"] = f"RAG {clock}"
+    result = await env.service.answer(env.request, env.sources, [], env.ctx)
+    assert (result.status == "answered") == answered
+    if not answered:
+        assert not env.model.payloads and not result.citations
 
 
 async def test_transcript_injection_is_untrusted_payload(env):
