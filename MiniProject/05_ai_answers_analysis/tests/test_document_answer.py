@@ -81,6 +81,7 @@ async def test_five_real_documents_local_http_worker_never_dispatches_provider(
         "กำไรสุทธิเท่าไร",
         "คำว่า “ศิลปิน” อยู่ตรงไหน",
         "ใครร้องช่วง 00:19–00:26",
+        "ชื่อเพลงนี้สื่อความหมายอย่างไร",
     ):
         result = await ask(env, question, ["C0DXctGPWxw"])
         assert result["status"] == "insufficient_evidence" and not result["citations"]
