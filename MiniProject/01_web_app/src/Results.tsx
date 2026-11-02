@@ -318,7 +318,9 @@ export function ResultView({
           coverage={result.coverage}
           insufficient={result.status === 'insufficient_evidence'}
           localEvidence={localEvidence}
-          localDocument={result.provider_metadata?.provider === 'local-document'}
+          localDocument={['local-document', 'document-fallback'].includes(
+            result.provider_metadata?.provider || '',
+          )}
         />
       )}
       <VisualCoverageNotice value={result.visualCoverage} />
