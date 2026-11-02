@@ -569,6 +569,9 @@ class AnswerService:
                 returned_model=",".join(versions) or None,
                 usage=usage,
                 latency_ms=sum(m.latency_ms for m in run.metadata),
+                fallback_from=next(
+                    (m.fallback_from for m in run.metadata if m.fallback_from), None
+                ),
             ),
         )
         run.context.check()

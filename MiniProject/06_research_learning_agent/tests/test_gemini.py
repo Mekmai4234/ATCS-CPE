@@ -365,6 +365,7 @@ async def test_first_decision_falls_back_and_later_turns_stay_on_that_model():
     try:
         reply = await model.decide([{"role": "user", "data": {}}], 5, context=context)
         assert reply.metadata.requested_model == "gemini-3.8-flash"
+        assert reply.metadata.fallback_from == "gemini-3.5-flash"
         history = [
             {"role": "user", "data": {}},
             {
@@ -384,6 +385,7 @@ async def test_first_decision_falls_back_and_later_turns_stay_on_that_model():
         await http.aclose()
     # Primary is available again, but the signed turn pins the run to the fallback.
     assert second.metadata.requested_model == "gemini-3.8-flash"
+    assert second.metadata.fallback_from == "gemini-3.5-flash"
     assert {name for name, _ in context.requests} == {"gemini-3.8-flash"}
 
 
@@ -437,6 +439,7 @@ async def test_artifact_generation_falls_back_on_primary_outage():
         await model.close()
         await http.aclose()
     assert result.metadata.requested_model == "gemini-3.8-flash"
+    assert result.metadata.fallback_from == "gemini-3.5-flash"
     assert sum(p.endswith(":generateContent") for p in paths) == 2
 
 
@@ -466,3 +469,22 @@ async def test_thinking_level_is_dropped_for_non_gemini3_flash_fallback():
         await http.aclose()
     generate = [b for p, b in zip(paths, bodies, strict=True) if p.endswith(":generateContent")]
     assert generate and "thinkingConfig" not in generate[0].get("generationConfig", {})
+
+
+def test_usage_reports_the_model_that_answered_after_fallback():
+    from youtube_backend.schemas import ProviderMetadata
+
+    from youtube_agent.models import Usage
+
+    usage = Usage(requested_model="gemini-3.5-flash")
+    usage.add(
+        ProviderMetadata(
+            provider="gemini",
+            requested_model="gemini-3.8-flash",
+            latency_ms=1,
+            fallback_from="gemini-3.5-flash",
+        )
+    )
+    result = usage.result()
+    assert result.requested_model == "gemini-3.8-flash"
+    assert result.fallback_from == "gemini-3.5-flash"
