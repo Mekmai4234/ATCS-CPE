@@ -83,6 +83,31 @@ def constrain_citations(schema_json, ids):
     return schema_json
 
 
+def finish_schema(schema_json, history):
+    """Require final citations and limit them to evidence IDs observed in this run.
+
+    Smaller fallback models finished with an empty citation_ids list, which publication
+    rejects, so the run ended with raw excerpts instead of the written answer.
+    """
+    ids = sorted(
+        {
+            item.get("chunk_id") or item.get("evidence_id")
+            for entry in history
+            if entry.get("role") == "tool" and isinstance(entry.get("result"), dict)
+            for item in entry["result"].get("evidence", [])
+            if isinstance(item, dict) and (item.get("chunk_id") or item.get("evidence_id"))
+        }
+    )
+    if ids:
+        schema_json["properties"]["citation_ids"] = {
+            "type": "array",
+            "items": {"type": "string", "enum": ids},
+            "minItems": 1,
+        }
+        schema_json["required"] = sorted({*schema_json.get("required", []), "citation_ids"})
+    return schema_json
+
+
 def byte_size(value):
     """Conservative local input guard, explicitly NOT a model token count."""
     return len(json_text(value).encode("utf-8"))
@@ -310,7 +335,9 @@ class GeminiModel:
                 description=DESCRIPTIONS.get(
                     name, "Use only authorized stored evidence and frame IDs."
                 ),
-                parameters_json_schema=provider_schema(schema),
+                parameters_json_schema=finish_schema(provider_schema(schema), history)
+                if name == "finish_research"
+                else provider_schema(schema),
             )
             for name, schema in registry.items()
         ]

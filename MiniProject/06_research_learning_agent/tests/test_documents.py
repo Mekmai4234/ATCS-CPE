@@ -134,3 +134,40 @@ async def test_research_with_paraphrased_goal_still_gets_document_evidence(integ
     assert job["state"] in {"completed", "partial"}, job.get("error_code")
     assert job["result"]["citations"]
     assert all(c["kind"] == "document_transcript" for c in job["result"]["citations"])
+
+
+async def test_few_phrase_hits_are_topped_up_with_query_dependent_spread(monkeypatch):
+    """Regression: five research searches all returned the same 5 exact-phrase passages."""
+    from types import SimpleNamespace
+
+    from youtube_rag import document_knowledge
+
+    from youtube_agent.integration import RagKnowledge
+
+    def hit(cid):
+        return SimpleNamespace(chunk=SimpleNamespace(chunk_id=cid))
+
+    monkeypatch.setattr(
+        document_knowledge, "search", lambda context, sources, query, **kw: [hit("p:1"), hit("p:2")]
+    )
+    offsets = []
+
+    def spread(self, context, sources, top_k, *, offset=""):
+        offsets.append(offset)
+        return [hit("p:2"), *[hit(f"s:{offset}:{i}") for i in range(top_k)]]
+
+    monkeypatch.setattr(RagKnowledge, "_spread", spread)
+    knowledge = RagKnowledge(rag=None)
+    hits = await knowledge.search("RAG ธุรกิจ", [], None, top_k=5)
+    ids = [h.chunk.chunk_id for h in hits]
+    assert ids[:2] == ["p:1", "p:2"] and len(ids) == 5 and len(set(ids)) == 5
+    assert offsets == ["RAG ธุรกิจ"]
+
+
+def test_spread_offset_differs_by_query():
+    import hashlib
+
+    shifts = {
+        int(hashlib.sha256(q.encode()).hexdigest(), 16) % 370 for q in ("RAG", "ธุรกิจ", "vector")
+    }
+    assert len(shifts) == 3
