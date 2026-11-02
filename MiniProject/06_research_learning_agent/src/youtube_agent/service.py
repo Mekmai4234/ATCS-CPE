@@ -61,6 +61,19 @@ class Run:
         return min(self.end - time.monotonic(), self.context.remaining_seconds)
 
 
+def spread_order(count):
+    """Indices 0..count-1 coarse-to-fine (0, n/2, n/4, 3n/4, ...) for even sampling."""
+    order, seen = [], set()
+    step = 1 << max(0, (count - 1).bit_length())
+    while step:
+        for index in range(0, count, step):
+            if index not in seen:
+                seen.add(index)
+                order.append(index)
+        step //= 2
+    return order
+
+
 class AgentService:
     def __init__(
         self, settings, model, knowledge, *, analyzer=None, media_answerer=None, media_selector=None
@@ -278,7 +291,7 @@ class AgentService:
 
     async def _artifact(self, request, run):
         # Full enumeration is bounded; a context overflow is explicit, never silently truncated.
-        records, cursor, cursors = {}, None, set()
+        ordered, cursor, cursors = [], None, set()
         while True:
             page = await self._bounded(
                 run,
@@ -292,49 +305,44 @@ class AgentService:
             batch = self._records(
                 run, [e.evidence() if hasattr(e, "evidence") else e for e in page.items]
             )
-            records.update({e.chunk_id: e for e in batch})
-            try:
-                self._input_fits(
-                    {"request": request, "evidence": [wire_evidence(e) for e in records.values()]}
-                )
-            except AppError as exc:
-                if exc.code != "context_budget_exceeded":
-                    raise
-                # Large libraries use ranked evidence per source, not a silent prefix.
-                # Coverage remains partial: only successful model inputs are credited.
-                records = {}
-                for source in run.sources:
-                    hits = await self._bounded(
-                        run,
-                        lambda _, source=source: self.knowledge.search(
-                            request.get("topic") or "main concepts key points",
-                            [source],
-                            run.context,
-                            top_k=8,
-                        ),
-                    )
-                    for hit in hits:
-                        record = self._records(run, [hit.chunk.evidence()])[0]
-                        candidate = {**records, record.chunk_id: record}
-                        if (
-                            byte_size(
-                                {
-                                    "request": request,
-                                    "evidence": [wire_evidence(e) for e in candidate.values()],
-                                }
-                            )
-                            <= self.settings.max_context_tokens * 3
-                        ):
-                            records = candidate
-                self._remember(run, list(records.values()))
-                break
-            self._remember(run, batch)
+            ordered.extend(batch)
             cursor = page.next_cursor
             if cursor is None:
                 break
             if cursor in cursors or not batch:
                 raise error("invalid_cursor", "Knowledge pagination made no progress")
             cursors.add(cursor)
+        records = {e.chunk_id: e for e in ordered}
+        budget = self.settings.max_context_tokens * 3
+        base = byte_size({"request": request, "evidence": []})
+        if base + sum(byte_size(wire_evidence(e)) + 1 for e in records.values()) > budget:
+            # Large libraries (and short transcript-document passages): topic hits first,
+            # then passages spread evenly across the whole transcript until the byte guard.
+            # Exact-phrase document search finds nothing for a generic or missing topic,
+            # which previously left no evidence at all. Coverage credits only these records.
+            selected, used = {}, base
+
+            def add(record):
+                nonlocal used
+                size = byte_size(wire_evidence(record)) + 1
+                if record.chunk_id not in selected and used + size <= budget:
+                    selected[record.chunk_id] = record
+                    used += size
+
+            if request.get("topic"):
+                for source in run.sources:
+                    hits = await self._bounded(
+                        run,
+                        lambda _, source=source: self.knowledge.search(
+                            request["topic"], [source], run.context, top_k=8
+                        ),
+                    )
+                    for hit in hits or []:
+                        add(self._records(run, [hit.chunk.evidence()])[0])
+            for index in spread_order(len(ordered)):
+                add(ordered[index])
+            records = {e.chunk_id: e for e in ordered if e.chunk_id in selected}
+        self._remember(run, list(records.values()))
         if not records:
             raise error(
                 "insufficient_evidence", "No transcript evidence for learning output", status=409
@@ -611,13 +619,13 @@ class AgentService:
     def _partial(self, run, reason):
         ids = sorted(run.processed or set(run.evidence))[:8]
         # No new model claims: preserve source excerpts with an explicit analysis limitation.
-        content = "Research stopped with partial findings. " + reason
+        content = f"การค้นคว้าหยุดก่อนเสร็จ ได้ผลเพียงบางส่วน ({reason})"
         if ids:
-            content += "\nRetrieved source excerpts (may be incompletely analyzed):\n" + "\n".join(
+            content += "\nข้อความจากคลิปที่ค้นได้ (อาจยังวิเคราะห์ไม่ครบ):\n" + "\n".join(
                 f"[{cid}] {run.evidence[cid].text[:500]}" for cid in ids
             )
         else:
-            content += " No supporting evidence was obtained."
+            content += " ยังไม่ได้หลักฐานที่สนับสนุน"
         return ResearchResult(
             state="partial",
             content=content,
