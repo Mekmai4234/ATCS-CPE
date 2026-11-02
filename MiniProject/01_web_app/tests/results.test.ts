@@ -186,3 +186,34 @@ it.each(['document_metadata', 'document_transcript'] as const)(
     }
   },
 );
+
+it('names the primary model when a same-project fallback answered', () => {
+  const html = renderToStaticMarkup(
+    createElement(ProviderNotice, {
+      metadata: {
+        provider: 'gemini',
+        requested_model: 'gemini-3.8-flash',
+        returned_model: 'gemini-3.8-flash',
+        latency_ms: 50,
+        fallback_from: 'gemini-3.5-flash',
+      },
+    }),
+  );
+  expect(html).toContain('โมเดล: gemini-3.8-flash');
+  expect(html).toContain('ใช้รุ่นสำรอง เพราะ gemini-3.5-flash ไม่พร้อมชั่วคราว');
+});
+
+it.each([undefined, null])('shows no fallback notice when the primary answered (%s)', (value) => {
+  const html = renderToStaticMarkup(
+    createElement(ProviderNotice, {
+      metadata: {
+        provider: 'gemini',
+        requested_model: 'gemini-3.5-flash',
+        returned_model: 'gemini-3.6-flash',
+        latency_ms: 50,
+        fallback_from: value,
+      },
+    }),
+  );
+  expect(html).not.toContain('รุ่นสำรอง');
+});
