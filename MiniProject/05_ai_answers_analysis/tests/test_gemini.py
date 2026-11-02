@@ -1,5 +1,6 @@
 import asyncio
 import json
+from contextlib import asynccontextmanager
 
 import httpx
 import pytest
@@ -479,3 +480,129 @@ def test_decoder_outcome_contract_matches_publication_validator(content, valid):
     schema = provider_response_schema(citation_ids=["c1"])
     validator = jsonschema.Draft202012Validator(schema)
     assert validator.is_valid(content) is valid
+
+
+class LimitedBroker(OfflineBroker):
+    """Rate-limit chosen model buckets; refuse models absent from the policy."""
+
+    def __init__(self, limited, unapproved=()):
+        super().__init__()
+        self.limited, self.unapproved = set(limited), set(unapproved)
+
+    def authorize(self, *, model, purpose, credential_sha256):
+        if model in self.unapproved:
+            raise AppError("free_model_unverified", "Model is not explicitly approved", 503)
+        return super().authorize(model=model, purpose=purpose, credential_sha256=credential_sha256)
+
+    @asynccontextmanager
+    async def reserve(self, **kwargs):
+        if kwargs["grant"].requested_model in self.limited:
+            raise AppError("quota_wait", "Local project budget is unavailable", 429, True)
+        async with super().reserve(**kwargs) as lease:
+            yield lease
+
+
+def fallback_model(handler, broker, fallbacks="gemini-fallback-lite"):
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = genai.Client(
+        api_key="test-only-secret",
+        vertexai=False,
+        http_options=types.HttpOptions(httpx_async_client=http),
+    )
+    settings = AnswerSettings(_env_file=None, llm_fallback_models=fallbacks)
+    return GeminiModel(settings, client=client, broker=broker), http
+
+
+def sdk_handler(paths):
+    def handler(request):
+        paths.append(request.url.path)
+        data = {"totalTokens": 20} if request.url.path.endswith(":countTokens") else response()
+        return httpx.Response(200, json=data)
+
+    return handler
+
+
+def test_model_chain_keeps_primary_first_and_drops_duplicates():
+    settings = AnswerSettings(
+        _env_file=None,
+        llm_model="gemini-a",
+        llm_fallback_models=" gemini-b, gemini-a ,,gemini-b,gemini-c ",
+    )
+    assert settings.model_chain() == ["gemini-a", "gemini-b", "gemini-c"]
+    assert AnswerSettings(_env_file=None).model_chain() == ["gemini-3.5-flash"]
+
+
+async def test_limited_primary_falls_back_to_next_model_in_same_project():
+    paths = []
+    broker = LimitedBroker({"gemini-3.5-flash"})
+    model, http = fallback_model(sdk_handler(paths), broker)
+    try:
+        result = await model.generate({"untrusted_evidence": []}, 5)
+    finally:
+        await model.close()
+        await http.aclose()
+    assert result.metadata.requested_model == "gemini-fallback-lite"
+    assert paths and all("gemini-fallback-lite" in path for path in paths)
+    assert {call["grant"].project_id for call in broker.calls} == {"OFFLINE-NO-REAL-PROJECT"}
+
+
+async def test_all_models_limited_reports_primary_limit_without_network():
+    paths = []
+    broker = LimitedBroker({"gemini-3.5-flash", "gemini-fallback-lite"})
+    model, http = fallback_model(sdk_handler(paths), broker)
+    try:
+        with pytest.raises(AppError) as caught:
+            await model.generate({}, 5)
+    finally:
+        await model.close()
+        await http.aclose()
+    assert caught.value.code == "quota_wait" and paths == []
+
+
+async def test_unapproved_fallback_is_skipped_and_primary_limit_reported():
+    paths = []
+    broker = LimitedBroker({"gemini-3.5-flash"}, unapproved={"gemini-fallback-lite"})
+    model, http = fallback_model(sdk_handler(paths), broker)
+    try:
+        with pytest.raises(AppError) as caught:
+            await model.generate({}, 5)
+    finally:
+        await model.close()
+        await http.aclose()
+    assert caught.value.code == "quota_wait" and paths == []
+
+
+@pytest.mark.parametrize(
+    "options", [{"model": "gemini-3.5-flash"}, {"purpose": "vision"}], ids=["pinned", "vision"]
+)
+async def test_pinned_or_vision_generation_never_falls_back(options):
+    paths = []
+    broker = LimitedBroker({"gemini-3.5-flash"})
+    model, http = fallback_model(sdk_handler(paths), broker)
+    try:
+        with pytest.raises(AppError) as caught:
+            await model.generate({}, 5, **options)
+    finally:
+        await model.close()
+        await http.aclose()
+    assert caught.value.code == "quota_wait" and paths == []
+
+
+async def test_non_quota_failure_does_not_try_another_model():
+    paths = []
+
+    def handler(request):
+        paths.append(request.url.path)
+        if request.url.path.endswith(":countTokens"):
+            return httpx.Response(200, json={"totalTokens": 20})
+        return httpx.Response(200, json=response("not json"))
+
+    model, http = fallback_model(handler, LimitedBroker(()))
+    try:
+        with pytest.raises(AppError) as caught:
+            await model.generate({}, 5)
+    finally:
+        await model.close()
+        await http.aclose()
+    assert caught.value.code == "invalid_model_output"
+    assert all("gemini-3.5-flash" in path for path in paths)
