@@ -199,6 +199,8 @@ class ProviderMetadata(Schema):
     returned_model: str | None = None
     usage: dict[str, int] = Field(default_factory=dict)
     latency_ms: float = Field(ge=0)
+    # LLM_MODEL when a same-project fallback model answered instead; None otherwise.
+    fallback_from: str | None = Field(default=None, max_length=200)
 
 
 class AnswerResult(Schema):

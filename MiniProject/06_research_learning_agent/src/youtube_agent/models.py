@@ -74,9 +74,14 @@ class Usage:
     returned_model: str | None = None
     latency_ms: float = 0
     usage: dict = field(default_factory=dict)
+    fallback_from: str | None = None
 
     def add(self, metadata):
         self.provider = metadata.provider
+        if getattr(metadata, "fallback_from", None):
+            # Report the model that actually answered, not only the configured primary.
+            self.fallback_from = metadata.fallback_from
+            self.requested_model = metadata.requested_model
         self.returned_model = metadata.returned_model or self.returned_model
         self.latency_ms += metadata.latency_ms
         for key, value in metadata.usage.items():
@@ -89,4 +94,5 @@ class Usage:
             returned_model=self.returned_model,
             usage=self.usage,
             latency_ms=self.latency_ms,
+            fallback_from=self.fallback_from,
         )
