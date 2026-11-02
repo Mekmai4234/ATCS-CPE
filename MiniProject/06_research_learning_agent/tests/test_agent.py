@@ -286,7 +286,7 @@ async def test_comparison_adapter_validates_exact_intervals(unit, bad_citation):
                     video_id=record.video_id,
                     title=record.title,
                     start_seconds=999 if bad_citation else record.start_seconds,
-                    end_seconds=record.end_seconds,
+                    end_seconds=1001 if bad_citation else record.end_seconds,
                 )
             ],
             coverage=Coverage(expected_videos=2, processed_videos=1, complete=False),

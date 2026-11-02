@@ -149,6 +149,14 @@ class AgentService:
         for artifact in getattr(result, "artifacts", []):
             citations.extend(artifact.citations)
         for citation in citations:
+            if citation.kind.startswith("document_"):
+                from youtube_backend.document_store import verify_citation
+
+                with run.context.repository.db.read() as connection:
+                    job = run.context.repository._owned(
+                        connection, run.context.job_id, run.context.lease_token
+                    )
+                    verify_citation(run.context.repository, connection, job, citation)
             if citation.kind == "video":
                 from youtube_backend.video_evidence import verify_video_citation
 
@@ -157,7 +165,9 @@ class AgentService:
                         connection, run.context.job_id, run.context.lease_token
                     )
                     verify_video_citation(run.context.repository, connection, job, citation)
-        ids = sorted({c.chunk_id for c in citations if c.kind == "transcript"})
+        ids = sorted(
+            {c.chunk_id for c in citations if c.kind in {"transcript", "document_transcript"}}
+        )
         for offset in range(0, len(ids), 1000):
             batch = ids[offset : offset + 1000]
             current = await self._bounded(
@@ -210,6 +220,7 @@ class AgentService:
                     start_seconds=record.start_seconds,
                     end_seconds=record.end_seconds,
                     url=f"{canonical_url(record.video_id)}&t={int(record.start_seconds)}s",
+                    **(record.document_citation or {}),
                 )
             )
         return result
