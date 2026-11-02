@@ -539,7 +539,7 @@ export default function FloatingBuddy(props: Props) {
                 </button>
               ))}
             </div>
-            {props.responseControl}
+            <div className="buddy-response-control">{props.responseControl}</div>
             <form
               className="buddy-composer"
               onSubmit={(event) => {

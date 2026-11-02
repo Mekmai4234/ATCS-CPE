@@ -380,13 +380,46 @@ body .buddy-v5 .buddy-messages .notice {
   line-height: 1.6;
 }
 body .buddy-v5 .buddy-suggestions {
-  padding: 4px 22px 10px;
+  padding: 8px 20px 12px;
   gap: 8px;
+  flex-wrap: wrap;
 }
 body .buddy-v5 .buddy-suggestions button {
-  min-height: 40px;
+  min-height: 44px;
   font-size: 12px;
   padding: 8px 12px;
+}
+body .buddy-v5 .buddy-response-control {
+  margin: 0 20px 12px;
+  min-width: 0;
+  color: #365d53;
+}
+body .buddy-v5 .buddy-response-control label {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+}
+body .buddy-v5 .buddy-response-control select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #bdd8cb;
+  border-radius: 12px;
+  background-color: #f5fbf8;
+  color: #143e36;
+  font: inherit;
+  font-size: 14px;
+}
+body .buddy-v5 .buddy-response-control select:focus-visible {
+  outline: 2px solid #00856c;
+  outline-offset: 2px;
 }
 body .buddy-v5 .buddy-composer {
   padding: 7px;
