@@ -130,8 +130,16 @@ def run_project(project, provenance, output):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkout", action="store_true")
+    parser.add_argument("--image", action="store_true")
     args = parser.parse_args()
-    provenance = context(args.checkout)
+    if args.image:
+        from image_source import capture
+
+        provenance = capture()
+        if json.loads(Path("/app/image-source.json").read_text(encoding="utf-8")) != provenance:
+            raise ValueError("Container source provenance changed")
+    else:
+        provenance = context(args.checkout)
     output = MODULE / "runtime" / f"browser-identity-{uuid4().hex[:10]}"
     output.mkdir(parents=True)
     projects = []

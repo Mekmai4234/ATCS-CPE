@@ -11,6 +11,7 @@
 !01_web_app/index.html
 !07_testing_deployment/
 !07_testing_deployment/Caddyfile
+!07_testing_deployment/Caddyfile.local
 **/.env
 **/.env.*
 **/node_modules/

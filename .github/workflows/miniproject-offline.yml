@@ -13,6 +13,36 @@ concurrency:
   group: miniproject-checkout-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  transcript-docker:
+    name: Docker ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [test-01-web, test-02-api, test-03-ingestion, test-04-rag, test-05-answers, test-06-learning, test-07-e2e]
+    defaults:
+      run:
+        working-directory: MiniProject
+    steps:
+      - uses: actions/checkout@v4
+      - run: python 07_testing_deployment/scripts/source.py record --record 07_testing_deployment/runtime/checkout-source.json
+      - name: Prepare fixture-only report mount
+        run: mkdir -p 07_testing_deployment/runtime/transcript-v3-docker && chmod 777 07_testing_deployment/runtime/transcript-v3-docker
+      - run: docker compose -p video-buddy-ci -f 07_testing_deployment/compose.transcript.yaml --profile test config --quiet
+      - name: Clean Linux image build from this checkout
+        run: docker compose -p video-buddy-ci -f 07_testing_deployment/compose.transcript.yaml build ${{ matrix.service }}
+      - name: Run complete owner suite in Docker
+        run: docker compose -p video-buddy-ci -f 07_testing_deployment/compose.transcript.yaml run --rm --no-deps ${{ matrix.service }}
+      - run: python 07_testing_deployment/scripts/source.py verify --record 07_testing_deployment/runtime/checkout-source.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: transcript-docker-${{ matrix.service }}
+          path: |
+            MiniProject/07_testing_deployment/runtime/checkout-source.json
+            MiniProject/07_testing_deployment/runtime/transcript-v3-docker/
+          retention-days: 7
   local-media-tools:
     runs-on: ubuntu-latest
     timeout-minutes: 20

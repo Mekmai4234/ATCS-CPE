@@ -15,6 +15,7 @@ MODULES = [
     "05_ai_answers_analysis",
     "06_research_learning_agent",
     "07_testing_deployment",
+    "Transcript",
 ]
 
 

@@ -181,7 +181,7 @@ async def test_legacy_migration_operator_bootstrap_claim_and_paired_restore(tmp_
     with TestClient(app) as client:
         assert login(client, app)["role"] == "admin"
         assert client.get("/api/videos").json()["total"] == owned
-        assert client.get("/health").json()["schema_revision"] == "0004"
+        assert client.get("/health").json()["schema_revision"] == "0005"
         assert client.get(path).json() == feedback.json()
         assert (
             client.get(f"/api/conversations/{saved['conversation_id']}").json()["messages"][-1][
