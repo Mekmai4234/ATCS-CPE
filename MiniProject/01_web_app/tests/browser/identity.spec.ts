@@ -72,10 +72,23 @@ test('actual05 local excerpts preserve topic/time scope, floating chat and saved
     'aria-pressed',
     'true',
   );
-  await ask('photosynthesis', 2);
+  for (const [index, question] of ['ช่วยยกตัวอย่างให้เข้าใจง่าย', 'ขยายความหน่อยครับ'].entries()) {
+    await ask(question, index + 2);
+    const followup = page.locator('.turn').last();
+    await expect(followup).toContainText('ข้อความต้นทางที่ค้นพบ');
+    await expect(followup).toContainText('RAG retrieves evidence before answering');
+    await expect(followup.locator('.citation')).not.toHaveCount(0);
+    const response = await page.request.get(`${api}/api/jobs/${accepted.at(-1)}`);
+    expect(response.ok()).toBe(true);
+    const result = (await response.json()).result;
+    expect(result.status).toBe('answered');
+    expect(result.provider_metadata.provider).toBe('local-evidence');
+    expect(result.provider_metadata.usage.generate_requests).toBe(0);
+  }
+  await ask('photosynthesis', 4);
   await expect(page.locator('.turn').last()).toContainText('หลักฐานไม่เพียงพอ');
   await expect(page.locator('.turn').last().locator('.citation')).toHaveCount(0);
-  await ask('RAG ช่วงเวลา 10:00-10:10 กล่าวถึงอะไร', 3);
+  await ask('RAG ช่วงเวลา 10:00-10:10 กล่าวถึงอะไร', 5);
   const last = page.locator('.turn').last();
   await expect(last).toContainText('หลักฐานไม่เพียงพอ');
   await expect(last).toContainText('600–610');
@@ -89,15 +102,15 @@ test('actual05 local excerpts preserve topic/time scope, floating chat and saved
   await expect(floating).toContainText('หลักฐานไม่เพียงพอ');
   await expect(floating.getByText('กำลังโหลดความคิดเห็น…', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: 'runtime/local-evidence-audit-mobile.png' });
-  expect(posts).toBe(3);
+  expect(posts).toBe(5);
   await page.reload();
   await page.getByRole('button', { name: 'ประวัติแชท', exact: true }).click();
   await page.getByRole('button', { name: 'เปิดบทสนทนา RAG', exact: true }).click();
-  await expect(page.locator('.turn')).toHaveCount(3);
+  await expect(page.locator('.turn')).toHaveCount(5);
   await expect(
     page.locator('.turn').first().getByRole('button', { name: 'ถูกใจ', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
-  expect(posts).toBe(3);
+  expect(posts).toBe(5);
   const response = await page.request.get(`${api}/api/jobs/${accepted.at(-1)}`);
   expect(response.ok()).toBe(true);
   const result = (await response.json()).result;
