@@ -96,6 +96,64 @@ async def test_empty_corpus_yields_no_model_call(unit):
     assert not ctx.calls
 
 
+@pytest.mark.parametrize(
+    "failure", ["local_unavailable", "local_timeout", "local_busy", "quota_wait"]
+)
+async def test_synthesis_failure_returns_revalidated_excerpts_without_analysis_credit(
+    unit, failure
+):
+    ctx = LocalContext()
+    unit.service.model = LocalModel(settings())
+
+    async def unavailable(**request):
+        raise AppError(failure, "sensitive transport details", 503, True)
+
+    ctx.local_inference = unavailable
+    result = await unit.service.research(unit.request, unit.sources, ctx)
+    assert result.state == "partial" and result.citations
+    assert "Retrieved source excerpts" in result.content and failure in result.content
+    assert "sensitive" not in result.content
+    assert result.coverage.processed_chunks == 0 and not result.coverage.complete
+    assert result.provider_metadata.provider == "none"
+
+
+async def test_synthesis_failure_cannot_hide_evidence_change_or_cancellation(unit):
+    ctx = LocalContext()
+    unit.service.model = LocalModel(settings())
+
+    async def changed(**request):
+        unit.knowledge.records.clear()
+        raise AppError("local_unavailable", "Unavailable", 503, True)
+
+    ctx.local_inference = changed
+    with pytest.raises(AppError, match="no longer available"):
+        await unit.service.research(unit.request, unit.sources, ctx)
+
+
+async def test_synthesis_failure_after_cancel_never_publishes_partial(unit):
+    ctx = LocalContext()
+    unit.service.model = LocalModel(settings())
+
+    async def cancelled(**request):
+        ctx.cancelled = True
+        raise AppError("local_unavailable", "Unavailable", 503, True)
+
+    ctx.local_inference = cancelled
+    with pytest.raises(LeaseLost):
+        await unit.service.research(unit.request, unit.sources, ctx)
+
+
+async def test_local_research_restart_reuses_successful_synthesis_and_revalidates(unit):
+    ctx = LocalContext()
+    unit.service.model = LocalModel(settings())
+    first = await unit.service.research(unit.request, unit.sources, ctx)
+    unit.service.model = LocalModel(settings())
+    resumed = await unit.service.research(unit.request, unit.sources, ctx)
+    assert len(ctx.calls) == 1 and first.content == resumed.content
+    assert resumed.provider_metadata.provider == "ollama-cache"
+    assert resumed.coverage.complete
+
+
 @pytest.mark.parametrize("kind", ["quiz", "flashcards", "study_plan"])
 async def test_learning_checkpoint_reuses_generated_result_and_revalidates_input(unit, kind):
     ctx = LocalContext()

@@ -39,6 +39,28 @@ async def test_retrieved_but_not_sent_is_not_counted(unit):
     assert "step limit" in result.content
 
 
+async def test_final_call_budget_exit_accounts_successful_usage_and_observed_evidence(unit):
+    unit.config.agent_max_model_calls = 2
+    unit.model.actions = [("read_video_chunks", {}), ("search_evidence", {"query": "RAG"})]
+    result = await unit.service.research(unit.request, unit.sources, unit.ctx)
+    assert result.state == "partial" and "Final model allowance" in result.content
+    assert result.provider_metadata.usage["input_tokens"] == 10
+    assert result.coverage.processed_chunks == 2
+    assert [call[0] for call in unit.knowledge.calls] == ["read"]
+
+
+async def test_last_decision_step_requests_final_synthesis_before_step_budget_runs_out(unit):
+    unit.config.agent_max_steps = 2
+    unit.model.actions = [
+        ("read_video_chunks", {}),
+        ("finish_research", {"content": "Evidence summary", "citation_ids": ["chunk-1"]}),
+    ]
+    result = await unit.service.research(unit.request, unit.sources, unit.ctx)
+    assert result.state == "completed"
+    assert unit.model.history[0][-1]["data"]["final_only"] is False
+    assert unit.model.history[1][-1]["data"]["final_only"] is True
+
+
 async def test_repeated_search_stops(unit):
     unit.model.actions = [("search_evidence", {"query": "RAG"})] * 2
     result = await unit.service.research(unit.request, unit.sources, unit.ctx)
