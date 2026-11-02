@@ -101,3 +101,49 @@ it('withheld results never render draft text, citations or feedback', () => {
   expect(markup).not.toContain('ความคิดเห็นต่อคำตอบ');
   expect(markup).toContain('ระบบระงับคำตอบนี้');
 });
+
+it.each([0, 0.2, 12.4])(
+  'local excerpts distinguish retrieval time %s from model generation',
+  (latency) => {
+    const html = renderToStaticMarkup(
+      createElement(ResultView, {
+        result: {
+          ...result,
+          status: 'answered',
+          provider_metadata: {
+            provider: 'local-evidence',
+            requested_model: 'none',
+            latency_ms: latency,
+          },
+          coverage: { ...result.coverage!, complete: false, processed_videos: 0 },
+        },
+      }),
+    );
+    expect(html).toContain('ข้อความต้นทางที่ค้นพบ');
+    expect(html).toContain('ไม่ได้สร้างคำตอบใหม่ด้วย AI');
+    expect(html).toContain('ไม่ยืนยันว่าตรวจครบทั้งคลิป');
+    expect(html).not.toContain('โมเดล: none');
+    expect(html).not.toContain('คลิป 0/1');
+    expect(html).not.toContain('เวลาประมวลผลที่บันทึก');
+    expect(html).toContain(
+      latency === 0 ? 'ไม่มีเวลาค้นที่วัดไว้ในผลเดิม' : 'เวลาค้นและตรวจหลักฐาน',
+    );
+  },
+);
+
+it.each(['none', 'system', 'transcript'])(
+  'does not imply a configured model ran for %s',
+  (provider) => {
+    const html = renderToStaticMarkup(
+      createElement(ProviderNotice, {
+        metadata: {
+          provider,
+          requested_model: 'configured-but-not-called',
+          latency_ms: 0,
+        },
+      }),
+    );
+    expect(html).not.toContain('configured-but-not-called');
+    expect(html).not.toContain('0 ms');
+  },
+);
