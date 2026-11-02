@@ -226,6 +226,13 @@ async def test_import_normalize_index_chat_compare_and_agent(tmp_path):
         )
         citations = chat["result"]["citations"]
         assert citations and {c["video_id"] for c in citations} == {A}
+        # Default transcript lookup in single-user mode explains the member-only limit
+        # instead of failing the job with authentication_required.
+        local = await finish(
+            client, worker, "/api/chat", dict(question="RAG คืออะไร", scope=dict(video_ids=[A]))
+        )
+        assert local["result"]["status"] == "insufficient_evidence"
+        assert local["result"]["provider_metadata"]["provider"] == "local-evidence"
         assert all(c["url"].startswith(f"https://www.youtube.com/watch?v={A}") for c in citations)
         assert all(0 <= c["start_seconds"] < c["end_seconds"] <= 20 for c in citations)
         analysis = await finish(
