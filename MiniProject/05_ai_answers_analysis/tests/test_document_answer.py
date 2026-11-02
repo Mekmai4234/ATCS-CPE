@@ -74,7 +74,14 @@ async def test_five_real_documents_local_http_worker_never_dispatches_provider(
             )
         if "63,000" in question:
             assert result["citations"][0]["end_seconds"] is None
-    for question in ("สีเสื้อใน MV", "ช่วยยกตัวอย่างให้เข้าใจง่าย", "สูตรขนมครก", "กำไรสุทธิเท่าไร"):
+    for question in (
+        "สีเสื้อใน MV",
+        "ช่วยยกตัวอย่างให้เข้าใจง่าย",
+        "สูตรขนมครก",
+        "กำไรสุทธิเท่าไร",
+        "คำว่า “ศิลปิน” อยู่ตรงไหน",
+        "ใครร้องช่วง 00:19–00:26",
+    ):
         result = await ask(env, question, ["C0DXctGPWxw"])
         assert result["status"] == "insufficient_evidence" and not result["citations"]
     assert not env.model.payloads
