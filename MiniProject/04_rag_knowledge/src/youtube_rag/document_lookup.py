@@ -18,13 +18,15 @@ def query_phrases(question):
         return quoted[:16]
     question = re.sub(r"\d{1,}:\d{2}(?::\d{2})?", " ", question)
     question = re.sub(
-        r"คำว่า|ประโยคที่ว่า|อยู่ตรงไหน|อยู่ช่วงไหน|ตรงไหน|คืออะไร|ค้นหา|ช่วยหา|"
+        r"คำว่า|ประโยคที่ว่า|อยู่ตรงไหน|อยู่ช่วงไหน|ตรงไหน|คืออะไร|ค้นหา|ช่วยหา|ช่วยอธิบาย|อธิบาย|"
         r"ในคลิป|จากคลิป|ข้อความ|บทพูด|ช่วงเวลา|ช่วง|พูดอะไร|กล่าวถึงอะไร|"
         r"ให้หน่อย|หน่อย|ครับ|ค่ะ|คะ",
         " ",
         question,
     )
     value = normalize(question).strip(" ?!.,–-—")
+    if value == "rag":
+        return ["rag", "retrieval augmented", "generation"]
     return [value] if len(value) >= 2 else []
 
 
