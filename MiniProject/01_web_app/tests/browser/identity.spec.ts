@@ -33,6 +33,76 @@ async function importOne(page: Page) {
   await expect.poll(async () => page.locator('input[type="checkbox"]:enabled').count()).toBe(1);
 }
 
+test('actual05 local excerpts preserve topic/time scope, floating chat and saved feedback', async ({
+  page,
+}) => {
+  test.skip(
+    process.env.WEB_LOCAL_EVIDENCE_TEST !== 'true',
+    'Explicit real05/synthetic-provider isolated runner required',
+  );
+  test.setTimeout(120000);
+  await signIn(page, 'fixture-local-audit');
+  await importOne(page);
+  let posts = 0;
+  const accepted: string[] = [];
+  page.on('response', async (response) => {
+    if (
+      new URL(response.url()).pathname === '/api/chat' &&
+      response.request().method() === 'POST'
+    ) {
+      posts++;
+      const data = await response.json();
+      if (data.job_id) accepted.push(data.job_id);
+    }
+  });
+  await page.getByRole('checkbox').first().check();
+  await page.getByRole('button', { name: 'ถาม Buddy จากวิดีโอที่เลือก', exact: true }).click();
+  async function ask(question: string, count: number) {
+    await page.getByLabel('คำถามของคุณ', { exact: true }).fill(question);
+    await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
+    await expect(page.locator('.turn')).toHaveCount(count);
+    await expect(page.getByLabel('คำถามของคุณ', { exact: true })).toBeEnabled();
+  }
+  await ask('RAG', 1);
+  const first = page.locator('.turn').first();
+  await expect(first).toContainText('ข้อความต้นทางที่ค้นพบ');
+  await expect(first).toContainText('เวลาค้นและตรวจหลักฐาน');
+  await first.getByRole('button', { name: 'ถูกใจ', exact: true }).click();
+  await expect(first.getByRole('button', { name: 'ถูกใจ', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await ask('photosynthesis', 2);
+  await expect(page.locator('.turn').last()).toContainText('หลักฐานไม่เพียงพอ');
+  await expect(page.locator('.turn').last().locator('.citation')).toHaveCount(0);
+  await ask('RAG ช่วงเวลา 10:00-10:10 กล่าวถึงอะไร', 3);
+  const last = page.locator('.turn').last();
+  await expect(last).toContainText('หลักฐานไม่เพียงพอ');
+  await expect(last).toContainText('600–610');
+  await expect(last.locator('.citation')).toHaveCount(0);
+  await page.screenshot({ path: 'runtime/local-evidence-audit-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('.buddy-launcher').click();
+  const floating = page.getByRole('dialog');
+  await expect(floating).toContainText('600–610');
+  await expect(floating).toContainText('หลักฐานไม่เพียงพอ');
+  await page.screenshot({ path: 'runtime/local-evidence-audit-mobile.png' });
+  expect(posts).toBe(3);
+  await page.reload();
+  await page.getByRole('button', { name: 'ประวัติแชท', exact: true }).click();
+  await page.getByRole('button', { name: 'เปิดบทสนทนา RAG', exact: true }).click();
+  await expect(page.locator('.turn')).toHaveCount(3);
+  await expect(
+    page.locator('.turn').first().getByRole('button', { name: 'ถูกใจ', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  expect(posts).toBe(3);
+  const response = await page.request.get(`${api}/api/jobs/${accepted.at(-1)}`);
+  expect(response.ok()).toBe(true);
+  const result = (await response.json()).result;
+  expect(result.status).toBe('insufficient_evidence');
+  expect(result.citations).toEqual([]);
+});
+
 test('provider status uses the advertised contract and stays compatible with older APIs', async ({
   page,
 }) => {
