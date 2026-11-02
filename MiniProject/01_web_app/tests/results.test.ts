@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { ResultView } from '../src/Results';
+import { ArtifactView, ResultView } from '../src/Results';
 import ProviderNotice from '../src/ProviderNotice';
 import type { TaskResult } from '../src/types';
 
@@ -254,4 +254,32 @@ it('says how much of the clip a finished partial research answer read', () => {
     }),
   );
   expect(stopped).toContain('ได้ผลบางส่วน — งานนี้ยังไม่สำเร็จครบถ้วน');
+});
+
+it('labels a study plan created by research as part of that result', () => {
+  const plan = {
+    artifact_id: 'a1',
+    type: 'study_plan' as const,
+    content: { days: [{ day: 1, topic: 'RAG', citations: [] }] },
+    citations: [],
+    coverage: {
+      expected_videos: 1,
+      processed_videos: 1,
+      expected_chunks: 370,
+      processed_chunks: 194,
+      complete: false,
+      notes: [],
+    },
+  };
+  const research = renderToStaticMarkup(
+    createElement(ResultView, {
+      result: { ...result, status: 'answered', answer: 'คำตอบ', artifacts: [plan] },
+      kind: 'research',
+    }),
+  );
+  expect(research).toContain('แผนเรียนที่แนบมากับการค้นคว้า');
+  expect(research).not.toContain('วางแผน<span');
+  const direct = renderToStaticMarkup(createElement(ArtifactView, { artifact: plan }));
+  expect(direct).toContain('วางแผน');
+  expect(direct).not.toContain('ที่แนบมากับการค้นคว้า');
 });
