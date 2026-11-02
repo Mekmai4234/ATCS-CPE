@@ -291,10 +291,14 @@ async def test_factory_owns_and_closes_live_clients_without_provider_calls(integ
     monkeypatch.setenv("EMBEDDING_PROVIDER", "gemini")
     monkeypatch.setenv("EMBEDDING_MODEL", "gemini-embedding-2")
     adapters = await create_adapters(settings=env.settings, repository=env.repo)
+    embedder = adapters.knowledge.rag.embedder
+    # 04 defers cloud clients until first use; create one so close() is observable.
+    assert embedder._http_client is None
+    assert embedder.client is not None
     await adapters.close()
     await adapters.close()
     assert adapters.ingestion.closed
-    assert adapters.knowledge.rag.embedder._http_client.is_closed
+    assert embedder._http_client.is_closed
 
 
 async def test_factory_startup_failure_closes_rag(integrated, monkeypatch):
