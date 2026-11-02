@@ -57,10 +57,17 @@ DESCRIPTIONS = {
     "finish_research": (
         "Return the final answer to the goal as plain text without Markdown (no ** or #). "
         "Give concrete points taken from the evidence and put every evidence ID you rely on "
-        "in citation_ids. If a learning artifact was created, mention it in one sentence "
-        "instead of repeating its content."
+        "in citation_ids."
     ),
 }
+ARTIFACT_CREATED = (
+    " A learning artifact was created in this run; mention it in one sentence instead of "
+    "repeating its content."
+)
+NO_ARTIFACT = (
+    " No learning artifact was created in this run; do not say that a lesson, plan, quiz "
+    "or flashcards were created."
+)
 
 
 @dataclass
