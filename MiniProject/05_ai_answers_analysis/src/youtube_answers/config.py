@@ -19,6 +19,7 @@ class AnswerSettings(BaseSettings):
     local_context_tokens: int = Field(default=4096, ge=512, le=32768)
     local_max_output_tokens: int = Field(default=1024, ge=64, le=8192)
     llm_model: str = Field(default="gemini-3.5-flash", min_length=1, max_length=200)
+    llm_fallback_models: str = Field(default="", max_length=1000)
     llm_timeout_seconds: float = Field(default=60, gt=0, le=600)
     max_context_tokens: int = Field(default=24000, ge=4096, le=1000000)
     answer_max_output_tokens: int = Field(default=8192, ge=128, le=32000)
@@ -37,3 +38,8 @@ class AnswerSettings(BaseSettings):
     def model_post_init(self, context):
         if self.enable_streaming:
             raise ValueError("Streaming is not implemented; use validated JSON results")
+
+    def model_chain(self):
+        """Primary model first, then distinct configured fallbacks in order."""
+        names = [self.llm_model, *self.llm_fallback_models.split(",")]
+        return list(dict.fromkeys(name.strip() for name in names if name.strip()))
