@@ -258,6 +258,16 @@ test('reload discovers the existing job and follows GET without another POST', a
   await drawer.getByRole('button', { name: 'ติดตามงาน', exact: true }).click();
   await expect(page.getByText('ผลจากงานเดิม', { exact: true })).toBeVisible();
   await expect(drawer).not.toBeVisible();
+  await expect(page.getByLabel('โหมดคำตอบ', { exact: true })).toHaveValue('local');
+  const followups: Record<string, unknown>[] = [];
+  await page.route('**/api/chat', (route) => {
+    followups.push(route.request().postDataJSON());
+    return route.fulfill({ status: 202, json: { job_id: 'recover-job', state: 'completed' } });
+  });
+  await page.getByLabel('คำถามของคุณ', { exact: true }).fill('ถามต่อจากคลิปเดิม');
+  await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
+  await expect.poll(() => followups.length).toBe(1);
+  expect(followups[0]).toMatchObject({ response_mode: 'local', scope });
   expect(posts).toBe(1);
 });
 

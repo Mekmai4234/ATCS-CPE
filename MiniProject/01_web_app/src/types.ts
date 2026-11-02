@@ -191,6 +191,7 @@ export interface MediaEvidenceData {
 }
 export interface RecoverableJob extends Job {
   request: {
+    response_mode?: 'local' | 'ai';
     type?: TaskType;
     question?: string;
     instruction?: string;

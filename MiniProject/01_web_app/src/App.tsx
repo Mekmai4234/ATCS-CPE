@@ -1240,6 +1240,13 @@ export default function App({
                       : job.kind === 'research'
                         ? 'research'
                         : job.request.type || 'summary';
+                  setSelected(job.sources.map((source) => source.video_id));
+                  setChannel(job.request.scope?.channel_ids?.[0] || '');
+                  setFrom(job.request.scope?.date_from || '');
+                  setTo(job.request.scope?.date_to || '');
+                  if (type === 'chat') {
+                    setResponseMode(job.request.response_mode === 'ai' ? 'ai' : 'local');
+                  }
                   setTaskType(type === 'chat' ? 'summary' : type);
                   navigateTab(type === 'chat' ? 'chat' : 'learn');
                   void execute(
