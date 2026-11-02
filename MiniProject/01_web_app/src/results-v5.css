@@ -12,6 +12,15 @@
   max-width: 75ch;
 }
 .v5r-result .v5r-title,
+/* Artifact created inside a research run: a sub-heading of that result. */
+.v5r-artifact .v5r-attached-title {
+  font-family: Kanit, 'IBM Plex Sans Thai', sans-serif;
+  font-size: 28px;
+  line-height: 1.3;
+  margin: 8px 0 24px;
+  color: var(--v5-ink, #083d3b);
+}
+
 .v5r-artifact .v5r-title {
   font-family: Kanit, 'IBM Plex Sans Thai', sans-serif;
   font-size: 64px;

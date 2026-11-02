@@ -195,17 +195,28 @@ function FlashcardContent({ artifact }: { artifact: Artifact }) {
   );
 }
 
-export function ArtifactView({ artifact }: { artifact: Artifact }) {
+export function ArtifactView({
+  artifact,
+  attached = false,
+}: {
+  artifact: Artifact;
+  // Created by a research run: part of that result, not a separate learning page.
+  attached?: boolean;
+}) {
   const isQuiz = artifact.type === 'quiz';
   const isCards = artifact.type === 'flashcards';
   const label = isQuiz ? 'ทดสอบ' : isCards ? 'ทบทวน' : 'วางแผน';
   const fullLabel = isQuiz ? 'แบบทดสอบ' : isCards ? 'แฟลชการ์ด' : 'แผนเรียน';
   return (
     <section className={`artifact v5r-artifact v5r-artifact-${artifact.type}`}>
-      <h3 className="v5r-title" aria-label={fullLabel}>
-        {label}
-        <span aria-hidden="true">.</span>
-      </h3>
+      {attached ? (
+        <h3 className="v5r-attached-title">{fullLabel}ที่แนบมากับการค้นคว้า</h3>
+      ) : (
+        <h3 className="v5r-title" aria-label={fullLabel}>
+          {label}
+          <span aria-hidden="true">.</span>
+        </h3>
+      )}
       {artifact.sources_available === false && (
         <p className="notice warning">แหล่งข้อมูลเดิมถูกลบหรือเปลี่ยนแปลงแล้ว</p>
       )}
@@ -345,7 +356,11 @@ export function ResultView({
         <StoredFeedback key={result.assistant_message_id} id={result.assistant_message_id} />
       )}
       {result.artifacts?.map((artifact, i) => (
-        <ArtifactView artifact={artifact} key={artifact.artifact_id || i} />
+        <ArtifactView
+          artifact={artifact}
+          attached={kind === 'research'}
+          key={artifact.artifact_id || i}
+        />
       ))}
     </div>
   );
