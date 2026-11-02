@@ -19,15 +19,34 @@ export default function ProviderNotice({ metadata }: { metadata?: Answer['provid
   const origins = metadata.provider.split(',');
   const label = origins.map((origin) => providers[origin] || 'ยังไม่ทราบผู้ให้บริการ').join(' · ');
   const cached = origins.some((origin) => origin.endsWith('-cache'));
+  const localEvidence = origins.includes('local-evidence');
+  const noModel = origins.every((origin) =>
+    ['none', 'system', 'transcript', 'local-evidence'].includes(origin),
+  );
   return (
     <p className="provider-notice">
-      {label} · โมเดล: {metadata.returned_model || metadata.requested_model || 'ไม่ได้ระบุ'}
+      {label}
+      {!noModel && (
+        <> · โมเดล: {metadata.returned_model || metadata.requested_model || 'ไม่ได้ระบุ'}</>
+      )}
       {!cached &&
+        (!noModel || localEvidence) &&
         typeof metadata.latency_ms === 'number' &&
         Number.isFinite(metadata.latency_ms) &&
-        metadata.latency_ms >= 0 && (
+        metadata.latency_ms >= 0 &&
+        (localEvidence ? (
+          metadata.latency_ms > 0 ? (
+            <>
+              {' '}
+              · เวลาค้นและตรวจหลักฐาน:{' '}
+              {metadata.latency_ms < 1 ? '<1' : Math.round(metadata.latency_ms)} ms
+            </>
+          ) : (
+            <> · ไม่มีเวลาค้นที่วัดไว้ในผลเดิม</>
+          )
+        ) : (
           <> · เวลาประมวลผลที่บันทึก: {Math.round(metadata.latency_ms)} ms</>
-        )}
+        ))}
     </p>
   );
 }

@@ -10,7 +10,7 @@ export default defineConfig({
     ...devices['Desktop Chrome'],
     channel: 'chrome',
     baseURL: 'http://127.0.0.1:3001',
-    trace: 'retain-on-failure',
+    trace: process.env.WEB_LOCAL_EVIDENCE_TEST === 'true' ? 'on' : 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
   webServer: [
