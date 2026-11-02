@@ -96,6 +96,10 @@ class Repository(Ownership):
 
     def _new_job(self, connection, kind, payload, **extra):
         self._check_mode(connection)
+        if payload.get("sources") and "document_sources" not in payload:
+            from .document_store import snapshot
+
+            payload = dict(payload, document_sources=snapshot(connection, payload["sources"]))
         if "execution" not in payload:
             from .local_inference import execution_identity
 
@@ -891,6 +895,10 @@ class Repository(Ownership):
 
                 for value in result.get("citations", []):
                     citation = Citation.model_validate(value)
+                    if citation.kind.startswith("document_"):
+                        from .document_store import verify_citation
+
+                        verify_citation(self, connection, job, citation)
                     if citation.kind == "video":
                         verify_video_citation(self, connection, job, citation)
             if kind == "attach":

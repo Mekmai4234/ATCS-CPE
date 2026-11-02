@@ -21,6 +21,13 @@ async def validate_result(result, sources, adapters, context, full_task=False):
     normalized = [Evidence.model_validate(e) for e in evidence]
     by_id = {e.chunk_id: e for e in normalized}
     for citation in result.citations:
+        if citation.kind.startswith("document_"):
+            from .document_store import verify_citation
+
+            with context.repository.db.read() as connection:
+                job = context.repository._owned(connection, context.job_id, context.lease_token)
+                verify_citation(context.repository, connection, job, citation)
+            continue
         if citation.kind == "video":
             from .video_evidence import verify_video_citation
 
