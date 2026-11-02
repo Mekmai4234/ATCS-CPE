@@ -84,3 +84,9 @@ it('distinguishes internal quota, provider throttling, worker and connection fai
   expect(new Set(messages).size).toBe(4);
   expect(messages.every(Boolean)).toBe(true);
 });
+
+it('explains learning failures instead of the generic failure text', () => {
+  for (const code of ['invalid_citation', 'invalid_artifact', 'invalid_model_output'])
+    expect(serviceMessage(code)).toBe('AI ส่งผลลัพธ์ไม่สมบูรณ์ กรุณาลองสร้างใหม่');
+  expect(serviceMessage('insufficient_evidence')).toContain('ยังไม่พบหลักฐาน');
+});

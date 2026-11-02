@@ -415,3 +415,55 @@ async def test_exact_token_rejection_falls_back_without_claiming_full_coverage(u
     )
     assert calls == 2 and result.coverage.processed_chunks == 1
     assert not result.coverage.complete
+
+
+async def test_real_thai_transcript_artifact_fits_admission_with_citation_enum(unit):
+    """Regression: a study plan over a 370-passage Thai transcript must leave room for the
+    decoder citation enum, which Gemini admission counts byte-for-byte in the config."""
+    from pathlib import Path
+
+    from conftest import evidence
+    from google.genai import types
+    from youtube_backend.schemas import StudyPlanContent
+    from youtube_ingestion.documents import load
+
+    from youtube_agent.gemini import (
+        POLICY,
+        byte_size,
+        constrain_citations,
+        provider_schema,
+        wire_evidence,
+    )
+
+    document = next(
+        d
+        for d in load(Path(__file__).resolve().parents[2] / "Transcript")
+        if d.video_id == "cWVse_LuFO0"
+    )
+    unit.knowledge.records = [evidence(cid=s.segment_id, text=s.text) for s in document.segments]
+    request = {"type": "study_plan", "topic": "", "days": 2, "scope": {"video_ids": [VIDEO_A]}}
+    await unit.service.artifact(request, unit.sources, unit.ctx)
+    supplied = unit.model.generated[0][1]
+    assert 1 < len(supplied) < len(document.segments)
+    ids = [e.chunk_id for e in supplied]
+    config = types.GenerateContentConfig(
+        system_instruction=POLICY,
+        max_output_tokens=unit.config.agent_max_output_tokens,
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        thinking_config=types.ThinkingConfig(thinking_level="LOW"),
+        response_mime_type="application/json",
+        response_json_schema=constrain_citations(provider_schema(StudyPlanContent), ids),
+    )
+    allowance = len(config.model_dump_json(exclude_none=True).encode("utf-8")) + 256
+    prompt = byte_size({"task": request, "evidence": [wire_evidence(e) for e in supplied]}) // 3
+    assert prompt + allowance <= unit.config.max_context_tokens
+
+
+def test_citation_arrays_are_limited_to_supplied_ids():
+    from youtube_backend.schemas import StudyPlanContent
+
+    from youtube_agent.gemini import constrain_citations, provider_schema
+
+    schema = constrain_citations(provider_schema(StudyPlanContent), ["b", "a", "a"])
+    day = next(v for v in schema["$defs"].values() if "citations" in v.get("properties", {}))
+    assert day["properties"]["citations"]["items"] == {"type": "string", "enum": ["a", "b"]}
