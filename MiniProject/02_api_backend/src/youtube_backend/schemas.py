@@ -116,11 +116,15 @@ class Evidence(Schema):
     title: str
     text: str
     start_seconds: float = Field(ge=0)
-    end_seconds: float = Field(gt=0)
+    end_seconds: float | None = Field(default=None, gt=0)
+    document_citation: dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def interval(self):
-        if self.end_seconds <= self.start_seconds:
+        if self.end_seconds is None:
+            if not self.document_citation:
+                raise ValueError("Only a document passage may have unknown end")
+        elif self.end_seconds <= self.start_seconds:
             raise ValueError("Invalid evidence interval")
         return self
 
