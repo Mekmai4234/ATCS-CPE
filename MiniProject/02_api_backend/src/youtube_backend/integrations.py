@@ -121,7 +121,11 @@ class ExecutionContext:
 
         from . import database as db
 
-        if not isinstance(key, str) or len(key) != 64:
+        if (
+            not isinstance(key, str)
+            or len(key) != 64
+            or any(x not in "0123456789abcdef" for x in key)
+        ):
             raise AppError("invalid_cache_key", "Invalid answer reuse key", 422)
         self.check()
         with self.repository.db.write() as c:
@@ -149,18 +153,52 @@ class ExecutionContext:
             ).mappings()
             for previous in rows:
                 result = previous["result"] or {}
+                if not isinstance(result, dict) or not isinstance(
+                    result.get("provider_metadata"), dict
+                ):
+                    continue
                 if (
                     previous["payload"].get("answer_reuse_key") == key
                     and previous["payload"]["sources"] == job["payload"]["sources"]
+                    and previous["payload"].get("history") == job["payload"].get("history")
+                    and {
+                        k: v
+                        for k, v in previous["payload"].get("request", {}).items()
+                        if k != "conversation_id"
+                    }
+                    == {
+                        k: v
+                        for k, v in job["payload"].get("request", {}).items()
+                        if k != "conversation_id"
+                    }
+                    and previous["payload"].get("execution") == job["payload"].get("execution")
                     and result.get("status") == "answered"
                     and result.get("visibility", "published") == "published"
                     and result.get("provider_metadata", {}).get("provider") != "local-evidence"
                     and result.get("citations")
+                    and isinstance(result["citations"], list)
                     and all(
-                        x.get("kind", "transcript") == "transcript" for x in result["citations"]
+                        isinstance(x, dict) and x.get("kind", "transcript") == "transcript"
+                        for x in result["citations"]
                     )
                 ):
-                    return result
+                    from pydantic import ValidationError
+
+                    from .schemas import AnswerResult
+
+                    try:
+                        checked = AnswerResult.model_validate(
+                            {
+                                field: result[field]
+                                for field in AnswerResult.model_fields
+                                if field in result
+                            }
+                        )
+                    except (ValidationError, TypeError, ValueError):
+                        # A corrupt historical candidate is a miss, never an excuse
+                        # to skip authorization or to return unvalidated metadata.
+                        continue
+                    return checked.model_dump(mode="json")
         return None
 
 
