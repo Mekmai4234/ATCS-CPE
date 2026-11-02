@@ -17,6 +17,18 @@ class LocalEvidenceRequest(Schema):
 
 
 def search(repo, request):
+    from youtube_rag.document_lookup import authorized_search, query_phrases
+
+    local = authorized_search(
+        repo, request.scope.model_dump(mode="json"), query_phrases(request.question)
+    )
+    if local["document_count"]:
+        return dict(
+            local,
+            kind="transcript_excerpts",
+            inspected_segments=local["candidates_examined"],
+            notice="ข้อความตรงคำค้นจากไฟล์ ไม่ใช่คำตอบที่ AI สร้าง เวลายังไม่ได้เทียบเสียงจริง",
+        )
     # Lexical excerpts are not generated answers or proof of semantic absence.
     terms = set(re.findall(r"[^\W_]+", request.question.casefold()))
     for word in list(terms):
