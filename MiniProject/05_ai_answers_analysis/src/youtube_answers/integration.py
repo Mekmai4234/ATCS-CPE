@@ -206,11 +206,30 @@ class AnswerAdapters(RagAdapters):
                 or not sources
             ):
                 raise
+            # Frozen transcript documents first: they keep line and timestamp provenance
+            # and apply the requested window themselves, including unknown final endings.
+            direct = self._document_fallback(request, sources, history, context)
+            if direct is not None:
+                return direct
             result = await self._local_answer(request, sources, history, context)
         if any(not overlaps(citation, window) for citation in result.citations):
             raise error(
                 "invalid_citation", "Answer evidence is outside the requested time interval"
             )
+        return result
+
+    def _document_fallback(self, request, sources, history, context):
+        """Answer from transcript documents while every approved model is unavailable."""
+        from .document_answer import document_answer
+
+        result = document_answer(request, sources, history, context)
+        if result is None or result.status != "answered":
+            return None
+        result.answer = (
+            "ขณะนี้ AI ใช้งานไม่ได้ชั่วคราว (เช่น โควตาเต็ม) จึงตอบจากไฟล์บทถอดเสียงแทน "
+            "ข้อความต่อไปนี้มาจากเอกสาร ไม่ใช่คำอธิบายที่ AI สร้างใหม่\n\n" + result.answer
+        )
+        result.coverage.notes.insert(0, "AI ไม่พร้อมใช้งานชั่วคราว จึงสลับมาตอบจากเอกสาร")
         return result
 
     async def _local_answer(self, request, sources, history, context):
