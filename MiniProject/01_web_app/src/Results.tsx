@@ -87,12 +87,23 @@ export function CoverageNotice({
   coverage,
   insufficient = false,
   localEvidence = false,
+  localDocument = false,
 }: {
   coverage?: Coverage;
   insufficient?: boolean;
   localEvidence?: boolean;
+  localDocument?: boolean;
 }) {
   if (!coverage) return null;
+  if (localDocument)
+    return (
+      <div className="coverage">
+        <strong>อ้างอิงจากไฟล์ที่เลือก</strong>
+        {coverage.notes?.map((note, i) => (
+          <span key={i}>{note}</span>
+        ))}
+      </div>
+    );
   if (coverage.expected_videos === 0)
     return <p className="notice">คุยทั่วไป · ไม่ได้อ้างอิงเนื้อหาวิดีโอ</p>;
   return (
@@ -307,6 +318,7 @@ export function ResultView({
           coverage={result.coverage}
           insufficient={result.status === 'insufficient_evidence'}
           localEvidence={localEvidence}
+          localDocument={result.provider_metadata?.provider === 'local-document'}
         />
       )}
       <VisualCoverageNotice value={result.visualCoverage} />
