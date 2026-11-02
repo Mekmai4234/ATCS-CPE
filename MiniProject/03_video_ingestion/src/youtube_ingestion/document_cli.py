@@ -32,7 +32,7 @@ def main():
         try:
             database.check_schema()
             for document, row in zip(documents, report, strict=True):
-                row.update(publish(database, document.model_dump()))
+                row.update(publish(database, document.model_dump(), create_missing=True))
         finally:
             database.close()
     print(json.dumps(report, ensure_ascii=False, indent=2))
