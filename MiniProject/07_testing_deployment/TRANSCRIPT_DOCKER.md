@@ -15,7 +15,9 @@ docker compose --env-file .env.local -f 07_testing_deployment/compose.transcript
 
 The import command is an explicit trusted local operator action, not a public
 upload API. It validates all five allowlisted files first, then publishes one
-immutable version per existing ready clip atomically. It never grants a library
+immutable version per existing ready clip atomically. On a fresh installation it
+creates allowlisted sources with a local index and no memberships; a signed-in
+member explicitly attaches the known video URL to use that source. It never grants a library
 membership, downloads a video, calls an embedder, or fabricates unknown endings.
 File hashes and video mappings are in `Transcript/manifest.json`. Existing
 captions/indexes and prior document versions remain available. Importing an

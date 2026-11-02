@@ -8,6 +8,7 @@ import os
 import sys
 from pathlib import Path
 
+from sqlalchemy.engine import make_url
 from youtube_backend.database import Database
 from youtube_backend.full import FullSettings
 from youtube_backend.full_pair import check_pair, initialize_pair
@@ -19,18 +20,21 @@ def main():
     os.environ.update(settings.child_environment())
     action = sys.argv[1]
     if action == "migrate":
-        database = Database(settings.database_url)
-        try:
-            with database.engine.connect() as c:
-                from sqlalchemy import inspect
+        path = Path(make_url(settings.database_url).database)
+        if not path.exists():
+            initialize_pair(settings)
+        else:
+            database = Database(settings.database_url)
+            try:
+                with database.engine.connect() as c:
+                    from sqlalchemy import inspect
 
-                existing = inspect(c).has_table("backend02_full_pair")
-            if existing:
+                    existing = inspect(c).has_table("backend02_full_pair")
+                if not existing:
+                    raise ValueError("Existing unbound database needs explicit paired migration")
                 upgrade_database(database)
-            else:
-                initialize_pair(settings)
-        finally:
-            database.close()
+            finally:
+                database.close()
         check_pair(settings)
         print("Migration and paired storage verified")
     elif action == "validate":
