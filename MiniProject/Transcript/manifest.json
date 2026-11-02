@@ -1,0 +1,73 @@
+[
+  {
+    "document_id": "transcript-C0DXctGPWxw",
+    "relative_path": "DICEBLUE 'รอ SIS (TER)' OFFICIAL MV.txt",
+    "video_id": "C0DXctGPWxw",
+    "language": "th",
+    "sha256": "b3749f96b4c47710704a7b50f4422cd938af309a053d72a6d0b552304fc2c21b",
+    "import_version": "transcript-v1",
+    "source_type": "user_supplied",
+    "timing_status": "user_supplied_unverified",
+    "headings": {}
+  },
+  {
+    "document_id": "transcript-f0SQzjp3QzM",
+    "relative_path": "RAG คืออะไร ทำให้ Gen AI เก่งขึ้นได้อย่างไร มาลองด้วย GPTs  Prompt Expert.txt",
+    "video_id": "f0SQzjp3QzM",
+    "language": "th",
+    "sha256": "4874646b5fa9971bf53818fa1d5f1853638a70a6ab221deb7d7ae935b0879c70",
+    "import_version": "transcript-v1",
+    "source_type": "user_supplied",
+    "timing_status": "user_supplied_unverified",
+    "headings": {
+      "13": "ปัญหาของ GPT กับข้อมูลเฉพาะองค์กร",
+      "29": "องค์ประกอบของ RAG: LLM, Vector Database, Chat Interface 🛠️",
+      "112": "สาธิตการสร้าง RAG ด้วย Custom GPT",
+      "180": "การอัปโหลดนโยบายบริษัทและสร้าง Assistant",
+      "266": "ทดสอบการใช้งาน Assistant กับคำถามพนักงาน",
+      "301": "สรุปและประโยชน์ของ RAG ในองค์กร"
+    }
+  },
+  {
+    "document_id": "transcript-cWVse_LuFO0",
+    "relative_path": "RAG คืออะไร เทคนิคที่ช่วยทำ AI ChatBot ให้ AI เข้าใจธุรกิจของคุณ.txt",
+    "video_id": "cWVse_LuFO0",
+    "language": "th",
+    "sha256": "6ac7e01c658366a308fb92f4d4af0f77292e2b97a148c016d7cbe27e77c230c7",
+    "import_version": "transcript-v1",
+    "source_type": "user_supplied",
+    "timing_status": "user_supplied_unverified",
+    "headings": {
+      "39": "การค้นหาแบบทั่วไปที่ไม่มี RAG",
+      "94": "การเพิ่มข้อมูลให้ AI",
+      "128": "Retrieval",
+      "144": "Keyword Search และข้อจำกัด",
+      "199": "Semantic Search: ค้นหาด้วยความหมาย",
+      "330": "Augmented",
+      "339": "Generation",
+      "353": "สรุปการทำงานของ RAG"
+    }
+  },
+  {
+    "document_id": "transcript-B-zaXo-skGo",
+    "relative_path": "ดีใจที่ตรงนั้นไม่ใช่เรา - Only Monday [Official MV].txt",
+    "video_id": "B-zaXo-skGo",
+    "language": "th",
+    "sha256": "ffa296c89a108ffd86766241f17dc76ffdd4b4411864401be34d6ab3366111fa",
+    "import_version": "transcript-v1",
+    "source_type": "user_supplied",
+    "timing_status": "user_supplied_unverified",
+    "headings": {}
+  },
+  {
+    "document_id": "transcript-NZImGB4O-X4",
+    "relative_path": "เอากาชาที่ขายมาเปิดเล่น...จะกำไรแบบในเกมไหม  ร้านเกลือ TCG ในชีวิตจริง EP.4.txt",
+    "video_id": "NZImGB4O-X4",
+    "language": "th",
+    "sha256": "f84d872fac097d49a3b08ee57d21131f4f3b986b7cbb6439b9f9f9701edbb9f7",
+    "import_version": "transcript-v1",
+    "source_type": "user_supplied",
+    "timing_status": "user_supplied_unverified",
+    "headings": {}
+  }
+]
