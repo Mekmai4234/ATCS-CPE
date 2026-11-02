@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     worker_poll_seconds: float = Field(default=0.5, gt=0, le=60)
     import_max_urls: int = Field(default=50, ge=1, le=500)
     llm_model: str = "gemini-3.5-flash"
+    # Comma-separated models in the same verified project, tried when LLM_MODEL's
+    # bucket is rate limited. Each must also be listed in the Free Tier policy.
+    llm_fallback_models: str = Field(default="", max_length=1000)
     vision_model: str = ""
     vision_max_frames: int = Field(default=12, ge=1, le=12)
     vision_frames_per_question: int = Field(default=3, ge=0, le=3)
