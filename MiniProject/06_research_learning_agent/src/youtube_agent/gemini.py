@@ -11,9 +11,22 @@ import httpx
 from google import genai
 from google.genai import errors, types
 from pydantic import ValidationError
+from youtube_backend.errors import AppError
 from youtube_backend.schemas import ProviderMetadata
 
 from .models import DESCRIPTIONS, TOOL_MODELS, Generated, ModelReply, error
+
+THINKING_LEVEL = re.compile(r"^(?:models/)?gemini-3(?:\.\d+)?-flash(?:-|$)")
+# Bucket exhaustion or a model-side outage (5xx, transport): another approved model in
+# the same project may answer. Timeouts and invalid output keep the job retry policy.
+FALLBACK_ERRORS = {
+    "quota_wait",
+    "provider_rate_limited",
+    "provider_unavailable",
+    "generation_unavailable",
+}
+# A fallback missing from the operator policy is skipped, not reported as the failure.
+UNAPPROVED_FALLBACK = {"free_model_unverified"}
 
 POLICY = """You research ONLY the authorized imported YouTube evidence.
 OCR is text on sampled images, not speech. Visual descriptions are uncertain samples.
@@ -82,8 +95,37 @@ class GeminiModel:
         )
         return self._client
 
-    async def _call(self, contents, config, timeout, context):
+    async def _call(self, contents, config, timeout, context, *, pinned=None):
+        """Try LLM_MODEL, then LLM_FALLBACK_MODELS when it is limited or unavailable.
+
+        Every attempt goes through the backend broker of the same verified project.
+        A pinned model (an agent run that already has native model turns) never
+        switches, because thought signatures belong to the model that produced them.
+        """
+        if pinned:
+            return await self._call_model(pinned, contents, config, timeout, context)
+        chain = self.settings.model_chain()
+        deadline = time.monotonic() + timeout
+        limited = None
+        for index, model in enumerate(chain):
+            remaining = deadline - time.monotonic()
+            if index and remaining < 1:
+                break
+            try:
+                return await self._call_model(model, contents, config, remaining, context)
+            except AppError as exc:
+                if index and exc.code in UNAPPROVED_FALLBACK:
+                    continue
+                if exc.code not in FALLBACK_ERRORS:
+                    raise
+                limited = limited or exc
+        raise limited
+
+    async def _call_model(self, model, contents, config, timeout, context):
         started = time.monotonic()
+        if config.thinking_config is not None and not THINKING_LEVEL.match(model):
+            # thinking_level is a Gemini 3 Flash option; other families keep defaults.
+            config = config.model_copy(update={"thinking_config": None})
         if context is None or not callable(getattr(context, "gemini_call", None)):
             raise error(
                 "free_tier_unverified", "Shared backend Free Tier admission required", status=503
@@ -123,7 +165,7 @@ class GeminiModel:
 
             reply = await context.gemini_call(
                 invoke,
-                model=self.settings.llm_model,
+                model=model,
                 endpoint=endpoint,
                 input_tokens=max(1, estimate),
                 call_key=f"agent:{endpoint}:{uuid4()}",
@@ -152,7 +194,7 @@ class GeminiModel:
                 count = await outbound(
                     "countTokens",
                     lambda: self.client.aio.models.count_tokens(
-                        model=self.settings.llm_model,
+                        model=model,
                         contents=contents,
                     ),
                     estimate + config_bytes,
@@ -171,7 +213,7 @@ class GeminiModel:
                 response = await outbound(
                     "generateContent",
                     lambda: self.client.aio.models.generate_content(
-                        model=self.settings.llm_model, contents=contents, config=config
+                        model=model, contents=contents, config=config
                     ),
                     count.total_tokens + config_allowance + self.settings.agent_max_output_tokens,
                 )
@@ -185,7 +227,7 @@ class GeminiModel:
             usage = response.usage_metadata
             metadata = ProviderMetadata(
                 provider="gemini",
-                requested_model=self.settings.llm_model,
+                requested_model=model,
                 returned_model=response.model_version,
                 usage={
                     k: v
@@ -215,7 +257,7 @@ class GeminiModel:
             raise provider_error(exc.code) from None
 
     def _config(self, **kwargs):
-        if re.match(r"^(?:models/)?gemini-3(?:\.\d+)?-flash(?:-|$)", self.settings.llm_model):
+        if THINKING_LEVEL.match(self.settings.llm_model):
             kwargs["thinking_config"] = types.ThinkingConfig(thinking_level="LOW")
         return types.GenerateContentConfig(
             system_instruction=POLICY,
@@ -262,6 +304,10 @@ class GeminiModel:
                 contents.append(
                     types.Content(role="user", parts=[types.Part(text=json_text(item["data"]))])
                 )
+        # Native model turns carry thought signatures of the model that produced them,
+        # so a run keeps that model once it has any; only its first decision may fall back.
+        turns = [item for item in history if item["role"] == "model"]
+        pinned = (turns[-1].get("model") or self.settings.llm_model) if turns else None
         response, metadata = await self._call(
             contents,
             self._config(
@@ -274,6 +320,7 @@ class GeminiModel:
             ),
             timeout,
             context,
+            pinned=pinned,
         )
         native = response.candidates[0].content
         if native is None:
@@ -331,7 +378,7 @@ class GeminiModel:
             response_json_schema=provider_schema(QuizGradeContent),
             max_output_tokens=min(4096, self.settings.agent_max_output_tokens),
         )
-        if re.match(r"^(?:models/)?gemini-3(?:\.\d+)?-flash(?:-|$)", self.settings.llm_model):
+        if THINKING_LEVEL.match(self.settings.llm_model):
             config.thinking_config = types.ThinkingConfig(thinking_level="LOW")
         response, _ = await self._call(
             [
