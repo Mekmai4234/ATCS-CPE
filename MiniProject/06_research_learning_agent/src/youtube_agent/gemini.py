@@ -103,7 +103,8 @@ class GeminiModel:
         switches, because thought signatures belong to the model that produced them.
         """
         if pinned:
-            return await self._call_model(pinned, contents, config, timeout, context)
+            response, metadata = await self._call_model(pinned, contents, config, timeout, context)
+            return response, self._mark_fallback(metadata, pinned)
         chain = self.settings.model_chain()
         deadline = time.monotonic() + timeout
         limited = None
@@ -112,7 +113,10 @@ class GeminiModel:
             if index and remaining < 1:
                 break
             try:
-                return await self._call_model(model, contents, config, remaining, context)
+                response, metadata = await self._call_model(
+                    model, contents, config, remaining, context
+                )
+                return response, self._mark_fallback(metadata, model)
             except AppError as exc:
                 if index and exc.code in UNAPPROVED_FALLBACK:
                     continue
@@ -120,6 +124,11 @@ class GeminiModel:
                     raise
                 limited = limited or exc
         raise limited
+
+    def _mark_fallback(self, metadata, model):
+        if model == self.settings.llm_model:
+            return metadata
+        return metadata.model_copy(update={"fallback_from": self.settings.llm_model})
 
     async def _call_model(self, model, contents, config, timeout, context):
         started = time.monotonic()
