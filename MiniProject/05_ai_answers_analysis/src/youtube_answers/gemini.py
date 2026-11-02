@@ -11,7 +11,7 @@ from youtube_backend.errors import AppError
 from youtube_backend.schemas import ProviderMetadata
 
 from .models import Generated, GeneratedAnswer, error
-from .prompts import POLICY, json_text
+from .prompts import POLICY, json_text, provider_response_schema
 from .quota import verified_grant
 from .timing import provider_call
 
@@ -19,65 +19,6 @@ from .timing import provider_call
 RATE_LIMITED = {"quota_wait", "provider_rate_limited", "generation_rate_limited"}
 # A fallback missing from the operator policy is skipped, not reported as the failure.
 UNAPPROVED_FALLBACK = {"free_model_unverified"}
-
-
-def provider_response_schema(schema=GeneratedAnswer, *, citation_ids=()):
-    """Keep high-cardinality array bounds out of Gemini's constrained decoder.
-
-    The nested 100 statements / 1000 citation IDs limits can make generateContent
-    reject this otherwise valid schema with INVALID_ARGUMENT. They are still enforced
-    by GeneratedAnswer when validating the actual response, before it is published.
-    """
-
-    def compact(value):
-        if isinstance(value, dict):
-            return {key: compact(item) for key, item in value.items() if key != "maxItems"}
-        if isinstance(value, list):
-            return [compact(item) for item in value]
-        return value
-
-    result = compact(schema.model_json_schema())
-    if schema is GeneratedAnswer and citation_ids:
-        result["$defs"]["Statement"]["properties"]["citation_ids"]["items"]["enum"] = sorted(
-            set(citation_ids)
-        )
-    if schema is GeneratedAnswer:
-        # Mirror GeneratedAnswer.outcome in the decoder. A generic object schema
-        # allowed answered+nonempty message, which repeatedly failed real analysis.
-        properties = result.pop("properties")
-        result.pop("required", None)
-        result.pop("additionalProperties", None)
-        result["anyOf"] = [
-            {
-                "type": "object",
-                "properties": {
-                    "status": {"type": "string", "enum": ["answered"]},
-                    "statements": {
-                        "type": "array",
-                        "items": properties["statements"]["items"],
-                        "minItems": 1,
-                    },
-                    "message": {"type": "string", "enum": [""]},
-                },
-                "required": ["status", "statements"],
-                "additionalProperties": False,
-            },
-            {
-                "type": "object",
-                "properties": {
-                    "status": {"type": "string", "enum": ["insufficient_evidence"]},
-                    "statements": {
-                        "type": "array",
-                        "items": properties["statements"]["items"],
-                        "maxItems": 0,
-                    },
-                    "message": {"type": "string", "minLength": 1},
-                },
-                "required": ["status", "message"],
-                "additionalProperties": False,
-            },
-        ]
-    return result
 
 
 class GeminiModel:
