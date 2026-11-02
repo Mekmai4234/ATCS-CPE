@@ -207,6 +207,36 @@ async def test_metadata_failure_keeps_captions_and_logs_no_secrets(config, caplo
     assert service.captions.closed and service.metadata.closed
 
 
+@pytest.mark.parametrize("failure", [False, True])
+async def test_stage_timings_distinguish_metadata_failure_and_total_without_private_content(
+    config, caplog, failure
+):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="youtube_ingestion.timing")
+
+    class PrivateMeta(Meta):
+        async def fetch(self, *args):
+            if failure:
+                raise AppError("metadata_unavailable", "PRIVATE_PROVIDER_ERROR", 503)
+            return Metadata(title="PRIVATE_TITLE")
+
+    service = IngestionService(config, captions=Captions(), metadata=PrivateMeta())
+    try:
+        result = await service.ingest(VIDEO_A, Context())
+        assert result.segments
+        records = [r for r in caplog.records if r.name == "youtube_ingestion.timing"]
+        for stage in ["metadata", "captions", "normalization", "total"]:
+            lines = [r.getMessage() for r in records if f"stage={stage} " in r.getMessage()]
+            assert len(lines) == 1
+            expected = "failed" if stage == "metadata" and failure else "completed"
+            assert f"outcome={expected}" in lines[0]
+            assert float(lines[0].split("duration_ms=")[1]) >= 0
+        assert all("PRIVATE" not in r.getMessage() for r in records)
+    finally:
+        await service.close()
+
+
 async def test_metadata_timeout_keeps_captions(config):
     config.metadata_timeout_seconds = 0.02
     service = IngestionService(config, captions=Captions(), metadata=Meta(delay=1))
