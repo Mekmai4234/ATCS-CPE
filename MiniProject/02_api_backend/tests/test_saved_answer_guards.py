@@ -48,7 +48,8 @@ def context(env, client, body):
 
 
 @pytest.mark.parametrize(
-    "change", [None, "question", "history", "execution", "metadata", "null_metadata", "old"]
+    "change",
+    [None, "question", "history", "execution", "metadata", "null_metadata", "old", "fallback"],
 )
 def test_reuse_validates_frozen_context_and_corrupt_metadata(identity, change):
     env = identity
@@ -66,6 +67,10 @@ def test_reuse_validates_frozen_context_and_corrupt_metadata(identity, change):
             result["provider_metadata"] = {"provider": "fixture"}
         if change == "null_metadata":
             result["provider_metadata"] = None
+        if change == "fallback":
+            result["provider_metadata"] = dict(
+                result["provider_metadata"], provider="document-fallback"
+            )
         c.execute(
             db.jobs.update()
             .where(db.jobs.c.job_id == original)

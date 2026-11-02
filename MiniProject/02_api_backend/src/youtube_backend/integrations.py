@@ -175,7 +175,7 @@ class ExecutionContext:
                     and result.get("status") == "answered"
                     and result.get("visibility", "published") == "published"
                     and result.get("provider_metadata", {}).get("provider")
-                    not in {"local-evidence", "local-document"}
+                    not in {"local-evidence", "local-document", "document-fallback"}
                     and result.get("citations")
                     and isinstance(result["citations"], list)
                     and all(
