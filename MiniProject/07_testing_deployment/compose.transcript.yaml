@@ -136,6 +136,7 @@ services:
     build: { context: .., dockerfile: 07_testing_deployment/Dockerfile, target: test-web }
     image: video-buddy-web-tests:local
     network_mode: bridge
+    shm_size: 1g
     working_dir: /app/01_web_app
     command: [sh, -c, "pnpm typecheck && pnpm format:check && pnpm test && pnpm build && pnpm exec playwright test --config ../07_testing_deployment/playwright.config.ts"]
   test-02-api:
@@ -158,6 +159,7 @@ services:
     build: { context: .., dockerfile: 07_testing_deployment/Dockerfile, target: test-web }
     image: video-buddy-web-tests:local
     network_mode: bridge
+    shm_size: 1g
     working_dir: /app
     command: [sh, -c, "python -m pytest 07_testing_deployment/tests -q -o cache_dir=/tmp/cache07 --junitxml=/evidence/07-e2e.xml && python 07_testing_deployment/scripts/browser_identity.py --image"]
 
