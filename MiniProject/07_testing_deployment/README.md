@@ -1,5 +1,8 @@
 # 07 — System verification and deployment
 
+Run the whole system locally (Docker, `http://localhost:3000`), back it up and renew the
+7-day Gemini policy with [LOCAL_STACK.md](LOCAL_STACK.md).
+
 The bounded `scripts/worker_probe.py` executes explicit chat/analysis/research/artifact
 cases once through the selected production factory and actual durable Worker. It
 requires `--allow-live --workers-stopped`, an existing member store, a unique run key,
