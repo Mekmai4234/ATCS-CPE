@@ -4,16 +4,18 @@ import re
 
 from .models import error
 
-RETRIEVAL_VERSION = "latest-topic-clock-v1"
+RETRIEVAL_VERSION = "latest-topic-clock-v2"
 
 CLOCK = re.compile(r"(?<![\d:])[\d:]*\d:[\d:]+(?![\d:])")
 FOLLOWUP = re.compile(
     r"(?:explain(?: more| further)?|tell me more|expand(?: on that)?"
     r"|give (?:me )?(?:an? )?examples?"
     r"|continue|more details?(?: please)?|how does (?:that|it) work"
-    r"|ขยายความ(?:หน่อย|เพิ่มเติม)?|อธิบาย(?:เพิ่ม(?:เติม)?|อีกครั้ง)(?:หน่อย)?"
+    r"|(?:ขอ(?:ช่วย)?|ช่วย)?\s*(?:ขยายความ(?:หน่อย|เพิ่มเติม)?"
+    r"|อธิบาย(?:เพิ่ม(?:เติม)?|อีกครั้ง)(?:หน่อย)?"
     r"|ยกตัวอย่าง(?:เรื่อง(?:นั้น|เดิม))?(?:หน่อย)?|ขอรายละเอียด(?:เพิ่ม(?:เติม)?)?"
-    r"|ต่อจากเดิม|เรื่องนั้นคืออะไร|ทำงานอย่างไร)",
+    r"|ต่อจากเดิม|เรื่องนั้นคืออะไร|ทำงานอย่างไร)"
+    r"(?:ให้เข้าใจง่าย(?:ขึ้น)?)?(?:หน่อย)?\s*(?:นะ)?(?:ครับ|ค่ะ|คะ)?)",
     re.I,
 )
 
