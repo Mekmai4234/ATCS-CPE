@@ -89,3 +89,52 @@ async def test_opted_in_ai_uses_same_document_evidence_instead_of_old_captions(i
         c["kind"] == "document_transcript" for c in result["citations"]
     )
     assert env.model.payloads
+
+
+async def test_ai_quota_exhaustion_degrades_to_document_answer(integrated, monkeypatch):
+    from youtube_backend.errors import AppError
+
+    env = integrated
+    await seed(env)
+
+    async def limited(*args, **kwargs):
+        raise AppError("quota_wait", "Every approved model bucket is limited", 429, True)
+
+    monkeypatch.setattr(env.answers, "_answer_provider", limited)
+    result = await ask(env, "คำว่า good night อยู่ตรงไหน", ["C0DXctGPWxw"], response_mode="ai")
+    assert result["status"] == "answered"
+    assert result["provider_metadata"]["provider"] == "local-document"
+    assert result["answer"].startswith("ขณะนี้ AI ใช้งานไม่ได้ชั่วคราว")
+    assert "good night" in result["answer"]
+    assert result["citations"] and all(
+        c["kind"] == "document_transcript" for c in result["citations"]
+    )
+    assert result["coverage"]["notes"][0] == "AI ไม่พร้อมใช้งานชั่วคราว จึงสลับมาตอบจากเอกสาร"
+
+    # Explanation requests have no direct document match and keep the older local search.
+    result = await ask(env, "ช่วยยกตัวอย่างให้เข้าใจง่าย", ["cWVse_LuFO0"], response_mode="ai")
+    assert result["provider_metadata"]["provider"] == "local-evidence"
+    assert not env.model.payloads
+
+
+async def test_non_quota_ai_failure_never_degrades_to_documents(integrated, monkeypatch):
+    from youtube_backend.errors import AppError
+
+    env = integrated
+    await seed(env)
+
+    async def broken(*args, **kwargs):
+        raise AppError("invalid_model_output", "Model returned invalid JSON", 502)
+
+    monkeypatch.setattr(env.answers, "_answer_provider", broken)
+    response = await env.client.post(
+        "/api/chat",
+        json={
+            "question": "คำว่า good night อยู่ตรงไหน",
+            "scope": {"video_ids": ["C0DXctGPWxw"]},
+            "response_mode": "ai",
+        },
+    )
+    await env.worker.run_once(response.json()["job_id"])
+    job = env.repo.get_job(response.json()["job_id"])
+    assert job["state"] == "failed" and job["error_code"] == "invalid_model_output"
