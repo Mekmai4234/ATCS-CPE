@@ -4,7 +4,7 @@ from youtube_backend.errors import AppError
 
 
 async def local_chat(env, question, conversation=None, video="dQw4w9WgXcQ"):
-    body = {"question": question, "scope": {"video_ids": [video]}}
+    body = {"response_mode": "ai", "question": question, "scope": {"video_ids": [video]}}
     if conversation:
         body["conversation_id"] = conversation
     response = await env.client.post("/api/chat", json=body)
@@ -136,7 +136,8 @@ async def test_invalid_time_is_rejected_before_provider_dispatch(
 
     monkeypatch.setattr(integrated.answers, "_answer_provider", forbidden)
     response = await integrated.client.post(
-        "/api/chat", json={"question": question, "scope": {"video_ids": ["dQw4w9WgXcQ"]}}
+        "/api/chat",
+        json={"response_mode": "ai", "question": question, "scope": {"video_ids": ["dQw4w9WgXcQ"]}},
     )
     await integrated.worker.run_once(response.json()["job_id"])
     job = integrated.repo.get_job(response.json()["job_id"])
@@ -153,7 +154,7 @@ async def test_quota_chat_completes_with_authorized_local_evidence(integrated, m
         raise AppError(reason, "Fixture admission failure", 503, True)
 
     monkeypatch.setattr(env.answers, "_answer_provider", limited)
-    body = {"question": "RAG", "scope": {"video_ids": ["dQw4w9WgXcQ"]}}
+    body = {"response_mode": "ai", "question": "RAG", "scope": {"video_ids": ["dQw4w9WgXcQ"]}}
     response = await env.client.post("/api/chat", json=body)
     await env.worker.run_once(response.json()["job_id"])
     job = env.repo.get_job(response.json()["job_id"])
@@ -174,7 +175,8 @@ async def test_permission_error_is_not_hidden_by_local_fallback(integrated, monk
 
     monkeypatch.setattr(env.answers, "_answer_provider", denied)
     response = await env.client.post(
-        "/api/chat", json={"question": "RAG", "scope": {"video_ids": ["dQw4w9WgXcQ"]}}
+        "/api/chat",
+        json={"response_mode": "ai", "question": "RAG", "scope": {"video_ids": ["dQw4w9WgXcQ"]}},
     )
     await env.worker.run_once(response.json()["job_id"])
     job = env.repo.get_job(response.json()["job_id"])
@@ -189,7 +191,7 @@ async def test_existing_paused_clip_chat_resumes_without_requiring_generation_qu
 
     env = integrated
 
-    body = {"question": "RAG", "scope": {"video_ids": ["dQw4w9WgXcQ"]}}
+    body = {"response_mode": "ai", "question": "RAG", "scope": {"video_ids": ["dQw4w9WgXcQ"]}}
     response = await env.client.post("/api/chat", json=body)
     job = env.raw_repo.claim(response.json()["job_id"])
     env.raw_repo.fail(

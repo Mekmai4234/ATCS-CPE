@@ -81,7 +81,7 @@ async def test_authenticated_local_worker_uses_actual_broker_and_preserves_citat
     chat = kind not in {"summary", "compare"}
     route = "/api/chat" if chat else "/api/analysis"
     body = (
-        {"question": "RAG", "scope": {"video_ids": ids[:1]}}
+        {"question": "RAG", "scope": {"video_ids": ids[:1]}, "response_mode": "ai"}
         if chat
         else {"type": kind, "scope": {"video_ids": ids if kind == "compare" else ids[:1]}}
     )

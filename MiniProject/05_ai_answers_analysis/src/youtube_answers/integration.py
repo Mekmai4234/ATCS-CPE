@@ -33,24 +33,67 @@ class RagKnowledge:
         self.rag = rag
 
     async def inventory(self, sources, context):
+        from youtube_rag.document_knowledge import page
+
+        document = page(context, sources, limit=1)
+        if document is not None:
+            return document.total
         return await self.rag.inventory(sources, BackendExecution(context))
 
     @timed_stage("retrieval")
     async def short_context(self, sources, context):
+        from youtube_rag.document_knowledge import page
+
+        document = page(context, sources, limit=80)
+        if document is not None:
+            if document.next_cursor or not document.inventory.complete:
+                return None
+            return (
+                document.items
+                if sum(len(c.text.encode()) + 512 for c in document.items) <= 16000
+                else None
+            )
         return await self.rag.short_context(sources, BackendExecution(context))
 
     @timed_stage("retrieval")
     async def search(self, query, sources, context, **kwargs):
+        from youtube_rag.document_knowledge import search
+
+        document = search(context, sources, query, **kwargs)
+        if document is not None:
+            return document
         return await self.rag.search(query, sources, BackendExecution(context), **kwargs)
 
     @timed_stage("retrieval")
     async def read(self, sources, context, **kwargs):
+        from youtube_rag.document_knowledge import page
+
+        document = page(context, sources, **kwargs)
+        if document is not None:
+            return document
         return await self.rag.read_video_chunks(sources, BackendExecution(context), **kwargs)
 
     async def transcript(self, source, context):
         """Read the frozen version under the durable job's existing authorization."""
         context.check()
         context.authorize_sources([source])
+        from types import SimpleNamespace
+
+        from youtube_backend.document_store import read
+
+        documents = read(context, [source])
+        if documents:
+            table = db.documents["passages"]
+            with context.repository.db.read() as connection:
+                rows = list(
+                    connection.scalars(
+                        sa.select(table.c.data)
+                        .where(table.c.version == documents[0]["version"])
+                        .order_by(table.c.ordinal)
+                    )
+                )
+            context.check()
+            return [SimpleNamespace(segment_id=r["segment_id"], text=r["text"]) for r in rows]
         with context.repository.db.read() as connection:
             condition = sa.and_(
                 db.segments.c.video_id == source.video_id,
@@ -79,6 +122,11 @@ class RagKnowledge:
         ]
 
     async def evidence(self, sources, ids, context):
+        from youtube_rag.document_knowledge import evidence
+
+        document = evidence(context, sources, ids)
+        if document is not None:
+            return document
         execution = BackendExecution(context)
         # Whole-video analysis can honestly return partial coverage when an index is missing.
         # 04's evidence() requires ALL supplied indexes; limit this lookup to those available.
@@ -91,6 +139,12 @@ class RagKnowledge:
 
 
 class AnswerAdapters(RagAdapters):
+    async def inventory(self, sources, context):
+        job = context.repository.check_execution(context.job_id, context.lease_token)
+        if job["kind"] in {"import", "reindex"}:
+            return await super().inventory(sources, context)
+        return await RagKnowledge(self.rag).inventory(sources, context)
+
     def __init__(
         self,
         *,
@@ -115,6 +169,20 @@ class AnswerAdapters(RagAdapters):
     @timed_stage("total")
     async def answer(self, request, sources, history, context):
         from youtube_backend.errors import AppError
+
+        if sources and request.get("response_mode") == "local":
+            from .document_answer import document_answer
+            from .transcript import wants_performer_attribution, wants_transcript
+
+            if wants_transcript(request["question"]):
+                return await self.answers.answer(request, sources, history, context)
+
+            direct = document_answer(request, sources, history, context)
+            if direct is not None:
+                return direct
+            if wants_performer_attribution(request["question"]):
+                return await self.answers.answer(request, sources, history, context)
+            return await self._local_answer(request, sources, history, context)
 
         window = time_window(request["question"], sources[0]) if sources else None
         try:
@@ -205,6 +273,8 @@ class AnswerAdapters(RagAdapters):
             "ขณะนี้ AI สร้างคำอธิบายใหม่ไม่ได้ จึงค้นข้อความจากบทถอดเสียงที่บันทึกไว้ให้โดยอัตโนมัติ "
             "ข้อความต่อไปนี้เป็นคำพูดจากคลิป ไม่ใช่ตัวอย่างหรือคำสรุปที่ AI สร้างใหม่"
         )
+        if request.get("response_mode") == "local":
+            notice = "ข้อความจากบทถอดเสียงในเครื่อง ไม่ใช่คำอธิบายใหม่จาก AI · provider calls 0"
         text = (
             notice
             + "\n\n"
@@ -248,11 +318,16 @@ class AnswerAdapters(RagAdapters):
         from youtube_backend.repository import digest
         from youtube_backend.schemas import AnswerResult
 
+        document_versions = context.repository.check_execution(context.job_id, context.lease_token)[
+            "payload"
+        ].get("document_sources", {})
+
         durable = getattr(context, "saved_answer", None)
         if callable(durable) and context.settings.auth_enabled and sources:
             signature = digest(
                 [
                     "durable-answer-v1",
+                    document_versions,
                     reuse_configuration(self.answers.settings, self.rag.settings),
                     [s.model_dump() for s in sources],
                     {k: v for k, v in request.items() if k != "conversation_id"},
@@ -294,6 +369,7 @@ class AnswerAdapters(RagAdapters):
                 [
                     reuse_configuration(self.answers.settings, self.rag.settings),
                     job["owner_id"],
+                    document_versions,
                     [s.model_dump() for s in sources],
                     {k: v for k, v in request.items() if k != "conversation_id"},
                     history,

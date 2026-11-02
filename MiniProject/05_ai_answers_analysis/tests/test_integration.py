@@ -208,7 +208,7 @@ async def test_http_full_transcript_uses_original_captions_without_model(integra
 
 async def test_http_chat_citations_history_and_database_reopen(integrated):
     env = integrated
-    request = {"question": "RAG คืออะไร", "scope": {"video_ids": [VIDEO_A]}}
+    request = {"question": "RAG คืออะไร", "scope": {"video_ids": [VIDEO_A]}, "response_mode": "ai"}
     response = await env.client.post(
         "/api/chat",
         json=request,
