@@ -15,6 +15,7 @@ export default function ProviderNotice({ metadata }: { metadata?: Answer['provid
     transcript: 'บทถอดเสียงที่บันทึกไว้ · ไม่ได้เรียก AI',
     'local-evidence': 'ค้นข้อความจากคลิปในเครื่อง · ไม่ได้สร้างคำตอบใหม่ด้วย AI',
     'local-document': 'ตอบจากไฟล์ · ไม่ใช้ AI · provider calls 0',
+    'document-fallback': 'AI ยังไม่พร้อม · แสดงข้อมูลจากไฟล์ที่เลือก',
     none: 'ไม่มีการเรียกโมเดลในผลนี้',
   };
   const origins = metadata.provider.split(',');
@@ -22,7 +23,14 @@ export default function ProviderNotice({ metadata }: { metadata?: Answer['provid
   const cached = origins.some((origin) => origin.endsWith('-cache'));
   const localEvidence = origins.includes('local-evidence') || origins.includes('local-document');
   const noModel = origins.every((origin) =>
-    ['none', 'system', 'transcript', 'local-evidence', 'local-document'].includes(origin),
+    [
+      'none',
+      'system',
+      'transcript',
+      'local-evidence',
+      'local-document',
+      'document-fallback',
+    ].includes(origin),
   );
   return (
     <p className="provider-notice">
