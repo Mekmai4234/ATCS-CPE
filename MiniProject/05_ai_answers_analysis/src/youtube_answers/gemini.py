@@ -81,7 +81,12 @@ class GeminiModel:
             if index and remaining < 1:
                 break
             try:
-                return await self._attempt(payload, remaining, model=candidate, **options)
+                generated = await self._attempt(payload, remaining, model=candidate, **options)
+                if index:
+                    generated.metadata = generated.metadata.model_copy(
+                        update={"fallback_from": chain[0]}
+                    )
+                return generated
             except AppError as exc:
                 if index and exc.code in UNAPPROVED_FALLBACK:
                     continue

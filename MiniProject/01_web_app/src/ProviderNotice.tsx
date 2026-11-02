@@ -30,6 +30,9 @@ export default function ProviderNotice({ metadata }: { metadata?: Answer['provid
       {!noModel && (
         <> · โมเดล: {metadata.returned_model || metadata.requested_model || 'ไม่ได้ระบุ'}</>
       )}
+      {!noModel && metadata.fallback_from && (
+        <> · ใช้รุ่นสำรอง เพราะ {metadata.fallback_from} ไม่พร้อมชั่วคราว</>
+      )}
       {!cached &&
         (!noModel || localEvidence) &&
         typeof metadata.latency_ms === 'number' &&

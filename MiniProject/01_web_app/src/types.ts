@@ -89,6 +89,8 @@ export interface Answer {
     requested_model: string;
     returned_model?: string | null;
     latency_ms?: number;
+    // Configured primary model when a same-project fallback model answered instead.
+    fallback_from?: string | null;
   };
   mode?: string;
 }
