@@ -174,11 +174,14 @@ class ExecutionContext:
                     and previous["payload"].get("execution") == job["payload"].get("execution")
                     and result.get("status") == "answered"
                     and result.get("visibility", "published") == "published"
-                    and result.get("provider_metadata", {}).get("provider") != "local-evidence"
+                    and result.get("provider_metadata", {}).get("provider")
+                    not in {"local-evidence", "local-document"}
                     and result.get("citations")
                     and isinstance(result["citations"], list)
                     and all(
-                        isinstance(x, dict) and x.get("kind", "transcript") == "transcript"
+                        isinstance(x, dict)
+                        and x.get("kind", "transcript")
+                        in {"transcript", "document_transcript", "document_metadata"}
                         for x in result["citations"]
                     )
                 ):

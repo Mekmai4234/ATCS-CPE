@@ -100,10 +100,14 @@ def resume(repo, job_id, moderation_token=None):
             .limit(1)
         ):
             raise AppError("conversation_busy", "Wait for the pending conversation turn", 409)
+        replacement = dict(old["payload"], resumes=job_id, moderation_event_id=None)
+        if old["kind"] == "chat" and replacement["request"].get("mode") != "general":
+            replacement["request"] = dict(replacement["request"])
+            replacement["request"].setdefault("response_mode", "local")
         job = repo._new_job(
             c,
             old["kind"],
-            dict(old["payload"], resumes=job_id, moderation_event_id=None),
+            replacement,
             conversation_id=old["conversation_id"],
             idempotency_key=key,
             request_hash=original_hash,
