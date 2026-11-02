@@ -65,6 +65,7 @@ CMD ["python", "07_testing_deployment/scripts/check.py"]
 
 # Browser dependencies are independent of application/test sources.
 FROM node:24-bookworm-slim@sha256:8cabefbd444809cf0e319b5831c65da1ea202200ca552a5e75fd7938a6f86658 AS browser-deps
+COPY --from=runtime /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /web
 RUN npm install --global pnpm@11.25.0
 COPY 01_web_app/package.json 01_web_app/pnpm-lock.yaml ./
