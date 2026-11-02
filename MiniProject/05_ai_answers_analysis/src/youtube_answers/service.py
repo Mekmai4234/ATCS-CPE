@@ -522,6 +522,7 @@ class AnswerService:
                     start_seconds=record.start_seconds,
                     end_seconds=record.end_seconds,
                     url=f"{canonical_url(record.video_id)}&t={int(record.start_seconds)}s",
+                    **(record.document_citation or {}),
                 )
             )
         text = (
