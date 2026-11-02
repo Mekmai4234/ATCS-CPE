@@ -61,6 +61,32 @@ class Run:
         return min(self.end - time.monotonic(), self.context.remaining_seconds)
 
 
+# User-facing Thai for run-stop reasons; coverage keeps the original diagnostic text.
+PARTIAL_REASONS = {
+    "Final model allowance reached.": "ใช้งบเรียก AI ครบแล้ว",
+    "Repeated action without a new observation.": "AI ทำขั้นตอนเดิมซ้ำโดยไม่ได้ข้อมูลใหม่",
+    "No cited final answer was supplied.": "AI ไม่ได้ส่งคำตอบสุดท้ายที่มีหลักฐานอ้างอิง",
+    "Agent decision step limit reached.": "ครบจำนวนขั้นตอนที่กำหนด",
+    "Agent operation exceeded its remaining time budget.": "ใช้เวลาเกินกำหนด",
+}
+STOP_CODES = {
+    "agent_budget_exhausted": "งบเรียก AI ไม่พอสำหรับขั้นต่อไป",
+    "context_budget_exceeded": "ข้อมูลที่ต้องส่งให้ AI เกินขีดจำกัด",
+    "quota_wait": "โควตา AI เต็มชั่วคราว",
+    "provider_rate_limited": "ผู้ให้บริการ AI จำกัดการใช้งานชั่วคราว",
+    "provider_unavailable": "ผู้ให้บริการ AI ไม่พร้อมชั่วคราว",
+    "insufficient_evidence": "หลักฐานจากคลิปไม่เพียงพอ",
+}
+
+
+def partial_reason(reason):
+    if reason.startswith("Stopped: "):
+        code = reason.removeprefix("Stopped: ").rstrip(".")
+        # Keep the stable code beside the Thai text for support and diagnostics.
+        return f"{STOP_CODES.get(code, 'หยุดก่อนเสร็จ')} · {code}"
+    return PARTIAL_REASONS.get(reason, reason)
+
+
 def spread_order(count):
     """Indices 0..count-1 coarse-to-fine (0, n/2, n/4, 3n/4, ...) for even sampling."""
     order, seen = [], set()
@@ -626,7 +652,7 @@ class AgentService:
     def _partial(self, run, reason):
         ids = sorted(run.processed or set(run.evidence))[:8]
         # No new model claims: preserve source excerpts with an explicit analysis limitation.
-        content = f"การค้นคว้าหยุดก่อนเสร็จ ได้ผลเพียงบางส่วน ({reason})"
+        content = f"การค้นคว้าหยุดก่อนเสร็จ ได้ผลเพียงบางส่วน ({partial_reason(reason)})"
         if ids:
             content += "\nข้อความจากคลิปที่ค้นได้ (อาจยังวิเคราะห์ไม่ครบ):\n" + "\n".join(
                 f"[{cid}] {run.evidence[cid].text[:500]}" for cid in ids
@@ -880,7 +906,17 @@ class AgentService:
                     try:
                         observation = await self._tool(reply.name, args, request, run)
                     except AppError as exc:
-                        if exc.code not in {"invalid_scope", "analysis_unavailable"}:
+                        # An artifact that does not fit the remaining model allowance must not
+                        # discard the run: report it so the reserved final call can still
+                        # write a cited answer from the evidence already gathered.
+                        final_call_left = (
+                            exc.code == "agent_budget_exhausted"
+                            and reply.name == "create_learning_artifact"
+                            and run.model_calls == self.settings.agent_max_model_calls - 1
+                        )
+                        if exc.code not in {"invalid_scope", "analysis_unavailable"} and not (
+                            final_call_left
+                        ):
                             raise
                         observation = {"error": exc.code}
                     self._event(
