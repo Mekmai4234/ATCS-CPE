@@ -206,7 +206,17 @@ class AnswerAdapters(RagAdapters):
                 or not sources
             ):
                 raise
-            result = await self._local_answer(request, sources, history, context)
+            from .document_answer import document_answer
+
+            result = document_answer(request, sources, history, context)
+            if result is not None:
+                result.provider_metadata.provider = "document-fallback"
+                result.coverage.notes[0] = (
+                    "AI ยังไม่พร้อม จึงเปิดหลักฐานจากไฟล์รุ่นเดิมแทน "
+                    "การใช้ provider ก่อนหน้าตรวจได้จากบัญชีงาน ไม่อ้างว่าเป็นศูนย์"
+                )
+            else:
+                result = await self._local_answer(request, sources, history, context)
         if any(not overlaps(citation, window) for citation in result.citations):
             raise error(
                 "invalid_citation", "Answer evidence is outside the requested time interval"

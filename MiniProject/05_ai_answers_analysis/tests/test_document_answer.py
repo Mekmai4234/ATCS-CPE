@@ -96,3 +96,22 @@ async def test_opted_in_ai_uses_same_document_evidence_instead_of_old_captions(i
         c["kind"] == "document_transcript" for c in result["citations"]
     )
     assert env.model.payloads
+
+
+async def test_ai_failure_falls_back_to_the_same_document_without_zero_call_claim(
+    integrated, monkeypatch
+):
+    from youtube_backend.errors import AppError
+
+    env = integrated
+    await seed(env)
+
+    async def unavailable(*args, **kwargs):
+        raise AppError("provider_unavailable", "Fixture after admission", 503, True)
+
+    monkeypatch.setattr(env.answers, "_answer_provider", unavailable)
+    result = await ask(env, "ใครร้อง", ["C0DXctGPWxw"], response_mode="ai")
+    assert "DICEBLUE" in result["answer"]
+    assert result["provider_metadata"]["provider"] == "document-fallback"
+    assert all(c["kind"] == "document_metadata" for c in result["citations"])
+    assert not any("provider calls 0" in note for note in result["coverage"]["notes"])
