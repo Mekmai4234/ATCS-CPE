@@ -12,6 +12,7 @@ import {
   videoIdFromUrl,
   videoQueryable,
   jobStatus,
+  progressText,
 } from './domain';
 import { EvidenceContext, SourceBadges } from './Evidence';
 import { demoTransport } from './demo';
@@ -1884,14 +1885,17 @@ export default function App({
                   {events.length > 0 && (
                     <details className="progress-events" open>
                       <summary>ความคืบหน้าการค้นคว้า</summary>
-                      {events.map((event) => (
-                        <p key={event.event_id}>
-                          <strong>
-                            ขั้นที่ {event.step} · {event.tool_name}
-                          </strong>{' '}
-                          {event.summary}
-                        </p>
-                      ))}
+                      {events.map((event) => {
+                        const text = progressText(event);
+                        return (
+                          <p key={event.event_id}>
+                            <strong>
+                              ขั้นที่ {event.step} · {text.tool}
+                            </strong>{' '}
+                            — {text.summary}
+                          </p>
+                        );
+                      })}
                     </details>
                   )}
                   {newResults && (
