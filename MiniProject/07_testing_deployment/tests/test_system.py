@@ -216,8 +216,13 @@ async def test_import_normalize_index_chat_compare_and_agent(tmp_path):
         for item, expected in zip(jobs, ["ready", "ready", "no_transcript"], strict=True):
             job = (await client.get(f"/api/jobs/{item['job_id']}")).json()
             assert job["stage"] == expected, job
+        # Chat defaults to transcript-document lookup (9b941f5); this journey checks the
+        # explicit AI opt-in. Member-only local evidence is covered by the auth suites.
         chat = await finish(
-            client, worker, "/api/chat", dict(question="RAG คืออะไร", scope=dict(video_ids=[A]))
+            client,
+            worker,
+            "/api/chat",
+            dict(question="RAG คืออะไร", scope=dict(video_ids=[A]), response_mode="ai"),
         )
         citations = chat["result"]["citations"]
         assert citations and {c["video_id"] for c in citations} == {A}
@@ -240,5 +245,8 @@ async def test_import_normalize_index_chat_compare_and_agent(tmp_path):
         history = await client.get(f"/api/conversations/{conversation_id}")
         assert history.status_code == 200 and len(history.json()["messages"]) == 2
         await finish(
-            client, worker, "/api/chat", dict(question="RAG evidence", scope=dict(video_ids=[A]))
+            client,
+            worker,
+            "/api/chat",
+            dict(question="RAG evidence", scope=dict(video_ids=[A]), response_mode="ai"),
         )
