@@ -13,6 +13,14 @@ from .config import AnswerSettings
 from .configuration import resolved_service
 from .gemini import GeminiModel
 from .models import error
+from .question_scope import (
+    lexical_query,
+    overlaps,
+    relevant,
+    requires_visual,
+    retrieval_query,
+    time_window,
+)
 from .quota import ExecutionBroker
 from .reuse import reuse_configuration
 from .service import AnswerService
@@ -108,8 +116,9 @@ class AnswerAdapters(RagAdapters):
     async def answer(self, request, sources, history, context):
         from youtube_backend.errors import AppError
 
+        window = time_window(request["question"], sources[0]) if sources else None
         try:
-            return await self._answer_provider(request, sources, history, context)
+            result = await self._answer_provider(request, sources, history, context)
         except AppError as exc:
             if (
                 exc.code
@@ -129,7 +138,12 @@ class AnswerAdapters(RagAdapters):
                 or not sources
             ):
                 raise
-            return await self._local_answer(request, sources, history, context)
+            result = await self._local_answer(request, sources, history, context)
+        if any(not overlaps(citation, window) for citation in result.citations):
+            raise error(
+                "invalid_citation", "Answer evidence is outside the requested time interval"
+            )
+        return result
 
     async def _local_answer(self, request, sources, history, context):
         from youtube_backend.schemas import AnswerResult, Citation, Coverage, ProviderMetadata
@@ -137,19 +151,26 @@ class AnswerAdapters(RagAdapters):
 
         context.check()
         context.authorize_sources(sources)
-        query = request["question"]
-        # Generic follow-ups need their preceding user question to find the topic.
-        for entry in reversed(history):
-            if entry.get("role") == "user":
-                query = (entry["content"] + "\n" + query)[-6000:]
-                break
+
+        from .authorization import MemberContext, guard_context
+
+        context = guard_context(context, sources, {"chat"})
+        if isinstance(context, MemberContext):
+            context.conversation(request.get("conversation_id"))
+            history = context.history(history)
+        started = time.perf_counter()
+        window = time_window(request["question"], sources[0])
+        query = lexical_query(retrieval_query(request["question"], history))
+        # A generic follow-up without an authorized topic cannot be a positive match.
         result = await self.rag.evidence_library().search(
-            query,
+            query or request["question"],
             sources,
             context,
             kinds=["transcript"],
             limit=6,
             neighbors=1,
+            start_seconds=window[0] if window else None,
+            end_seconds=window[1] if window else None,
         )
         # Re-read each exported reference under this exact execution before publishing.
         records = (
@@ -160,7 +181,15 @@ class AnswerAdapters(RagAdapters):
             else []
         )
         by_id = {record.chunk_id: record for record in records}
-        selected = [by_id[item.evidence_id] for item in result.items if item.evidence_id in by_id]
+        selected = [
+            by_id[item.evidence_id]
+            for item in result.items
+            if item.evidence_id in by_id
+            and query
+            and not requires_visual(request["question"])
+            and overlaps(by_id[item.evidence_id], window)
+            and relevant(query, by_id[item.evidence_id].text)
+        ]
         citations = [
             Citation(
                 citation_id=str(i + 1),
@@ -187,6 +216,14 @@ class AnswerAdapters(RagAdapters):
             )
         )
         context.check()
+        notes = ["ค้นข้อความในเครื่องเท่านั้น ไม่ได้ส่งหลักฐานให้โมเดลสังเคราะห์", *result.notes]
+        if requires_visual(request["question"]):
+            notes.append("คำถามต้องตรวจภาพซึ่งข้อความบทถอดเสียงยังยืนยันไม่ได้")
+        if window:
+            notes.append(f"ค้นเฉพาะช่วง {window[0]:g}–{window[1]:g} วินาที; ไม่ยืนยันข้อมูลนอกช่วงนี้")
+            if any(r.start_seconds < window[0] or r.end_seconds > window[1] for r in selected):
+                notes.append("ข้อความอ้างอิงบางส่วนคร่อมขอบช่วงที่ขอ แสดงเวลาเดิม ไม่ยืนยันว่าทุกคำอยู่ในช่วงนั้น")
+        elapsed = (time.perf_counter() - started) * 1000
         return AnswerResult(
             status="answered" if selected else "insufficient_evidence",
             answer=text,
@@ -197,10 +234,13 @@ class AnswerAdapters(RagAdapters):
                 expected_chunks=None,
                 processed_chunks=None,
                 complete=False,
-                notes=["ค้นข้อความในเครื่องเท่านั้น ไม่ได้ส่งหลักฐานให้โมเดลสังเคราะห์", *result.notes],
+                notes=notes,
             ),
             provider_metadata=ProviderMetadata(
-                provider="local-evidence", requested_model="none", latency_ms=0
+                provider="local-evidence",
+                requested_model="none",
+                latency_ms=elapsed,
+                usage={"generate_requests": 0, "local_retrieval_validation_ms": round(elapsed)},
             ),
         )
 
@@ -263,6 +303,9 @@ class AnswerAdapters(RagAdapters):
             )
             cached = self.answer_reuse.get(key)
             if cached and cached[0] > time.monotonic():
+                from youtube_backend.validation import validate_result
+
+                await validate_result(cached[1], sources, self, context)
                 if any(c.kind == "video" for c in cached[1].citations):
                     from youtube_backend.quota import QuotaBroker
 

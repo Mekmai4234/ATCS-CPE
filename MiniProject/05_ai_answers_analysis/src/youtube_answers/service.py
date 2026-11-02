@@ -17,6 +17,7 @@ from youtube_backend.urls import canonical_url
 from .authorization import MemberContext, guard_context
 from .models import GeneratedAnswer, error
 from .prompts import input_size, json_text, payload
+from .question_scope import overlaps, retrieval_query, time_window
 from .timing import timed_stage
 from .transcript import has_performer_cues, wants_performer_attribution, wants_transcript
 
@@ -145,12 +146,12 @@ class AnswerService:
         if wants_transcript(request["question"]):
             return await self._transcript(run)
         history = self._history(history, run)
-        # Carry recent user context into retrieval without asking a model to change scope.
-        query = request["question"]
-        for item in reversed(history):
-            candidate = item["content"] + "\n" + query
-            if item["role"] == "user" and len(candidate.encode("utf-8")) <= 6500:
-                query = candidate
+        query = retrieval_query(request["question"], history) or request["question"]
+        window = time_window(request["question"], run.sources[0])
+        if window:
+            run.notes.append(
+                f"หลักฐานจำกัดช่วง {window[0]:g}–{window[1]:g} วินาที; แสดงเวลา chunk เดิมที่อาจคร่อมขอบช่วง"
+            )
         expected = await self._bounded(
             run, lambda _: self.knowledge.inventory(run.sources, run.context)
         )
@@ -183,6 +184,8 @@ class AnswerService:
                 ):
                     short = page.items
         if short:
+            short = [chunk for chunk in short if overlaps(chunk, window)]
+        if short:
             nodes = [self._record(run, chunk.evidence()) for chunk in short]
             if (
                 input_size(payload("answer", request, nodes, history))
@@ -196,6 +199,7 @@ class AnswerService:
                     query, run.sources, run.context, top_k=self.settings.retrieval_top_k
                 ),
             )
+            hits = [hit for hit in hits if overlaps(hit.chunk, window)]
             nodes = [self._record(run, hit.chunk.evidence()) for hit in hits]
         else:
             hits = short
@@ -243,6 +247,8 @@ class AnswerService:
                     ),
                 )
                 for chunk in page.items:
+                    if not overlaps(chunk, window):
+                        continue
                     record = chunk.evidence()
                     if record.chunk_id in included:
                         continue
