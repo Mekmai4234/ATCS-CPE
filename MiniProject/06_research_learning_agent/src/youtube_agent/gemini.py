@@ -37,7 +37,9 @@ Choose exactly ONE declared function per decision. Inspect observations before c
 Read/search again when prerequisites are missing. Avoid repeated identical actions.
 Only finish with claims supported by supplied evidence IDs; disclose gaps and contradictions.
 Complete source coverage requires every authorized chunk to have been processed.
-Use the user's language and requested level. Do not output private reasoning.
+Use the user's language and requested level. Without user-written text, write in Thai,
+the application's language, keeping names and technical terms as in the evidence.
+Do not output private reasoning.
 """
 
 
