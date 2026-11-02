@@ -131,6 +131,23 @@ def test_missing_clip_does_not_gain_library_access(ready):
     assert exc.value.code == "video_not_ready"
 
 
+def test_explicit_local_allowlist_can_initialize_a_source_without_granting_membership(env):
+    value = document()
+    value["video_id"] = "C0DXctGPWxw"
+    first = publish(env.db, value, create_missing=True)
+    with env.db.read() as c:
+        video = (
+            c.execute(sa.select(db.videos).where(db.videos.c.video_id == value["video_id"]))
+            .mappings()
+            .one()
+        )
+        assert video["status"] == "ready"
+        assert video["indexed_version"] == value["sha256"]
+        assert c.scalar(sa.select(sa.func.count()).select_from(db.user_videos)) == 0
+        assert c.scalar(sa.select(sa.func.count()).select_from(db.jobs)) == 0
+    assert publish(env.db, value, create_missing=True) == {**first, "imported": False}
+
+
 def test_document_page_authorization_and_old_version_retention(ready):
     import time
 

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import time
 import unicodedata
 
 import sqlalchemy as sa
@@ -22,7 +23,7 @@ def ngrams(text):
     return {text[i : i + size] for size in (1, 2, 3) for i in range(len(text) - size + 1)}
 
 
-def publish(database, document):
+def publish(database, document, *, create_missing=False):
     """Local operator only. Validate/index/activate in one BEGIN IMMEDIATE transaction."""
     segments = document["segments"]
     if not segments or len({s["segment_id"] for s in segments}) != len(segments):
@@ -43,7 +44,24 @@ def publish(database, document):
             .mappings()
             .first()
         )
-        if not video or video["status"] != "ready":
+        if video is None and create_missing:
+            # Trusted local allowlist import creates a source, never a membership.
+            # It becomes visible only after a member explicitly attaches its URL.
+            now = time.time()
+            values = dict(
+                video_id=video_id,
+                canonical_url=canonical_url(video_id),
+                title="[ไฟล์ผู้ใช้] " + document["relative_path"],
+                status="indexing",
+                generation=1,
+                transcript_version=document["sha256"],
+                indexed_version=document["sha256"],
+                created_at=now,
+                updated_at=now,
+            )
+            c.execute(db.videos.insert().values(**values))
+            video = values
+        elif not video or video["status"] != "ready":
             raise AppError(
                 "video_not_ready", "Document mapping requires an existing ready clip", 409
             )
@@ -101,6 +119,12 @@ def publish(database, document):
             .values(video_id=video_id, version=version)
             .on_conflict_do_update(index_elements=[active.c.video_id], set_={"version": version})
         )
+        if video["status"] == "indexing":
+            c.execute(
+                db.videos.update()
+                .where(db.videos.c.video_id == video_id)
+                .values(status="ready", updated_at=time.time())
+            )
     return dict(version=version, imported=not bool(exists), activated=True, indexed_segments=count)
 
 
