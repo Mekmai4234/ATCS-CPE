@@ -36,14 +36,14 @@ async def test_retrieved_but_not_sent_is_not_counted(unit):
     assert result.state == "partial"
     assert result.coverage.processed_chunks == 0
     assert result.citations
-    assert "step limit" in result.content
+    assert "ครบจำนวนขั้นตอนที่กำหนด" in result.content
 
 
 async def test_final_call_budget_exit_accounts_successful_usage_and_observed_evidence(unit):
     unit.config.agent_max_model_calls = 2
     unit.model.actions = [("read_video_chunks", {}), ("search_evidence", {"query": "RAG"})]
     result = await unit.service.research(unit.request, unit.sources, unit.ctx)
-    assert result.state == "partial" and "Final model allowance" in result.content
+    assert result.state == "partial" and "ใช้งบเรียก AI ครบแล้ว" in result.content
     assert result.provider_metadata.usage["input_tokens"] == 10
     assert result.coverage.processed_chunks == 2
     assert [call[0] for call in unit.knowledge.calls] == ["read"]
@@ -64,7 +64,7 @@ async def test_last_decision_step_requests_final_synthesis_before_step_budget_ru
 async def test_repeated_search_stops(unit):
     unit.model.actions = [("search_evidence", {"query": "RAG"})] * 2
     result = await unit.service.research(unit.request, unit.sources, unit.ctx)
-    assert "Repeated action" in result.content
+    assert "ทำขั้นตอนเดิมซ้ำ" in result.content
     assert len(unit.knowledge.calls) == 1
 
 
@@ -467,3 +467,28 @@ def test_citation_arrays_are_limited_to_supplied_ids():
     schema = constrain_citations(provider_schema(StudyPlanContent), ["b", "a", "a"])
     day = next(v for v in schema["$defs"].values() if "citations" in v.get("properties", {}))
     assert day["properties"]["citations"]["items"] == {"type": "string", "enum": ["a", "b"]}
+
+
+async def test_artifact_over_budget_still_lets_the_final_call_answer(unit):
+    """Regression (web): search, search, create_learning_artifact with 4 model calls
+    stopped as agent_budget_exhausted with raw excerpts instead of a final answer."""
+    unit.config.agent_max_model_calls = 4
+    unit.model.actions = [
+        ("search_evidence", {"query": "RAG"}),
+        ("search_evidence", {"query": "retrieval"}),
+        ("create_learning_artifact", {"type": "study_plan"}),
+        ("finish_research", {"content": "สรุปคำตอบจากหลักฐาน", "citation_ids": ["chunk-1"]}),
+    ]
+    result = await unit.service.research(unit.request, unit.sources, unit.ctx)
+    assert result.content == "สรุปคำตอบจากหลักฐาน"
+    assert not unit.model.generated
+    assert unit.model.history[3][-2]["result"] == {"error": "agent_budget_exhausted"}
+    assert unit.model.history[3][-1]["data"]["final_only"] is True
+
+
+def test_partial_reason_is_thai_and_keeps_stop_code():
+    from youtube_agent.service import partial_reason
+
+    assert partial_reason("Stopped: quota_wait.") == "โควตา AI เต็มชั่วคราว · quota_wait"
+    assert partial_reason("Stopped: new_code.") == "หยุดก่อนเสร็จ · new_code"
+    assert partial_reason("Agent decision step limit reached.") == "ครบจำนวนขั้นตอนที่กำหนด"
