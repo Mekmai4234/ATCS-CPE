@@ -83,6 +83,7 @@ COPY --from=test /app /app
 COPY --from=browser-deps --chown=10001:10001 /web/node_modules /app/01_web_app/node_modules
 COPY --chown=10001:10001 01_web_app/ /app/01_web_app/
 COPY 07_testing_deployment/playwright.config.ts /app/07_testing_deployment/playwright.config.ts
+COPY 07_testing_deployment/playwright.identity.config.ts /app/07_testing_deployment/playwright.identity.config.ts
 ENV PATH="/app/07_testing_deployment/.venv/bin:$PATH" MINIPROJECT_ROOT=/app PYTHONDONTWRITEBYTECODE=1 PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 RUN ldconfig && chown 10001:10001 /app/01_web_app \
     && python /app/07_testing_deployment/scripts/image_source.py record

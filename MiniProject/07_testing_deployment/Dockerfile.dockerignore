@@ -48,6 +48,7 @@
 !01_web_app/playwright.config.ts
 !01_web_app/index.html
 !07_testing_deployment/playwright.config.ts
+!07_testing_deployment/playwright.identity.config.ts
 **/node_modules/
 **/dist/
 **/test-results/
