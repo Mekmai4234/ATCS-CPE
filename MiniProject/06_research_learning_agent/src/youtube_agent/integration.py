@@ -26,9 +26,36 @@ class RagKnowledge:
         from youtube_rag.document_knowledge import search
 
         document = search(context, sources, query, **kwargs)
-        if document is not None:
+        if document:
             return document
+        if document is not None:
+            # Document lookup is exact-phrase only; a paraphrased agent query finds nothing.
+            # Return passages spread across each transcript (score 0 = not a match) so the
+            # agent still sees authorized evidence instead of stopping as insufficient.
+            return self._spread(context, sources, kwargs.get("top_k", 8))
         return await self.rag.search(query, sources, BackendExecution(context), **kwargs)
+
+    def _spread(self, context, sources, top_k):
+        from youtube_rag.document_knowledge import page
+        from youtube_rag.models import SearchHit
+
+        from .service import spread_order
+
+        hits = []
+        for source in sources:
+            chunks, cursor = [], None
+            while True:
+                current = page(context, [source], limit=200, cursor=cursor)
+                if current is None:
+                    break
+                chunks.extend(current.items)
+                cursor = current.next_cursor
+                if cursor is None:
+                    break
+            per_source = max(1, top_k // len(sources))
+            picked = sorted(spread_order(len(chunks))[:per_source])
+            hits.extend(SearchHit(chunk=chunks[i], ranking_score=0) for i in picked)
+        return hits
 
     async def read(self, sources, context, **kwargs):
         from youtube_rag.document_knowledge import page

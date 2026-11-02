@@ -119,10 +119,28 @@ def input_size(payload):
     )
 
 
+# Intermediate steps carry the final request (e.g. compare) but see one video's batch.
+# Smaller fallback models otherwise judged a single-video batch "insufficient" for a
+# comparison and dropped that video's facts before the final synthesis.
+TASK_RULES = {
+    "summarize_batch": (
+        "Summarize the substantive points of these transcript items. They are one part of "
+        "one video, prepared for a later final step; do not compare and do not require any "
+        "other video. Return insufficient_evidence only if the items contain no substantive "
+        "content at all."
+    ),
+    "merge_summaries": (
+        "Merge these intermediate summaries into fewer statements, keeping every important "
+        "fact and its citation IDs. Do not require videos that are not supplied."
+    ),
+}
+
+
 def payload(task, request, evidence, history=()):
     return {
         "prompt_version": PROMPT_VERSION,
         "task": task,
+        **({"task_rules": TASK_RULES[task]} if task in TASK_RULES else {}),
         "request": request,
         "untrusted_history": list(history),
         "untrusted_evidence": [

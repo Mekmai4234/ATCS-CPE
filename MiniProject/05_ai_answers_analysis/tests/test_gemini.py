@@ -689,3 +689,16 @@ async def test_primary_model_outage_falls_back_to_next_model(status):
     assert result.metadata.requested_model == "gemini-fallback-lite"
     assert result.metadata.fallback_from == "gemini-3.5-flash"
     assert sum(path.endswith(":generateContent") for path in paths) == 2
+
+
+def test_intermediate_tasks_state_their_single_batch_scope():
+    """Regression: compare batches were judged insufficient for lacking other videos."""
+    from youtube_answers.prompts import payload
+
+    request = {"type": "compare", "instruction": ""}
+    batch = payload("summarize_batch", request, [])
+    assert "do not require any other video" in batch["task_rules"]
+    assert "do not compare" in batch["task_rules"]
+    assert "task_rules" in payload("merge_summaries", request, [])
+    assert "task_rules" not in payload("compare", request, [])
+    assert "task_rules" not in payload("answer", {"question": "q"}, [])

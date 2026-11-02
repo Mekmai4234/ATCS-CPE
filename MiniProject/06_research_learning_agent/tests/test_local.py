@@ -111,7 +111,7 @@ async def test_synthesis_failure_returns_revalidated_excerpts_without_analysis_c
     ctx.local_inference = unavailable
     result = await unit.service.research(unit.request, unit.sources, ctx)
     assert result.state == "partial" and result.citations
-    assert "Retrieved source excerpts" in result.content and failure in result.content
+    assert "ข้อความจากคลิปที่ค้นได้" in result.content and failure in result.content
     assert "sensitive" not in result.content
     assert result.coverage.processed_chunks == 0 and not result.coverage.complete
     assert result.provider_metadata.provider == "none"

@@ -350,9 +350,14 @@ async def test_large_artifact_uses_ranked_subset_with_partial_coverage(unit):
     )
     assert result.citations
     assert not result.coverage.complete
-    assert result.coverage.processed_chunks == 1
+    # Topic hits first, then passages spread over the transcript up to the byte guard.
+    assert 1 < result.coverage.processed_chunks < 100
     assert result.coverage.expected_chunks == 100
     assert any(call[0] == "search" for call in unit.knowledge.calls)
+    supplied = [e.chunk_id for e in unit.model.generated[0][1]]
+    # Spread, not a prefix: both the start and the second half of the transcript appear.
+    assert "chunk-0" in supplied
+    assert max(int(cid.split("-")[1]) for cid in supplied) >= 50
 
 
 async def test_full_thai_clip_can_fit_without_dropping_chunks(unit):
