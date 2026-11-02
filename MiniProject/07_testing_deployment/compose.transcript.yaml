@@ -5,8 +5,8 @@
 #   docker compose -f 07_testing_deployment/compose.transcript.yaml up -d
 #
 # Secrets (GEMINI_API_KEY, GOOGLE_CLIENT_ID) come from ../.env.local and are never
-# written here. The Free Tier policy directory is mounted read-only; renew the
-# policy in place, then restart api and worker.
+# written here. The Free Tier policy directory is mounted read-only. Runbook (backup,
+# rollback, 7-day policy renewal, fallback models): LOCAL_STACK.md.
 name: video-buddy
 
 x-runtime: &runtime

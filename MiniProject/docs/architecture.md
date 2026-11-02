@@ -1,16 +1,17 @@
 # สถาปัตยกรรมและข้อตกลงการเชื่อมต่อ
 
 > หมวด 02 มี implementation แล้ว ดู [ข้อตกลง API ที่ใช้งานจริง](backend_api_contract.md) และ [คู่มือรัน Backend](../02_api_backend/README.md)
-> หมวด 01 และ 03–06 ยังเป็นข้อกำหนดออกแบบ การทดสอบ 02 ใช้ fixture แทนโมดูลเหล่านั้น
+> หมวด 01–07 มี implementation ที่รันได้แล้ว ระบบทั้งหมดรันในเครื่องได้ตาม [07_testing_deployment/LOCAL_STACK.md](../07_testing_deployment/LOCAL_STACK.md)
+> ส่วนหัวข้อ "ที่เสนอ" ด้านล่างเป็นข้อกำหนดออกแบบเดิม รายละเอียดที่ใช้งานจริงดู README ของแต่ละหมวด
 
 ## เทคโนโลยีที่เสนอ
 
-Frontend: TypeScript + React/Next.js
+Frontend: TypeScript + React + Vite (ใช้จริง; เดิมเสนอ Next.js)
 Backend/AI: Python + FastAPI
 Application data: SQLite สำหรับต้นแบบ
 Knowledge data: ChromaDB
 LLM: Gemini ผ่าน Google GenAI SDK (`google-genai`) สำหรับ 05 และ 06
-Embeddings: คงข้อเสนอ OpenAI `text-embedding-3-small` ของ 04 แยกจากโมเดลสร้างคำตอบ
+Embeddings: Gemini `gemini-embedding-2` (1536 มิติ) ของ 04 แยกจากโมเดลสร้างคำตอบ; เปลี่ยนรุ่นต้อง reindex ใหม่ทั้งหมด
 เก็บ credentials ทั้งหมดฝั่ง server และเลือกโมเดลผ่าน configuration
 Background jobs: เริ่มจาก worker ที่อ่านงานจาก persistent job store ของ API; เลือก durable queue เพิ่มเมื่อการ deploy ต้องใช้
 
@@ -97,13 +98,14 @@ URL อ้างอิงสร้างจาก video ID และเวลา
 .env.example ที่ MiniProject root เป็นแม่แบบรวม
 กำหนดให้ค่าพาธ runtime สัมพัทธ์อ้างจาก MiniProject root; แต่ละ entrypoint ต้อง resolve ตามกติกานี้
 Frontend รับเฉพาะ NEXT_PUBLIC_API_BASE_URL ส่วนกุญแจ model และฐานข้อมูลอยู่ server
-หากใช้ Next.js ให้เลือกวิธีโหลดค่า public ใน environment ของ frontend แล้วบันทึกวิธีจริงใน 01/step.txt
+หน้าเว็บ (Vite) อ่านเฉพาะค่า public นี้ตอน build วิธีจริงอยู่ใน 01_web_app/README.md
 แยก data, application logs และ index ไว้ใน runtime/ ที่ถูก ignore
 บทถอดเสียงและชื่อคลิปเป็นข้อมูลที่ไม่เชื่อถือ ห้ามนำไปใช้เป็นคำสั่งระบบหรือสิทธิ์เรียกเครื่องมือ
 
 ## การตั้งค่า Gemini และข้อตกลงเอกสาร
 
-- `GEMINI_API_KEY` ใช้กับการสร้างคำตอบและ Agent; `OPENAI_API_KEY` ใช้เฉพาะเมื่อเลือก embedding adapter เดิม
+- `GEMINI_API_KEY` ใช้กับการสร้างคำตอบ, Agent และ embeddings ทุกคำขอต้องผ่าน broker ตาม policy ใน `GEMINI_FREE_POLICY_FILE` (อายุไม่เกิน 7 วัน)
+- `LLM_FALLBACK_MODELS` รายชื่อรุ่นสำรองในโปรเจกต์และ key เดียวกัน ใช้เมื่อรุ่นหลักถูกจำกัดโควตาหรือตอบ 5xx ทุกรุ่นต้องอยู่ใน policy ห้ามสลับ key หรือบัญชี; vision และ embeddings ไม่สลับรุ่น
 - `LLM_MODEL=gemini-3.5-flash` สะท้อนชื่อรุ่นที่ผู้ใช้ระบุ เอกสาร Google ระบุว่าชื่อรุ่นนี้ deprecated และคำขอถูกส่งต่อไป `gemini-3.6-flash` ต้องตรวจสอบสิทธิ์และรุ่นที่ตอบกลับตอนเชื่อมต่อจริง
 - แหล่งอ้างอิง: https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash และ https://ai.google.dev/gemini-api/docs/libraries
 - `MAX_CONTEXT_TOKENS` เป็นงบ input ของแอป ไม่ใช่จำนวน token สูงสุดของโมเดล; ต้องเผื่องบ output และข้อจำกัด provider
