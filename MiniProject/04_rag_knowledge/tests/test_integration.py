@@ -26,7 +26,8 @@ async def test_real_backend_worker_marks_ready_only_after_verified_chroma_invent
     evidence = (await env.adapters.evidence(query.sources, [hits[0].chunk.chunk_id], query.ctx))[0]
     env.repo.check_evidence_bounds(evidence)
     citation = Citation(
-        citation_id="c1", **evidence.model_dump(exclude={"text", "transcript_version"})
+        citation_id="c1",
+        **evidence.model_dump(exclude={"text", "transcript_version"}, exclude_none=True),
     )
     assert citation.start_seconds == hits[0].chunk.start_seconds
 
