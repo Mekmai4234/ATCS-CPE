@@ -306,3 +306,163 @@ async def test_grading_uses_structured_marks_and_same_broker_gate(make_model):
         context=context,
     )
     assert result["marks"][0]["correct"] is True
+
+
+class LimitedBrokerContext(MockBrokerContext):
+    """Broker double: rate-limit chosen model buckets, refuse models absent from policy."""
+
+    def __init__(self, limited=(), unapproved=()):
+        super().__init__()
+        self.limited, self.unapproved, self.requests = set(limited), set(unapproved), []
+
+    async def gemini_call(self, callback, **request):
+        self.requests.append((request["model"], request["endpoint"]))
+        if request["model"] in self.unapproved:
+            raise AppError("free_model_unverified", "Model is not explicitly approved", 503)
+        if request["model"] in self.limited:
+            raise AppError("quota_wait", "Local project budget is unavailable", 429, True)
+        return await super().gemini_call(callback, **request)
+
+
+def fallback_agent(handler, context, fallbacks="gemini-3.8-flash"):
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = genai.Client(
+        api_key="test-only-secret",
+        vertexai=False,
+        http_options=types.HttpOptions(
+            httpx_async_client=http, retry_options=types.HttpRetryOptions(attempts=1)
+        ),
+    )
+    settings = AgentSettings(_env_file=None, llm_fallback_models=fallbacks)
+    context.settings = settings
+    return GeminiModel(settings, client=client), http
+
+
+def wire(paths, bodies=None, *, outage=None):
+    def handler(request):
+        paths.append(request.url.path)
+        if bodies is not None:
+            bodies.append(json.loads(request.content))
+        if outage and outage in request.url.path and request.url.path.endswith(":generateContent"):
+            return httpx.Response(503, json={"error": {"code": 503, "message": "busy"}})
+        if request.url.path.endswith(":countTokens"):
+            return httpx.Response(200, json={"totalTokens": 12})
+        return httpx.Response(200, json=response())
+
+    return handler
+
+
+def test_agent_model_chain_keeps_primary_first_and_drops_duplicates():
+    settings = AgentSettings(
+        _env_file=None, llm_model="gemini-a", llm_fallback_models=" gemini-b,gemini-a,,gemini-c"
+    )
+    assert settings.model_chain() == ["gemini-a", "gemini-b", "gemini-c"]
+
+
+async def test_first_decision_falls_back_and_later_turns_stay_on_that_model():
+    paths, context = [], LimitedBrokerContext(limited={"gemini-3.5-flash"})
+    model, http = fallback_agent(wire(paths), context)
+    try:
+        reply = await model.decide([{"role": "user", "data": {}}], 5, context=context)
+        assert reply.metadata.requested_model == "gemini-3.8-flash"
+        history = [
+            {"role": "user", "data": {}},
+            {
+                "role": "model",
+                "native": reply.native,
+                "name": reply.name,
+                "arguments": {},
+                "model": reply.metadata.requested_model,
+            },
+            {"role": "tool", "name": reply.name, "call_id": "call-1", "result": {"ok": True}},
+        ]
+        context.limited.clear()
+        context.requests.clear()
+        second = await model.decide(history, 5, context=context)
+    finally:
+        await model.close()
+        await http.aclose()
+    # Primary is available again, but the signed turn pins the run to the fallback.
+    assert second.metadata.requested_model == "gemini-3.8-flash"
+    assert {name for name, _ in context.requests} == {"gemini-3.8-flash"}
+
+
+async def test_legacy_turn_without_model_stays_on_primary_and_never_falls_back():
+    paths, context = [], LimitedBrokerContext(limited={"gemini-3.5-flash"})
+    model, http = fallback_agent(wire(paths), context)
+    history = [
+        {"role": "user", "data": {}},
+        {"role": "model", "native": types.Content(role="model", parts=[types.Part(text="x")])},
+        {"role": "user", "data": {}},
+    ]
+    try:
+        with pytest.raises(AppError) as caught:
+            await model.decide(history, 5, context=context)
+    finally:
+        await model.close()
+        await http.aclose()
+    assert caught.value.code == "quota_wait"
+    assert {name for name, _ in context.requests} == {"gemini-3.5-flash"}
+
+
+async def test_artifact_generation_falls_back_on_primary_outage():
+    paths, context = [], LimitedBrokerContext()
+    output = {
+        "questions": [
+            {
+                "question": "What does RAG retrieve?",
+                "answer": "Evidence",
+                "explanation": "It retrieves evidence",
+                "citations": ["chunk-1"],
+            }
+        ]
+    }
+
+    def handler(request):
+        paths.append(request.url.path)
+        if "gemini-3.5-flash:" in request.url.path and request.url.path.endswith(
+            ":generateContent"
+        ):
+            return httpx.Response(503, json={"error": {"code": 503, "message": "busy"}})
+        if request.url.path.endswith(":countTokens"):
+            return httpx.Response(200, json={"totalTokens": 12})
+        return httpx.Response(200, json=response([{"text": json.dumps(output)}]))
+
+    model, http = fallback_agent(handler, context)
+    try:
+        result = await model.generate(
+            {"type": "quiz"}, [evidence()], QuizContent, 5, context=context
+        )
+    finally:
+        await model.close()
+        await http.aclose()
+    assert result.metadata.requested_model == "gemini-3.8-flash"
+    assert sum(p.endswith(":generateContent") for p in paths) == 2
+
+
+async def test_unapproved_fallback_is_skipped_and_primary_limit_reported():
+    paths, context = (
+        [],
+        LimitedBrokerContext(limited={"gemini-3.5-flash"}, unapproved={"gemini-3.8-flash"}),
+    )
+    model, http = fallback_agent(wire(paths), context)
+    try:
+        with pytest.raises(AppError) as caught:
+            await model.decide([{"role": "user", "data": {}}], 5, context=context)
+    finally:
+        await model.close()
+        await http.aclose()
+    assert caught.value.code == "quota_wait" and paths == []
+
+
+async def test_thinking_level_is_dropped_for_non_gemini3_flash_fallback():
+    paths, bodies = [], []
+    context = LimitedBrokerContext(limited={"gemini-3.5-flash"})
+    model, http = fallback_agent(wire(paths, bodies), context, fallbacks="gemini-2.5-flash-lite")
+    try:
+        await model.decide([{"role": "user", "data": {}}], 5, context=context)
+    finally:
+        await model.close()
+        await http.aclose()
+    generate = [b for p, b in zip(paths, bodies, strict=True) if p.endswith(":generateContent")]
+    assert generate and "thinkingConfig" not in generate[0].get("generationConfig", {})
