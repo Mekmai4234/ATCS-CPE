@@ -237,6 +237,17 @@ export function ArtifactView({ artifact }: { artifact: Artifact }) {
     </section>
   );
 }
+/** Models sometimes emit Markdown **bold**; show it as bold text, never as raw markup. */
+export function BoldText({ text }: { text: string }) {
+  return (
+    <>
+      {text
+        .split(/\*\*(.+?)\*\*/g)
+        .map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : part))}
+    </>
+  );
+}
+
 export function ResultView({
   result,
   partial = false,
@@ -257,13 +268,29 @@ export function ResultView({
   const answer = result.answer || (typeof result.content === 'string' ? result.content : '');
   const label = kind === 'compare' ? 'เทียบ' : kind === 'research' ? 'ค้นคว้า' : 'สรุป';
   const localEvidence = result.provider_metadata?.provider === 'local-evidence';
+  const read = result.coverage?.processed_chunks;
+  const total = result.coverage?.expected_chunks;
+  // A finished research answer stays "partial" while it has read only part of the clip;
+  // say how much was read instead of implying the task itself did not finish.
+  const answeredFromPart =
+    kind === 'research' &&
+    typeof read === 'number' &&
+    typeof total === 'number' &&
+    read > 0 &&
+    read < total &&
+    !answer.startsWith('การค้นคว้าหยุดก่อนเสร็จ');
   return (
     <div className={`result-content v5r-result v5r-result-${kind}`}>
-      {partial && (
-        <p className="notice warning" role="status">
-          ได้ผลบางส่วน — งานนี้ยังไม่สำเร็จครบถ้วน
-        </p>
-      )}
+      {partial &&
+        (answeredFromPart ? (
+          <p className="notice" role="status">
+            ได้คำตอบแล้ว — อ้างอิงเนื้อหาคลิป {read}/{total} ช่วง ยังไม่ได้อ่านครบทุกช่วง
+          </p>
+        ) : (
+          <p className="notice warning" role="status">
+            ได้ผลบางส่วน — งานนี้ยังไม่สำเร็จครบถ้วน
+          </p>
+        ))}
       {result.status === 'insufficient_evidence' && (
         <h3 className="insufficient">หลักฐานไม่เพียงพอ</h3>
       )}
@@ -279,7 +306,11 @@ export function ResultView({
               <span aria-hidden="true">.</span>
             </h3>
           )}
-          {answer && <p className="answer-text">{answer}</p>}
+          {answer && (
+            <p className="answer-text">
+              <BoldText text={answer} />
+            </p>
+          )}
           {!!result.citations?.length && (
             <>
               <h4>
