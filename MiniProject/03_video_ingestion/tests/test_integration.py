@@ -285,16 +285,22 @@ async def test_production_factory_rejects_offline_profile(integrated):
     assert error.value.code == "ingestion_configuration"
 
 
-async def test_factory_owns_and_closes_live_clients_without_provider_calls(integrated, monkeypatch):
+@pytest.mark.parametrize("materialize", [False, True])
+async def test_factory_owns_and_closes_live_clients_without_provider_calls(
+    integrated, monkeypatch, materialize
+):
     env = integrated
     monkeypatch.setenv("GEMINI_API_KEY", "test-not-real-key")
     monkeypatch.setenv("EMBEDDING_PROVIDER", "gemini")
     monkeypatch.setenv("EMBEDDING_MODEL", "gemini-embedding-2")
     adapters = await create_adapters(settings=env.settings, repository=env.repo)
+    if materialize:
+        assert adapters.knowledge.rag.embedder.client is not None
     await adapters.close()
     await adapters.close()
     assert adapters.ingestion.closed
-    assert adapters.knowledge.rag.embedder._http_client.is_closed
+    transport = adapters.knowledge.rag.embedder._http_client
+    assert transport.is_closed if materialize else transport is None
 
 
 async def test_factory_startup_failure_closes_rag(integrated, monkeypatch):
