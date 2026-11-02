@@ -104,6 +104,7 @@ async def test_native_calls_signatures_ids_and_policy_survive_roundtrip(make_mod
     assert requests[0][0].endswith(":countTokens")
     first_body = requests[1][1]
     assert "ONLY the authorized" in json.dumps(first_body["systemInstruction"])
+    assert "write in Thai" in first_body["systemInstruction"]["parts"][0]["text"]
     assert first_body["generationConfig"]["thinkingConfig"] == {"thinking_level": "LOW"}
     assert first_body["generationConfig"]["maxOutputTokens"] == 8192
     assert len(first_body["tools"][0]["functionDeclarations"]) == 5
