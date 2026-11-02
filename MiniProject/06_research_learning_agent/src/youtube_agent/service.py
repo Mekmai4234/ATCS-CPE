@@ -684,13 +684,34 @@ class AgentService:
             if selected:
                 records = selected
         self._remember(run, list(records.values()))
-        result = await self._bounded(
-            run,
-            lambda timeout: self.model.synthesize_research(
-                request, [wire_evidence(e) for e in records.values()], timeout, run.context
-            ),
-            model=True,
-        )
+        try:
+            result = await self._bounded(
+                run,
+                lambda timeout: self.model.synthesize_research(
+                    request, [wire_evidence(e) for e in records.values()], timeout, run.context
+                ),
+                model=True,
+            )
+        except (AppError, TimeoutError) as exc:
+            run.context.check()
+            # Preserve useful retrieved excerpts when synthesis is unavailable. Evidence
+            # and inventory are still revalidated; cancellation/revocation never publish.
+            if isinstance(exc, AppError) and exc.code not in {
+                "quota_wait",
+                "quota_pending",
+                "provider_unavailable",
+                "provider_timeout",
+                "provider_rate_limited",
+                "local_unavailable",
+                "local_timeout",
+                "local_busy",
+                "agent_budget_exhausted",
+                "generation_unavailable",
+                "generation_timeout",
+            }:
+                raise
+            reason = exc.code if isinstance(exc, AppError) else "synthesis_timeout"
+            return await self._deliver(run, self._partial(run, f"Stopped: {reason}."))
         run.usage.add(result.metadata)
         run.usage.usage["supplied_chunks"] = len(records)
         if selection is not None:
@@ -754,8 +775,10 @@ class AgentService:
                             "remaining_steps": self.settings.agent_max_steps - step + 1,
                             "remaining_seconds": max(0, run.remaining()),
                             "coverage": self._coverage(run).model_dump(),
-                            "final_only": run.model_calls
-                            == self.settings.agent_max_model_calls - 1,
+                            "final_only": (
+                                run.model_calls == self.settings.agent_max_model_calls - 1
+                                or step == self.settings.agent_max_steps
+                            ),
                         },
                     }
                 )
@@ -772,6 +795,11 @@ class AgentService:
                     ),
                     model=True,
                 )
+                # Even an unusable final action consumed a successful model call and
+                # observed the pending evidence. Account for it before budget exit.
+                run.usage.add(reply.metadata)
+                run.processed.update(run.pending)
+                run.pending.clear()
                 if (
                     run.model_calls == self.settings.agent_max_model_calls
                     and reply.name != "finish_research"
@@ -779,10 +807,6 @@ class AgentService:
                     return await self._deliver(
                         run, self._partial(run, "Final model allowance reached.")
                     )
-                run.usage.add(reply.metadata)
-                # Only credit observations after the subsequent decision successfully returned.
-                run.processed.update(run.pending)
-                run.pending.clear()
                 history.append(
                     {
                         "role": "model",
