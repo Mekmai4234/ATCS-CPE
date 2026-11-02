@@ -1736,6 +1736,11 @@ export default function App({
                     </label>
                   )}
                   {tab === 'learn' && (
+                    <p className="notice">
+                      การสร้างสรุป เปรียบเทียบ ค้นคว้า และแบบฝึกหัดใช้ AI ตามโควตาปัจจุบัน
+                    </p>
+                  )}
+                  {tab === 'learn' && (
                     <details className="v5-learning-settings">
                       <summary>ปรับรายละเอียด</summary>
                       <div className="learning-controls">
