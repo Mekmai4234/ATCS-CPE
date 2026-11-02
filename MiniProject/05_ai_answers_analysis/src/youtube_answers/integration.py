@@ -238,6 +238,31 @@ class AnswerAdapters(RagAdapters):
 
         context.check()
         context.authorize_sources(sources)
+        if not context.settings.auth_enabled:
+            # The local evidence library is member-only (04). Single-user mode has no
+            # member, so explain the limit instead of failing with authentication_required.
+            return AnswerResult(
+                status="insufficient_evidence",
+                answer=(
+                    "ไม่พบข้อความที่ตรงคำค้นในไฟล์บทถอดเสียงของคลิปนี้ และการค้นข้อความแบบละเอียด"
+                    "ต้องเข้าสู่ระบบสมาชิก ลองระบุคำพูดให้ชัดขึ้น หรือเลือก “ให้ AI ช่วยอธิบาย”"
+                ),
+                citations=[],
+                coverage=Coverage(
+                    expected_videos=len(sources),
+                    processed_videos=0,
+                    expected_chunks=None,
+                    processed_chunks=None,
+                    complete=False,
+                    notes=["โหมดผู้ใช้คนเดียว (AUTH_ENABLED=false) ไม่มีคลังหลักฐานของสมาชิก"],
+                ),
+                provider_metadata=ProviderMetadata(
+                    provider="local-evidence",
+                    requested_model="none",
+                    latency_ms=0,
+                    usage={"generate_requests": 0},
+                ),
+            )
 
         from .authorization import MemberContext, guard_context
 

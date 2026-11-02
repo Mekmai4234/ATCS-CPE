@@ -439,9 +439,7 @@ class AnswerService:
                 run.processed.update(cid for n in group for cid in n["citation_ids"])
                 summaries.extend(self._nodes(run, result))
                 if result.status == "insufficient_evidence":
-                    run.notes.append(
-                        f"Evidence batch for {source.video_id} could not be summarized."
-                    )
+                    run.notes.append(f"สรุปหลักฐานบางช่วงของคลิป {source.video_id} ไม่ได้")
         # Recursively reduce summaries. Fail explicitly if the model does not compress.
         while summaries:
             data = payload(request["type"], request, summaries)
@@ -453,9 +451,7 @@ class AnswerService:
                 result = await self._generate(run, payload("merge_summaries", request, group))
                 reduced.extend(self._nodes(run, result))
                 if result.status == "insufficient_evidence":
-                    run.notes.append(
-                        "An intermediate summary had insufficient supporting evidence."
-                    )
+                    run.notes.append("สรุปขั้นกลางบางส่วนมีหลักฐานไม่เพียงพอ")
             if len(json_text(reduced).encode()) >= len(json_text(summaries).encode()):
                 raise error("context_budget_exceeded", "Intermediate summaries did not compress")
             summaries = reduced
