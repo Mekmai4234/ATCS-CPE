@@ -4,6 +4,7 @@ import {
   citationUrl,
   jobStatus,
   jobWarning,
+  progressText,
   retryTime,
   terminal,
   videoIdFromUrl,
@@ -142,5 +143,35 @@ describe('source scope', () => {
     expect(
       jobWarning({ state: 'queued', error_code: 'generation_provider_busy' } as Job),
     ).toBeNull();
+  });
+});
+
+describe('research progress text', () => {
+  it('translates tool steps and run summaries into Thai', () => {
+    const step = { tool_name: 'search_evidence', state: 'running' };
+    expect(progressText({ ...step, summary: 'Executing validated scoped action' })).toEqual({
+      tool: 'ค้นหลักฐาน',
+      summary: 'กำลังทำงาน',
+    });
+    expect(
+      progressText({
+        tool_name: 'run_controller',
+        state: 'partial',
+        summary:
+          'Validated output; processed_chunks=194; complete=False; model_calls=5; tool_calls=19',
+      }),
+    ).toEqual({ tool: 'สรุปผล', summary: 'อ่านเนื้อหาแล้ว 194 ช่วง · เรียก AI 5 ครั้ง' });
+    expect(
+      progressText({
+        tool_name: 'read_video_chunks',
+        state: 'completed',
+        summary: 'Read authorized page; selected_chunks=8',
+      }).summary,
+    ).toBe('อ่านเนื้อหาแล้ว 8 ช่วง');
+  });
+  it('keeps unknown tools and summaries unchanged', () => {
+    expect(
+      progressText({ tool_name: 'search_prepared_media', state: 'running', summary: 'New text' }),
+    ).toEqual({ tool: 'search_prepared_media', summary: 'New text' });
   });
 });
