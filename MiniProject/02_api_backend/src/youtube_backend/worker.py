@@ -267,12 +267,14 @@ class Worker:
                         await task
         final = self.repo.get_job(job["job_id"], internal=True)
         logger.info(
-            "job_finished job_id=%s request_id=%s kind=%s state=%s stage=%s latency_ms=%.1f",
+            "job_finished job_id=%s request_id=%s kind=%s state=%s stage=%s error_code=%s "
+            "latency_ms=%.1f",
             job["job_id"],
             job["request_id"],
             job["kind"],
             final["state"],
             final["stage"],
+            final.get("error_code"),
             (time.monotonic() - started) * 1000,
         )
         return True
