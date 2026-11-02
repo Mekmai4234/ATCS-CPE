@@ -1,5 +1,7 @@
 """06-owned composition: reuse 04, implement research/artifact, leave 03/05 explicit."""
 
+import hashlib
+
 from youtube_rag.config import RagSettings
 from youtube_rag.integration import RagAdapters
 from youtube_rag.manifest import BackendExecution
@@ -26,16 +28,24 @@ class RagKnowledge:
         from youtube_rag.document_knowledge import search
 
         document = search(context, sources, query, **kwargs)
-        if document:
-            return document
+        top_k = kwargs.get("top_k", 8)
+        if document is not None and len(document) < top_k:
+            # Document lookup is exact-phrase only: a paraphrased agent query finds few or
+            # no passages, and repeated queries returned the same handful. Top up with
+            # passages spread across each transcript (score 0 = not a match), starting
+            # at a query-dependent offset so different queries reveal different parts.
+            seen = {hit.chunk.chunk_id for hit in document}
+            extra = [
+                hit
+                for hit in self._spread(context, sources, top_k * 2, offset=query)
+                if hit.chunk.chunk_id not in seen
+            ]
+            return document + extra[: top_k - len(document)]
         if document is not None:
-            # Document lookup is exact-phrase only; a paraphrased agent query finds nothing.
-            # Return passages spread across each transcript (score 0 = not a match) so the
-            # agent still sees authorized evidence instead of stopping as insufficient.
-            return self._spread(context, sources, kwargs.get("top_k", 8))
+            return document
         return await self.rag.search(query, sources, BackendExecution(context), **kwargs)
 
-    def _spread(self, context, sources, top_k):
+    def _spread(self, context, sources, top_k, *, offset=""):
         from youtube_rag.document_knowledge import page
         from youtube_rag.models import SearchHit
 
@@ -53,7 +63,10 @@ class RagKnowledge:
                 if cursor is None:
                     break
             per_source = max(1, top_k // len(sources))
-            picked = sorted(spread_order(len(chunks))[:per_source])
+            shift = int(hashlib.sha256(offset.encode()).hexdigest(), 16) % max(1, len(chunks))
+            picked = sorted(
+                (i + shift) % len(chunks) for i in spread_order(len(chunks))[:per_source]
+            )
             hits.extend(SearchHit(chunk=chunks[i], ranking_score=0) for i in picked)
         return hits
 
