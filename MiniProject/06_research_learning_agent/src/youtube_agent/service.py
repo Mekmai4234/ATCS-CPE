@@ -313,18 +313,25 @@ class AgentService:
                 raise error("invalid_cursor", "Knowledge pagination made no progress")
             cursors.add(cursor)
         records = {e.chunk_id: e for e in ordered}
-        budget = self.settings.max_context_tokens * 3
-        base = byte_size({"request": request, "evidence": []})
-        if base + sum(byte_size(wire_evidence(e)) + 1 for e in records.values()) > budget:
+        # Estimated tokens: evidence JSON at ~3 bytes/token, plus each ID once more because
+        # the decoder schema lists every supplied ID as an enum and Gemini admission counts
+        # that config byte-for-byte. A fixed reserve covers policy, schema and framing.
+        budget = self.settings.max_context_tokens - 4096
+        base = byte_size({"request": request, "evidence": []}) // 3
+
+        def cost(record):
+            return (byte_size(wire_evidence(record)) + 3) // 3 + len(record.chunk_id) + 3
+
+        if base + sum(cost(e) for e in records.values()) > budget:
             # Large libraries (and short transcript-document passages): topic hits first,
-            # then passages spread evenly across the whole transcript until the byte guard.
+            # then passages spread evenly across the whole transcript until the budget.
             # Exact-phrase document search finds nothing for a generic or missing topic,
             # which previously left no evidence at all. Coverage credits only these records.
             selected, used = {}, base
 
             def add(record):
                 nonlocal used
-                size = byte_size(wire_evidence(record)) + 1
+                size = cost(record)
                 if record.chunk_id not in selected and used + size <= budget:
                     selected[record.chunk_id] = record
                     used += size

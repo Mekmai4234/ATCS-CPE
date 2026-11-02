@@ -118,6 +118,9 @@ describe('source scope', () => {
     expect(jobWarning(job)).toContain('ถูกตัด');
     expect(jobWarning({ ...job, state: 'completed' })).toBeNull();
     expect(jobWarning({ ...job, error_code: 'invalid_citation' })).toBe(
+      'AI ส่งผลลัพธ์ไม่สมบูรณ์ กรุณาลองสร้างใหม่',
+    );
+    expect(jobWarning({ ...job, error_code: 'some_unknown_failure' })).toBe(
       'ทำรายการไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
     );
   });
