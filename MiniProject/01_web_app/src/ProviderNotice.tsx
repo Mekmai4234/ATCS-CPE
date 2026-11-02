@@ -14,14 +14,15 @@ export default function ProviderNotice({ metadata }: { metadata?: Answer['provid
     system: 'ข้อความจากระบบ · ไม่ใช่การวิเคราะห์คลิปด้วย AI',
     transcript: 'บทถอดเสียงที่บันทึกไว้ · ไม่ได้เรียก AI',
     'local-evidence': 'ค้นข้อความจากคลิปในเครื่อง · ไม่ได้สร้างคำตอบใหม่ด้วย AI',
+    'local-document': 'ตอบจากไฟล์ · ไม่ใช้ AI · provider calls 0',
     none: 'ไม่มีการเรียกโมเดลในผลนี้',
   };
   const origins = metadata.provider.split(',');
   const label = origins.map((origin) => providers[origin] || 'ยังไม่ทราบผู้ให้บริการ').join(' · ');
   const cached = origins.some((origin) => origin.endsWith('-cache'));
-  const localEvidence = origins.includes('local-evidence');
+  const localEvidence = origins.includes('local-evidence') || origins.includes('local-document');
   const noModel = origins.every((origin) =>
-    ['none', 'system', 'transcript', 'local-evidence'].includes(origin),
+    ['none', 'system', 'transcript', 'local-evidence', 'local-document'].includes(origin),
   );
   return (
     <p className="provider-notice">

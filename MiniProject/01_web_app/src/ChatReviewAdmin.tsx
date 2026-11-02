@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Api, ApiError } from './api';
 import ProviderNotice from './ProviderNotice';
-import type { Answer } from './types';
+import type { Answer, Citation } from './types';
 const labelNames: Record<string, string> = {
   user_dissatisfied: 'ผู้ใช้ไม่พอใจ',
   answer_risk_suspected: 'ระบบสงสัยคำตอบเสี่ยง',
@@ -40,7 +40,7 @@ type Detail = {
     visible_to_user: boolean;
   };
   feedback?: { rating: string; reason: string; comment: string };
-  citations?: { title: string; start_seconds: number }[];
+  citations?: Citation[];
   scope?: { video_id: string; transcript_version: string }[];
 };
 export default function ChatReviewAdmin({ api }: { api: Api }) {
@@ -440,7 +440,12 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
           <ul>
             {detail.citations?.map((c, i) => (
               <li key={i}>
-                {c.title} · {c.start_seconds} วินาที
+                {c.title} ·{' '}
+                {c.kind === 'document_metadata'
+                  ? 'ข้อมูลเอกสาร ไม่มีเวลาเสียง'
+                  : c.end_seconds === null
+                    ? `ตั้งแต่ ${c.start_seconds} วินาที ไม่ทราบเวลาจบ`
+                    : `${c.start_seconds} วินาที`}
               </li>
             ))}
           </ul>

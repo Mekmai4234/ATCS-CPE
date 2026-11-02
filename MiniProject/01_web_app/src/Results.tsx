@@ -39,12 +39,19 @@ export function Citations({
               <small>
                 {citation.kind === 'video'
                   ? 'ภาพและเสียง · AI วิเคราะห์'
-                  : evidenceLabels[citation.presentation?.kind || 'transcript']}
+                  : citation.kind?.startsWith('document_')
+                    ? 'ไฟล์ผู้ใช้ · ยังไม่ได้เทียบเสียงจริง'
+                    : evidenceLabels[citation.presentation?.kind || 'transcript']}
               </small>
               <span>
-                {visual && validFrame(frame)
-                  ? timestamp(frame.timeSeconds)
-                  : `${timestamp(citation.start_seconds)}–${timestamp(citation.end_seconds)}`}
+                {citation.kind === 'document_metadata'
+                  ? 'ข้อมูลเอกสาร · ไม่มีเวลาเสียง'
+                  : visual && validFrame(frame)
+                    ? timestamp(frame.timeSeconds)
+                    : citation.kind === 'document_transcript' && citation.end_seconds === null
+                      ? `ตั้งแต่ ${timestamp(citation.start_seconds)} · ไม่ทราบเวลาจบ`
+                      : `${timestamp(citation.start_seconds)}–${timestamp(citation.end_seconds)}`}
+                {citation.document_line && ` · บรรทัด ${citation.document_line}`}
               </span>
             </div>
             {url ? (
@@ -52,7 +59,11 @@ export function Citations({
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={`เปิดหลักฐาน ${citation.title} ที่ ${timestamp(visual && validFrame(frame) ? frame.timeSeconds : citation.start_seconds)}`}
+                aria-label={
+                  citation.kind === 'document_metadata'
+                    ? `เปิดคลิปจากเอกสาร ${citation.title}`
+                    : `เปิดหลักฐาน ${citation.title} ที่ ${timestamp(visual && validFrame(frame) ? frame.timeSeconds : citation.start_seconds)}`
+                }
               >
                 เปิดคลิป ↗
               </a>

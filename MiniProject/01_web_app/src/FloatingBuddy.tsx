@@ -1,6 +1,6 @@
 import { smallTalkReply } from './smallTalk';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import InteractiveBuddy from './InteractiveBuddy';
 import type { BuddyState } from './InteractiveBuddy';
@@ -28,6 +28,7 @@ interface Props {
   selected: string[];
   select: (id: string) => void;
   question: string;
+  responseControl?: ReactNode;
   change: (text: string) => void;
   submit: (event: FormEvent) => void;
   turns: BuddyTurn[];
@@ -538,6 +539,7 @@ export default function FloatingBuddy(props: Props) {
                 </button>
               ))}
             </div>
+            {props.responseControl}
             <form
               className="buddy-composer"
               onSubmit={(event) => {
