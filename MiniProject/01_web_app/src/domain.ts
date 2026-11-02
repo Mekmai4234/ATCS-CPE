@@ -1,4 +1,4 @@
-import type { Citation, Job, Scope, Video } from './types';
+import type { Citation, Job, ProgressEvent, Scope, Video } from './types';
 import { serviceMessage, userMessages } from './userMessages';
 export const evidenceLabels = {
   transcript: 'บทถอดเสียง',
@@ -179,4 +179,38 @@ export function jobWarning(job: Job): string | null {
   if (job.state === 'cancelled') return 'งานถูกยกเลิกแล้ว';
   if (job.stage === 'no_transcript') return 'ไม่พบบทถอดเสียงที่ใช้งานได้';
   return null;
+}
+
+const progressTools: Record<string, string> = {
+  search_evidence: 'ค้นหลักฐาน',
+  read_video_chunks: 'อ่านเนื้อหาคลิป',
+  compare_videos: 'เปรียบเทียบคลิป',
+  create_learning_artifact: 'สร้างแผนเรียน/แบบฝึก',
+  finish_research: 'เขียนคำตอบสุดท้าย',
+  run_controller: 'สรุปผล',
+};
+const progressSummaries: Record<string, string> = {
+  'Executing validated scoped action': 'กำลังทำงาน',
+  'Scoped observation recorded': 'ได้ผลแล้ว',
+  'Rechecking final sources': 'ตรวจหลักฐานก่อนส่งคำตอบ',
+  'Invalid tool arguments': 'คำสั่งไม่ถูกต้อง ข้ามขั้นนี้',
+  'Collecting scoped evidence': 'รวบรวมหลักฐาน',
+};
+
+/** Thai wording for research progress; unknown events keep their original text. */
+export function progressText(event: Pick<ProgressEvent, 'tool_name' | 'state' | 'summary'>) {
+  const tool = progressTools[event.tool_name] || event.tool_name;
+  const value = (key: string) => event.summary.match(new RegExp(`${key}=(\\w+)`))?.[1];
+  let summary = progressSummaries[event.summary];
+  if (!summary && event.summary.startsWith('Validated output')) {
+    const read = value('processed_chunks');
+    const calls = value('model_calls');
+    summary = [read && `อ่านเนื้อหาแล้ว ${read} ช่วง`, calls && `เรียก AI ${calls} ครั้ง`]
+      .filter(Boolean)
+      .join(' · ');
+  }
+  if (!summary && event.summary.startsWith('Read authorized page'))
+    summary = `อ่านเนื้อหาแล้ว ${value('selected_chunks') ?? '?'} ช่วง`;
+  if (event.state === 'rejected' && !summary) summary = 'ไม่สำเร็จ';
+  return { tool, summary: summary || event.summary };
 }
