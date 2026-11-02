@@ -661,3 +661,26 @@ def test_whole_video_document_batches_fit_gemini_admission_with_citation_enum():
         allowance = len(config.model_dump_json(exclude_none=True).encode("utf-8")) + 256
         estimated_prompt = (len(json_text(data).encode("utf-8")) + 2) // 3
         assert estimated_prompt + allowance <= settings.max_context_tokens
+
+
+@pytest.mark.parametrize("status", [500, 503])
+async def test_primary_model_outage_falls_back_to_next_model(status):
+    paths = []
+
+    def handler(request):
+        paths.append(request.url.path)
+        if "gemini-3.5-flash:" in request.url.path and request.url.path.endswith(
+            ":generateContent"
+        ):
+            return httpx.Response(status, json={"error": {"code": status, "message": "busy"}})
+        data = {"totalTokens": 20} if request.url.path.endswith(":countTokens") else response()
+        return httpx.Response(200, json=data)
+
+    model, http = fallback_model(handler, LimitedBroker(()))
+    try:
+        result = await model.generate({"untrusted_evidence": []}, 5)
+    finally:
+        await model.close()
+        await http.aclose()
+    assert result.metadata.requested_model == "gemini-fallback-lite"
+    assert sum(path.endswith(":generateContent") for path in paths) == 2
