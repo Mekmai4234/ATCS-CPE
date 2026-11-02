@@ -8,6 +8,7 @@ from youtube_rag.integration import RagAdapters
 from .config import IngestionSettings
 from .errors import failure
 from .service import IngestionService
+from .timing import timed_ingestion
 
 
 class IngestionAdapters(UnavailableAdapters):
@@ -25,6 +26,7 @@ class IngestionAdapters(UnavailableAdapters):
         # Internal opt-in handoff only; 02's current transcript worker does not call it.
         return await self.ingestion.prepare_media(path, context)
 
+    @timed_ingestion("index")
     async def index(self, *args):
         return await self.knowledge.index(*args)
 
