@@ -75,9 +75,11 @@ export function Citations({
 export function CoverageNotice({
   coverage,
   insufficient = false,
+  localEvidence = false,
 }: {
   coverage?: Coverage;
   insufficient?: boolean;
+  localEvidence?: boolean;
 }) {
   if (!coverage) return null;
   if (coverage.expected_videos === 0)
@@ -85,25 +87,33 @@ export function CoverageNotice({
   return (
     <div className={`coverage ${coverage.complete ? '' : 'warning'}`}>
       <strong>
-        {coverage.complete
-          ? insufficient
-            ? 'ตรวจข้อมูลครบแล้ว แต่ยังยืนยันคำตอบไม่ได้'
-            : 'ตรวจสอบแหล่งข้อมูลแล้ว'
-          : 'ข้อมูลยังไม่ครอบคลุมทั้งหมด'}
+        {localEvidence
+          ? 'ค้นข้อความบางส่วน ไม่ยืนยันว่าตรวจครบทั้งคลิป'
+          : coverage.complete
+            ? insufficient
+              ? 'ตรวจข้อมูลครบแล้ว แต่ยังยืนยันคำตอบไม่ได้'
+              : 'ตรวจสอบแหล่งข้อมูลแล้ว'
+            : 'ข้อมูลยังไม่ครอบคลุมทั้งหมด'}
       </strong>
-      <span>
-        คลิป {coverage.processed_videos}/{coverage.expected_videos}
-        {coverage.expected_chunks !== null
-          ? ` · ข้อความ ${coverage.processed_chunks}/${coverage.expected_chunks}`
-          : ''}
-      </span>
+      {!localEvidence && (
+        <span>
+          คลิป {coverage.processed_videos}/{coverage.expected_videos}
+          {coverage.expected_chunks !== null
+            ? ` · ข้อความ ${coverage.processed_chunks}/${coverage.expected_chunks}`
+            : ''}
+        </span>
+      )}
       {coverage.notes?.map((note, i) => (
         <span key={i}>
           {note.startsWith('Only evidence actually')
             ? 'นับเฉพาะข้อมูลที่ส่งให้ AI สำเร็จแล้ว บางช่วงอาจยังไม่ได้อ่าน'
             : note.startsWith('Stopped: context_budget_exceeded')
               ? 'ข้อมูลเกินงบต่อคำขอ ลองระบุหัวข้อให้แคบลง'
-              : note}
+              : note.startsWith('Lexical relevance only')
+                ? 'ผลค้นใช้คำในบทถอดเสียง ไม่ใช่การยืนยันความหมายหรือการตรวจภาพทั้งคลิป'
+                : note.startsWith('Collection bound reached')
+                  ? 'ขอบเขตการค้นยังไม่ครบ การค้นไม่พบไม่ได้ยืนยันว่าไม่มีข้อมูลทั้งคลิป'
+                  : note}
         </span>
       ))}
     </div>
@@ -235,6 +245,7 @@ export function ResultView({
     ['summary', 'compare', 'research'].includes(kind) && !result.artifacts?.length;
   const answer = result.answer || (typeof result.content === 'string' ? result.content : '');
   const label = kind === 'compare' ? 'เทียบ' : kind === 'research' ? 'ค้นคว้า' : 'สรุป';
+  const localEvidence = result.provider_metadata?.provider === 'local-evidence';
   return (
     <div className={`result-content v5r-result v5r-result-${kind}`}>
       {partial && (
@@ -261,9 +272,11 @@ export function ResultView({
           {!!result.citations?.length && (
             <>
               <h4>
-                {result.status === 'insufficient_evidence'
-                  ? 'แหล่งข้อมูลที่ตรวจสอบ'
-                  : 'หลักฐานจากคลิป'}
+                {localEvidence
+                  ? 'ข้อความต้นทางที่ค้นพบ'
+                  : result.status === 'insufficient_evidence'
+                    ? 'แหล่งข้อมูลที่ตรวจสอบ'
+                    : 'หลักฐานจากคลิป'}
               </h4>
               <Citations
                 citations={result.citations}
@@ -282,6 +295,7 @@ export function ResultView({
         <CoverageNotice
           coverage={result.coverage}
           insufficient={result.status === 'insufficient_evidence'}
+          localEvidence={localEvidence}
         />
       )}
       <VisualCoverageNotice value={result.visualCoverage} />
