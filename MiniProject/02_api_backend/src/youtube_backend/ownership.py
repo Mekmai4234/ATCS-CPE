@@ -52,6 +52,9 @@ class Ownership:
             raise AppError("video_not_found", "Video not found", 404)
 
     def _check_job_authorization(self, connection, job):
+        from .document_store import check_snapshot
+
+        check_snapshot(connection, job)
         if not self.settings.auth_enabled:
             return
         owner = job["owner_id"]

@@ -5,11 +5,12 @@ import sqlalchemy as sa
 from sqlalchemy import event
 from sqlalchemy.engine import make_url
 
+from .document_schema import create_tables as create_document_tables
 from .extension_schema import create_tables
 from .review_schema import create_tables as create_review_tables
 
 metadata = sa.MetaData()
-SCHEMA_REVISION = "0004"
+SCHEMA_REVISION = "0005"
 
 users = sa.Table(
     "users",
@@ -208,6 +209,7 @@ fixture_chunks = sa.Table(
 
 v2 = create_tables(metadata)
 review = create_review_tables(metadata)
+documents = create_document_tables(metadata)
 
 
 class Database:

@@ -38,6 +38,7 @@ class ChatRequest(Schema):
     conversation_id: str | None = Field(default=None, max_length=100)
     scope: Scope | None = None
     mode: Literal["video", "general"] = "video"
+    response_mode: Literal["local", "ai"] = "local"
 
     @model_validator(mode="after")
     def chat_scope(self):
@@ -129,11 +130,38 @@ class Citation(Schema):
     chunk_id: str = Field(min_length=1)
     video_id: str
     title: str
-    start_seconds: float = Field(ge=0)
-    end_seconds: float = Field(gt=0)
+    start_seconds: float | None = Field(default=None, ge=0)
+    end_seconds: float | None = Field(default=None, gt=0)
     url: str = ""
-    kind: Literal["transcript", "video"] = "transcript"
+    kind: Literal["transcript", "video", "document_metadata", "document_transcript"] = "transcript"
     observation_cache_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    document_id: str | None = None
+    document_version: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    source_hash: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    document_line: int | None = Field(default=None, ge=1)
+    metadata_field: str | None = None
+
+    @model_validator(mode="after")
+    def citation_shape(self):
+        if self.kind.startswith("document_"):
+            if not all((self.document_id, self.document_version, self.source_hash)):
+                raise ValueError("Document citation needs immutable source identity")
+            if self.kind == "document_metadata":
+                if (
+                    self.start_seconds is not None
+                    or self.end_seconds is not None
+                    or not self.metadata_field
+                ):
+                    raise ValueError("Metadata has no audio interval")
+            elif self.start_seconds is None or self.document_line is None:
+                raise ValueError("Document passage needs start and source line")
+        elif self.start_seconds is None or self.end_seconds is None:
+            raise ValueError("Transcript/video evidence needs a complete interval")
+        if self.end_seconds is not None and (
+            self.start_seconds is None or self.end_seconds <= self.start_seconds
+        ):
+            raise ValueError("Invalid citation interval")
+        return self
 
 
 class Coverage(Schema):

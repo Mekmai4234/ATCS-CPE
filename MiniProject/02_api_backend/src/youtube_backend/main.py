@@ -595,6 +595,14 @@ def create_app(settings=None, database=None, adapters=None):
 
         return worker_status(settings)
 
+    @app.get("/api/videos/{video_id}/document")
+    def document_source(
+        video_id: str, version: str | None = None, limit: Limit = 50, offset: Offset = 0
+    ):
+        from .document_store import source_page
+
+        return source_page(repository, video_id, version, limit, offset)
+
     @app.get("/api/quota", response_model=QuotaStatus, response_model_exclude_none=True)
     def member_quota():
         from .quota_status import quota_status
