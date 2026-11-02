@@ -15,8 +15,16 @@ from .prompts import POLICY, json_text, provider_response_schema
 from .quota import verified_grant
 from .timing import provider_call
 
-# Per-model bucket exhaustion: another approved model in the same project may answer.
-RATE_LIMITED = {"quota_wait", "provider_rate_limited", "generation_rate_limited"}
+# Per-model bucket exhaustion or a model-side outage (Gemini 5xx such as overload):
+# another approved model in the same project may answer. Timeouts and invalid
+# output are not retried here; the job's own retry policy owns them.
+RATE_LIMITED = {
+    "quota_wait",
+    "provider_rate_limited",
+    "generation_rate_limited",
+    "provider_unavailable",
+    "generation_provider_busy",
+}
 # A fallback missing from the operator policy is skipped, not reported as the failure.
 UNAPPROVED_FALLBACK = {"free_model_unverified"}
 
@@ -56,7 +64,7 @@ class GeminiModel:
             raise error("quota_pending", "Verified model/project policy changed", status=503)
 
     async def generate(self, payload, timeout, *, model=None, **options):
-        """Try LLM_MODEL, then LLM_FALLBACK_MODELS when only its bucket is limited.
+        """Try LLM_MODEL, then LLM_FALLBACK_MODELS when it is limited or unavailable.
 
         Every attempt still uses the same verified project/key and the broker's
         reservations. A caller-pinned model or a vision request never falls back.
@@ -77,7 +85,10 @@ class GeminiModel:
             except AppError as exc:
                 if index and exc.code in UNAPPROVED_FALLBACK:
                     continue
-                if exc.code not in RATE_LIMITED:
+                # Without a native broker, other transient 5xx map to a retryable
+                # generation_provider_error rather than provider_unavailable.
+                transient = exc.code == "generation_provider_error" and exc.retryable
+                if exc.code not in RATE_LIMITED and not transient:
                     raise
                 limited = limited or exc
         raise limited
