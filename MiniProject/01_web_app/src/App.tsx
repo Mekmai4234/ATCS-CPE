@@ -1804,7 +1804,9 @@ export default function App({
                     placeholder={
                       tab === 'chat'
                         ? 'คลิปเหล่านี้อธิบายเรื่อง RAG ไว้อย่างไร?'
-                        : 'อยากเรียนรู้หรือเจาะลึกเรื่องอะไร…'
+                        : taskType === 'research'
+                          ? 'จำเป็น · เช่น เข้าใจ RAG ตั้งแต่พื้นฐานจนนำไปใช้กับธุรกิจ'
+                          : 'อยากเรียนรู้หรือเจาะลึกเรื่องอะไร…'
                     }
                   />
                   <div className="form-footer">
@@ -1814,7 +1816,9 @@ export default function App({
                         : scopeHelp) ||
                         (tab === 'learn' && taskType === 'compare' && selectedInFilter.length < 2
                           ? 'เลือกคลิปที่ตรงตัวกรองอย่างน้อย 2 คลิปเพื่อเปรียบเทียบ'
-                          : 'อ้างอิงเฉพาะคลิปที่เลือกและตรงกับตัวกรอง')}
+                          : tab === 'learn' && taskType === 'research' && !question.trim()
+                            ? 'พิมพ์เป้าหมายค้นคว้าก่อนเริ่มงาน'
+                            : 'อ้างอิงเฉพาะคลิปที่เลือกและตรงกับตัวกรอง')}
                     </small>
                     <button
                       className="primary"
@@ -1824,7 +1828,6 @@ export default function App({
                         (!!scopeHelp &&
                           !(tab === 'chat' && (!selected.length || smallTalkReply(question)))) ||
                         (tab === 'chat' && !question.trim()) ||
-                        (tab === 'learn' && taskType === 'research' && !question.trim()) ||
                         (tab === 'learn' && taskType === 'compare' && selectedInFilter.length < 2)
                       }
                     >

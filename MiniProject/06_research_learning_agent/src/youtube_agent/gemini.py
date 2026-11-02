@@ -60,6 +60,29 @@ def provider_schema(schema):
     return compact(schema.model_json_schema())
 
 
+def constrain_citations(schema_json, ids):
+    """Restrict every `citations` string array to the supplied evidence IDs.
+
+    Smaller fallback models otherwise invent or reformat IDs, and the artifact is then
+    rejected as invalid_citation after a paid generation. Publication still validates.
+    """
+    ids = sorted(set(ids))
+
+    def visit(value):
+        if isinstance(value, dict):
+            prop = value.get("properties", {}).get("citations")
+            if ids and isinstance(prop, dict) and prop.get("type") == "array":
+                prop["items"] = {"type": "string", "enum": ids}
+            for item in value.values():
+                visit(item)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item)
+
+    visit(schema_json)
+    return schema_json
+
+
 def byte_size(value):
     """Conservative local input guard, explicitly NOT a model token count."""
     return len(json_text(value).encode("utf-8"))
@@ -363,7 +386,13 @@ class GeminiModel:
             [types.Content(role="user", parts=[types.Part(text=json_text(payload))])],
             self._config(
                 response_mime_type="application/json",
-                response_json_schema=provider_schema(schema),
+                response_json_schema=constrain_citations(
+                    provider_schema(schema),
+                    [
+                        e.get(citation_key) if isinstance(e, dict) else getattr(e, citation_key)
+                        for e in evidence
+                    ],
+                ),
             ),
             timeout,
             context,
