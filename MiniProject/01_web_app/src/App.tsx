@@ -213,6 +213,7 @@ export default function App({
   const [jobs, setJobs] = useState<Record<string, Job>>({});
   const [watchErrors, setWatchErrors] = useState<Record<string, string>>({});
   const [question, setQuestion] = useState('');
+  const [responseMode, setResponseMode] = useState<'local' | 'ai'>('local');
   const [taskType, setTaskType] = useState<TaskType>('summary');
   const [learningFocus, setLearningFocus] = useState(false);
   const [days, setDays] = useState(7);
@@ -594,7 +595,15 @@ export default function App({
       if (alive.current) setBusy(false);
     }
   }
-  draftIdentity.current = JSON.stringify([question, selected, channel, from, to, conversation]);
+  draftIdentity.current = JSON.stringify([
+    question,
+    selected,
+    channel,
+    from,
+    to,
+    conversation,
+    responseMode,
+  ]);
   async function submitTask(event: FormEvent, forcedType?: TaskType) {
     event.preventDefault();
     if (busyRef.current || operationRef.current) return;
@@ -652,6 +661,7 @@ export default function App({
               question: text,
               conversation_id: sameScope ? conversation : null,
               scope,
+              response_mode: general ? 'ai' : responseMode,
               ...(general ? { mode: 'general' } : {}),
             }
           : type === 'summary' || type === 'compare'
@@ -1711,6 +1721,20 @@ export default function App({
                     archiveLoading
                   }
                 >
+                  {tab === 'chat' && selected.length > 0 && (
+                    <label>
+                      โหมดคำตอบ
+                      <select
+                        aria-label="โหมดคำตอบ"
+                        disabled={taskLocked}
+                        value={responseMode}
+                        onChange={(event) => setResponseMode(event.target.value as 'local' | 'ai')}
+                      >
+                        <option value="local">ตอบจากไฟล์ (ไม่ใช้ AI)</option>
+                        <option value="ai">ให้ AI ช่วยอธิบาย (ใช้โควตา)</option>
+                      </select>
+                    </label>
+                  )}
                   {tab === 'learn' && (
                     <details className="v5-learning-settings">
                       <summary>ปรับรายละเอียด</summary>
@@ -2036,6 +2060,24 @@ export default function App({
               )
             }
             question={question}
+            responseControl={
+              selected.length > 0 ? (
+                <label>
+                  โหมดคำตอบ
+                  <select
+                    aria-label="โหมดคำตอบ"
+                    disabled={taskLocked}
+                    value={responseMode}
+                    onChange={(event) => setResponseMode(event.target.value as 'local' | 'ai')}
+                  >
+                    <option value="local">ตอบจากไฟล์ (ไม่ใช้ AI)</option>
+                    <option value="ai">ให้ AI ช่วยอธิบาย (ใช้โควตา)</option>
+                  </select>
+                </label>
+              ) : (
+                <small>คุยทั่วไปใช้ AI ตามโควตาปัจจุบัน</small>
+              )
+            }
             change={setQuestion}
             submit={(event) => submitTask(event, 'chat')}
             turns={turns.filter((turn) => turn.type === 'chat')}

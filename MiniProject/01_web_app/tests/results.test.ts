@@ -147,3 +147,42 @@ it.each(['none', 'system', 'transcript'])(
     expect(html).not.toContain('0 ms');
   },
 );
+
+it.each(['document_metadata', 'document_transcript'] as const)(
+  'renders %s provenance without inventing a timed interval',
+  (kind) => {
+    const html = renderToStaticMarkup(
+      createElement(ResultView, {
+        result: {
+          ...result,
+          status: 'answered',
+          provider_metadata: { provider: 'local-document', requested_model: 'none', latency_ms: 1 },
+          citations: [
+            {
+              ...result.citations![0],
+              kind,
+              document_id: 'source',
+              document_version: 'a'.repeat(64),
+              source_hash: 'b'.repeat(64),
+              start_seconds: kind === 'document_metadata' ? null : 19,
+              end_seconds: null,
+              metadata_field: kind === 'document_metadata' ? 'artist' : null,
+              document_line: kind === 'document_transcript' ? 31 : null,
+            },
+          ],
+        },
+      }),
+    );
+    expect(html).toContain('ตอบจากไฟล์');
+    expect(html).not.toContain('โมเดล: none');
+    expect(html).not.toContain('0:00–');
+    if (kind === 'document_metadata') {
+      expect(html).toContain('ข้อมูลเอกสาร · ไม่มีเวลาเสียง');
+      expect(html).not.toContain('&amp;t=');
+    } else {
+      expect(html).toContain('ตั้งแต่ 0:19 · ไม่ทราบเวลาจบ');
+      expect(html).toContain('บรรทัด 31');
+      expect(html).toContain('&amp;t=19s');
+    }
+  },
+);

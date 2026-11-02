@@ -51,7 +51,7 @@ export class Api {
   ) {}
   private mapCitation = (value: import('./types').Citation) => ({
     ...value,
-    presentation: this.evidence?.citation(value),
+    presentation: value.kind?.startsWith('document_') ? undefined : this.evidence?.citation(value),
   });
   private mapArtifact = (value: Artifact): Artifact => ({
     ...value,
