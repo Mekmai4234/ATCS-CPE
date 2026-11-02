@@ -19,6 +19,49 @@ const scope = {
   date_from: '2026-10-01',
   date_to: null,
 };
+
+for (const provider of ['local-document', 'document-fallback']) {
+  test(`job history uses actual ${provider} result instead of configured Gemini`, async ({
+    page,
+  }) => {
+    await fixture(page);
+    await page.route('**/api/member/jobs?*', (route) =>
+      route.fulfill({
+        json: {
+          items: [
+            {
+              job_id: 'local-history',
+              kind: 'chat',
+              state: 'completed',
+              stage: 'completed',
+              request: { question: 'ใครร้อง', scope },
+              sources: [],
+              execution: { provider: 'gemini', model: 'configured-cloud-model' },
+              result: {
+                answer: 'ชื่อศิลปิน',
+                provider_metadata: { provider, requested_model: 'none' },
+              },
+            },
+          ],
+          total: 1,
+        },
+      }),
+    );
+    await page.goto(base);
+    await page.getByRole('button', { name: 'ดูงานทั้งหมด', exact: true }).click();
+    const drawer = page.getByRole('dialog', { name: 'งานของฉัน', exact: true });
+    await drawer.getByRole('tab', { name: 'ประวัติ', exact: true }).click();
+    const card = drawer.locator('article').filter({ hasText: 'ใครร้อง' });
+    await expect(card).toContainText(
+      provider === 'local-document'
+        ? 'ตอบจากไฟล์ · ไม่ใช้ AI · provider calls 0'
+        : 'AI ยังไม่พร้อม · แสดงข้อมูลจากไฟล์ที่เลือก',
+    );
+    await expect(card).not.toContainText('configured-cloud-model');
+    if (provider === 'document-fallback') await expect(card).not.toContainText('provider calls 0');
+  });
+}
+
 async function fixture(page: Page) {
   const posts: Record<string, unknown>[] = [];
   await page.route('**/__test__/session', (route) =>

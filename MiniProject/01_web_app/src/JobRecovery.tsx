@@ -6,6 +6,7 @@ import { UiIcon } from './Visuals';
 import QuotaNotice from './QuotaNotice';
 import ProviderStatus, { type ProviderState } from './ProviderStatus';
 import LocalEvidenceSearch from './LocalEvidenceSearch';
+import ProviderNotice from './ProviderNotice';
 
 function WorkIcon({ name }: { name: 'list' | 'pause' | 'close' | 'check' | 'clock' }) {
   const paths = {
@@ -541,7 +542,9 @@ export default function JobRecovery({
                       {typeName(job)}
                     </div>
                     <h3 className="job-card-title">{label(job)}</h3>
-                    {job.execution?.provider && (
+                    {job.result?.provider_metadata ? (
+                      <ProviderNotice metadata={job.result.provider_metadata} />
+                    ) : job.execution?.provider ? (
                       <p className="job-card-description">
                         ผู้ให้บริการที่ตรึงไว้ในงาน:{' '}
                         {job.execution.provider === 'ollama'
@@ -551,7 +554,7 @@ export default function JobRecovery({
                             : 'ยังไม่ทราบ'}
                         {job.execution.model && <> · {job.execution.model}</>}
                       </p>
-                    )}
+                    ) : null}
                     {quota ? (
                       <p className="job-card-description">
                         {allQuota && quotaTimes.length === 1
