@@ -247,6 +247,8 @@ class MediaAgentService:
                     {
                         "role": "model",
                         "native": reply.native,
+                        # Later decisions must reuse the model that signed this turn.
+                        "model": reply.metadata.requested_model,
                         "name": reply.name,
                         "arguments": reply.arguments,
                     }

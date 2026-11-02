@@ -19,6 +19,8 @@ class AgentSettings(BaseSettings):
     local_context_tokens: int = Field(default=4096, ge=512, le=32768)
     local_max_output_tokens: int = Field(default=1024, ge=64, le=8192)
     llm_model: str = Field(default="gemini-3.5-flash", min_length=1, max_length=200)
+    # Same-project models tried when LLM_MODEL is limited or unavailable (see module 05).
+    llm_fallback_models: str = Field(default="", max_length=1000)
     max_context_tokens: int = Field(default=24000, ge=1024, le=1000000)
     agent_max_steps: int = Field(default=8, ge=1, le=100)
     agent_timeout_seconds: float = Field(default=120, gt=0, le=3600)
@@ -35,6 +37,11 @@ class AgentSettings(BaseSettings):
         if self.agent_finalize_reserve_seconds >= self.agent_timeout_seconds:
             raise ValueError("Finalization reserve must be smaller than the run deadline")
         return self
+
+    def model_chain(self):
+        """Primary model first, then distinct configured fallbacks in order."""
+        names = [self.llm_model, *self.llm_fallback_models.split(",")]
+        return list(dict.fromkeys(name.strip() for name in names if name.strip()))
 
     @classmethod
     def from_backend(cls, settings):
