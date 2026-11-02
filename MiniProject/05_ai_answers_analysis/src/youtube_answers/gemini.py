@@ -7,12 +7,18 @@ import time
 import httpx
 from google import genai
 from google.genai import errors, types
+from youtube_backend.errors import AppError
 from youtube_backend.schemas import ProviderMetadata
 
 from .models import Generated, GeneratedAnswer, error
 from .prompts import POLICY, json_text
 from .quota import verified_grant
 from .timing import provider_call
+
+# Per-model bucket exhaustion: another approved model in the same project may answer.
+RATE_LIMITED = {"quota_wait", "provider_rate_limited", "generation_rate_limited"}
+# A fallback missing from the operator policy is skipped, not reported as the failure.
+UNAPPROVED_FALLBACK = {"free_model_unverified"}
 
 
 def provider_response_schema(schema=GeneratedAnswer, *, citation_ids=()):
@@ -108,7 +114,34 @@ class GeminiModel:
         if current.model_dump(exclude={"expires_at"}) != grant.model_dump(exclude={"expires_at"}):
             raise error("quota_pending", "Verified model/project policy changed", status=503)
 
-    async def generate(
+    async def generate(self, payload, timeout, *, model=None, **options):
+        """Try LLM_MODEL, then LLM_FALLBACK_MODELS when only its bucket is limited.
+
+        Every attempt still uses the same verified project/key and the broker's
+        reservations. A caller-pinned model or a vision request never falls back.
+        """
+        if model or options.get("purpose", "chat") != "chat":
+            return await self._attempt(
+                payload, timeout, model=model or self.settings.llm_model, **options
+            )
+        chain = self.settings.model_chain()
+        deadline = time.monotonic() + timeout
+        limited = None
+        for index, candidate in enumerate(chain):
+            remaining = deadline - time.monotonic()
+            if index and remaining < 1:
+                break
+            try:
+                return await self._attempt(payload, remaining, model=candidate, **options)
+            except AppError as exc:
+                if index and exc.code in UNAPPROVED_FALLBACK:
+                    continue
+                if exc.code not in RATE_LIMITED:
+                    raise
+                limited = limited or exc
+        raise limited
+
+    async def _attempt(
         self,
         payload,
         timeout,
@@ -117,10 +150,9 @@ class GeminiModel:
         policy=POLICY,
         images=(),
         purpose="chat",
-        model=None,
+        model,
         output_limit=None,
     ):
-        model = model or self.settings.llm_model
         grant = self.grant(model, purpose)
         if images and purpose != "vision":
             raise error("invalid_scope", "Images require an authorized vision grant")
