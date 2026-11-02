@@ -489,3 +489,55 @@ def test_usage_reports_the_model_that_answered_after_fallback():
     result = usage.result()
     assert result.requested_model == "gemini-3.8-flash"
     assert result.fallback_from == "gemini-3.5-flash"
+
+
+def test_finish_schema_requires_citations_from_observed_evidence():
+    """Regression: flash-lite finished with no citation_ids and the run became partial."""
+    from youtube_agent.gemini import finish_schema, provider_schema
+    from youtube_agent.models import FinishArgs
+
+    history = [
+        {"role": "user", "data": {}},
+        {
+            "role": "tool",
+            "name": "search_evidence",
+            "result": {
+                "evidence": [{"chunk_id": "doc:2", "text": "b"}, {"chunk_id": "doc:1", "text": "a"}]
+            },
+        },
+        {"role": "tool", "name": "read_video_chunks", "result": {"error": "x"}},
+    ]
+    schema = finish_schema(provider_schema(FinishArgs), history)
+    assert schema["properties"]["citation_ids"]["items"]["enum"] == ["doc:1", "doc:2"]
+    assert schema["properties"]["citation_ids"]["minItems"] == 1
+    assert "citation_ids" in schema["required"]
+    untouched = finish_schema(provider_schema(FinishArgs), [{"role": "user", "data": {}}])
+    assert "enum" not in json.dumps(untouched)
+
+
+async def test_finish_declaration_on_the_wire_lists_observed_ids(make_model):
+    bodies = []
+
+    def handler(request):
+        bodies.append(json.loads(request.content))
+        if request.url.path.endswith(":countTokens"):
+            return httpx.Response(200, json={"totalTokens": 10})
+        return httpx.Response(200, json=response())
+
+    model = make_model(handler)
+    history = [
+        {"role": "user", "data": {}},
+        {
+            "role": "tool",
+            "name": "search_evidence",
+            "call_id": "c",
+            "result": {"evidence": [{"chunk_id": "doc:7", "text": "t"}]},
+        },
+        {"role": "user", "data": {}},
+    ]
+    await model.decide(history, 5)
+    tools = bodies[-1]["tools"][0]["functionDeclarations"]
+    finish = next(t for t in tools if t["name"] == "finish_research")
+    assert finish["parameters_json_schema"]["properties"]["citation_ids"]["items"]["enum"] == [
+        "doc:7"
+    ]
