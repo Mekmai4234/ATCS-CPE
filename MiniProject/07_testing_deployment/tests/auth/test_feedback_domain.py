@@ -69,7 +69,7 @@ async def test_feedback_publication_and_backup_restore_with_real_domain_services
             client,
             worker,
             "/api/chat",
-            dict(question="Explain RAG", scope={"video_ids": [domain.A]}),
+            dict(question="Explain RAG", scope={"video_ids": [domain.A]}, response_mode="ai"),
         )
         result = chat["result"]
         mid, cid = result["assistant_message_id"], result["conversation_id"]
