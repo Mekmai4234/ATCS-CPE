@@ -99,6 +99,7 @@ class Ownership:
             self._check_sources(connection, job["payload"].get("sources", []), owner=owner)
 
     def _import_private(self, urls):
+        from .document_store import locally_seeded
         from .repository import row
 
         if len(urls) > self.settings.import_max_urls:
@@ -122,6 +123,7 @@ class Ownership:
                 ) or (
                     video
                     and video["status"] not in {"deleted", "deleting"}
+                    and not locally_seeded(c, video)
                     and not c.scalar(
                         sa.select(db.user_videos.c.video_id)
                         .where(db.user_videos.c.video_id == video_id)

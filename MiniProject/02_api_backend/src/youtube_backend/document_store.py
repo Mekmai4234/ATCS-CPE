@@ -23,6 +23,24 @@ def ngrams(text):
     return {text[i : i + size] for size in (1, 2, 3) for i in range(len(text) - size + 1)}
 
 
+def locally_seeded(connection, video):
+    """Only sources created by the trusted local importer permit first attachment."""
+    if not video:
+        return False
+    versions, active = db.documents["versions"], db.documents["active"]
+    data = connection.scalar(
+        sa.select(versions.c.data)
+        .join(active, active.c.version == versions.c.version)
+        .where(
+            active.c.video_id == video["video_id"],
+            versions.c.video_id == video["video_id"],
+            versions.c.generation == video["generation"],
+            versions.c.transcript_version == video["indexed_version"],
+        )
+    )
+    return isinstance(data, dict) and data.get("local_library_import") is True
+
+
 def publish(database, document, *, create_missing=False):
     """Local operator only. Validate/index/activate in one BEGIN IMMEDIATE transaction."""
     segments = document["segments"]
@@ -44,7 +62,8 @@ def publish(database, document, *, create_missing=False):
             .mappings()
             .first()
         )
-        if video is None and create_missing:
+        seeded = video is None and create_missing
+        if seeded:
             # Trusted local allowlist import creates a source, never a membership.
             # It becomes visible only after a member explicitly attaches its URL.
             now = time.time()
@@ -65,6 +84,7 @@ def publish(database, document, *, create_missing=False):
             raise AppError(
                 "video_not_ready", "Document mapping requires an existing ready clip", 409
             )
+        seeded = seeded or locally_seeded(c, video)
         identity = [POLICY, document, video["generation"], video["indexed_version"]]
         version = hashlib.sha256(
             json.dumps(identity, sort_keys=True, ensure_ascii=False).encode()
@@ -79,7 +99,10 @@ def publish(database, document, *, create_missing=False):
                     generation=video["generation"],
                     transcript_version=video["indexed_version"],
                     source_hash=document["sha256"],
-                    data={k: v for k, v in document.items() if k != "segments"},
+                    data={
+                        **{k: v for k, v in document.items() if k != "segments"},
+                        "local_library_import": seeded,
+                    },
                 )
             )
             for i, segment in enumerate(segments):
