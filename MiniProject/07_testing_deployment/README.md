@@ -1,7 +1,8 @@
 # 07 — System verification and deployment
 
 Run the whole system locally (Docker, `http://localhost:3000`), back it up and renew the
-7-day Gemini policy with [LOCAL_STACK.md](LOCAL_STACK.md).
+7-day Gemini policy with [LOCAL_STACK.md](LOCAL_STACK.md). Release operation, restore
+rehearsal, rollback and live-probe budgeting: [RELEASE_RUNBOOK.md](RELEASE_RUNBOOK.md).
 
 The bounded `scripts/worker_probe.py` executes explicit chat/analysis/research/artifact
 cases once through the selected production factory and actual durable Worker. It
