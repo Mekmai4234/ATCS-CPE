@@ -541,3 +541,32 @@ async def test_finish_declaration_on_the_wire_lists_observed_ids(make_model):
     assert finish["parameters_json_schema"]["properties"]["citation_ids"]["items"]["enum"] == [
         "doc:7"
     ]
+
+
+@pytest.mark.parametrize("code", ["provider_timeout", "generation_timeout"])
+async def test_timed_out_model_falls_back_with_a_shared_deadline(code, monkeypatch):
+    """Regression: gemini-3.8-flash hung for the whole call timeout, so the run failed
+    with provider_timeout and the working fallback model was never tried."""
+    settings = AgentSettings(
+        _env_file=None,
+        llm_fallback_models="gemini-3.8-flash,gemini-3.5-flash-lite",
+    )
+    model = GeminiModel(settings, client=object())
+    budgets = []
+
+    async def call_model(name, contents, config, timeout, context):
+        budgets.append((name, round(timeout)))
+        if name == "gemini-3.5-flash":
+            raise AppError("quota_wait", "Local project budget is unavailable", 429, True)
+        if name == "gemini-3.8-flash":
+            raise AppError(code, "No answer in time", 504, True)
+        from youtube_backend.schemas import ProviderMetadata
+
+        return "ok", ProviderMetadata(provider="gemini", requested_model=name, latency_ms=1)
+
+    monkeypatch.setattr(model, "_call_model", call_model)
+    response, metadata = await model._call([], types.GenerateContentConfig(), 60, None)
+    assert response == "ok" and metadata.requested_model == "gemini-3.5-flash-lite"
+    assert metadata.fallback_from == "gemini-3.5-flash"
+    # Earlier attempts keep a reserve for later models; the last gets what remains.
+    assert [b for _, b in budgets] == [30, 30, 60]

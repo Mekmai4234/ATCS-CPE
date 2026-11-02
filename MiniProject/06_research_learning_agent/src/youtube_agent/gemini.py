@@ -17,13 +17,16 @@ from youtube_backend.schemas import ProviderMetadata
 from .models import DESCRIPTIONS, TOOL_MODELS, Generated, ModelReply, error
 
 THINKING_LEVEL = re.compile(r"^(?:models/)?gemini-3(?:\.\d+)?-flash(?:-|$)")
-# Bucket exhaustion or a model-side outage (5xx, transport): another approved model in
-# the same project may answer. Timeouts and invalid output keep the job retry policy.
+# Bucket exhaustion, a model-side outage (5xx, transport) or a model that does not answer
+# in time: another approved model in the same project may answer. Invalid output still
+# fails the attempt; the job retry policy owns it.
 FALLBACK_ERRORS = {
     "quota_wait",
     "provider_rate_limited",
     "provider_unavailable",
     "generation_unavailable",
+    "provider_timeout",
+    "generation_timeout",
 }
 # A fallback missing from the operator policy is skipped, not reported as the failure.
 UNAPPROVED_FALLBACK = {"free_model_unverified"}
@@ -162,9 +165,13 @@ class GeminiModel:
             remaining = deadline - time.monotonic()
             if index and remaining < 1:
                 break
+            # A model that hangs must leave time for the next one: keep up to 30 s (never
+            # more than half) in reserve while a later model remains in the chain.
+            last = index == len(chain) - 1
+            attempt = remaining if last else max(remaining / 2, remaining - 30)
             try:
                 response, metadata = await self._call_model(
-                    model, contents, config, remaining, context
+                    model, contents, config, attempt, context
                 )
                 return response, self._mark_fallback(metadata, model)
             except AppError as exc:
