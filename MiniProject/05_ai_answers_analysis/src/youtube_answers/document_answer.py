@@ -14,7 +14,9 @@ POLICY = "transcript-first-v1"
 
 
 def metadata_intent(question):
-    if re.search(r"คำว่า|ประโยค|ตรงไหน|ช่วง|\d:\d", question):
+    if re.search(
+        r"คำว่า|ประโยค|ตรงไหน|ช่วง|\d:\d|สื่อความหมาย|วิเคราะห์|ยกตัวอย่าง|อธิบายใหม่|สีอะไร|สีเสื้อ", question
+    ):
         return None
     question = re.sub(r"\s+", "", question).casefold()
     for field, aliases in {
