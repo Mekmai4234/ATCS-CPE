@@ -107,6 +107,7 @@ async def env(tmp_path, config):
         adapter_mode="custom",
         adapter_factory="youtube_rag.integration:create_adapters",
         database_url=f"sqlite:///{(tmp_path / 'app.db').as_posix()}",
+        media_asset_dir=str(tmp_path / "assets"),
         job_lease_seconds=120,
         job_retry_base_seconds=0,
         job_timeout_seconds=300,
