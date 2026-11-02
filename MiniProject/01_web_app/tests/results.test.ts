@@ -123,6 +123,8 @@ it.each([0, 0.2, 12.4])(
     expect(html).toContain('ไม่ได้สร้างคำตอบใหม่ด้วย AI');
     expect(html).toContain('ไม่ยืนยันว่าตรวจครบทั้งคลิป');
     expect(html).not.toContain('โมเดล: none');
+    expect(html).toContain('อ้างอิงจากไฟล์ที่เลือก');
+    expect(html).not.toContain('คลิป 0/1');
     expect(html).not.toContain('คลิป 0/1');
     expect(html).not.toContain('เวลาประมวลผลที่บันทึก');
     expect(html).toContain(
