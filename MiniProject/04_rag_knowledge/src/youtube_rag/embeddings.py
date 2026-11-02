@@ -85,30 +85,30 @@ class GeminiEmbedder:
             raise ValueError("GeminiEmbedder requires the gemini configuration")
         self.settings = settings
         self._api_key = settings.gemini_api_key.get_secret_value()
-        # Pin the async transport so optional aiohttp dependencies cannot change retry/
-        # cancellation behavior. The SDK does not own an explicitly supplied HTTPX client.
-        self._http_client = (
-            httpx.AsyncClient(timeout=settings.rag_operation_timeout_seconds)
-            if client is None and self._api_key
-            else None
-        )
-        self.client = client or (
-            genai.Client(
-                api_key=self._api_key,
-                vertexai=False,
-                http_options=types.HttpOptions(
-                    timeout=int(settings.rag_operation_timeout_seconds * 1000),
-                    retry_options=types.HttpRetryOptions(attempts=1),
-                    httpx_async_client=self._http_client,
-                ),
-            )
-            if self._http_client is not None
-            else None
-        )
-        self._embedding_http = http_client or self._http_client
+        self._http_client = None
+        self._client = client
+        self._embedding_http = http_client
         self.count_requests = 0
         self.embed_requests = 0
         self.counted_input_tokens = 0
+
+    @property
+    def client(self):
+        if self._client is not None or not self._api_key:
+            return self._client
+        self._http_client = httpx.AsyncClient(timeout=self.settings.rag_operation_timeout_seconds)
+        self._client = genai.Client(
+            api_key=self._api_key,
+            vertexai=False,
+            http_options=types.HttpOptions(
+                timeout=int(self.settings.rag_operation_timeout_seconds * 1000),
+                retry_options=types.HttpRetryOptions(attempts=1),
+                httpx_async_client=self._http_client,
+            ),
+        )
+        if self._embedding_http is None:
+            self._embedding_http = self._http_client
+        return self._client
 
     @property
     def credential_sha256(self):
@@ -235,11 +235,11 @@ class GeminiEmbedder:
             ) from None
 
     async def close(self):
-        if self.client is None:
+        if self._client is None:
             return
         try:
-            await self.client.aio.aclose()
-            self.client.close()
+            await self._client.aio.aclose()
+            self._client.close()
         finally:
             if self._http_client is not None:
                 await self._http_client.aclose()
