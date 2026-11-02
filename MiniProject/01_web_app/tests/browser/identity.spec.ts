@@ -80,12 +80,14 @@ test('actual05 local excerpts preserve topic/time scope, floating chat and saved
   await expect(last).toContainText('หลักฐานไม่เพียงพอ');
   await expect(last).toContainText('600–610');
   await expect(last.locator('.citation')).toHaveCount(0);
+  await expect(last.getByRole('button', { name: 'ถูกใจ', exact: true })).toBeVisible();
   await page.screenshot({ path: 'runtime/local-evidence-audit-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.buddy-launcher').click();
   const floating = page.getByRole('dialog');
   await expect(floating).toContainText('600–610');
   await expect(floating).toContainText('หลักฐานไม่เพียงพอ');
+  await expect(floating.getByText('กำลังโหลดความคิดเห็น…', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: 'runtime/local-evidence-audit-mobile.png' });
   expect(posts).toBe(3);
   await page.reload();
