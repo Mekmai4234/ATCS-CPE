@@ -5,7 +5,11 @@ from test_integration import integrated as integrated
 
 async def test_saved_answer_survives_lru_loss_and_never_calls_generation(integrated, monkeypatch):
     env = integrated
-    body = {"question": "Explain RAG from this clip", "scope": {"video_ids": ["dQw4w9WgXcQ"]}}
+    body = {
+        "question": "Explain RAG from this clip",
+        "scope": {"video_ids": ["dQw4w9WgXcQ"]},
+        "response_mode": "ai",
+    }
     first = await env.client.post("/api/chat", json=body)
     await env.worker.run_once(first.json()["job_id"])
     original = env.repo.get_job(first.json()["job_id"])

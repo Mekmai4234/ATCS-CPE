@@ -52,7 +52,11 @@ def time_window(question, source):
 
 
 def overlaps(record, window):
-    return window is None or (record.end_seconds > window[0] and record.start_seconds < window[1])
+    return window is None or (
+        record.end_seconds is not None
+        and record.end_seconds > window[0]
+        and record.start_seconds < window[1]
+    )
 
 
 def lexical_query(question):

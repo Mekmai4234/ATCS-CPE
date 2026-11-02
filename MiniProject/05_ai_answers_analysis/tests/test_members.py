@@ -14,7 +14,12 @@ from youtube_backend.schemas import Source
 
 
 def body(question="RAG", videos=None, **extra):
-    return {"question": question, "scope": {"video_ids": videos or [VIDEO_A]}, **extra}
+    return {
+        "question": question,
+        "scope": {"video_ids": videos or [VIDEO_A]},
+        "response_mode": "ai",
+        **extra,
+    }
 
 
 async def completed_chat(env, client=None, **kwargs):

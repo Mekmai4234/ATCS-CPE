@@ -247,8 +247,9 @@ async def test_transport_and_timeout_redacted(make_model):
 
 def test_missing_key_fails_without_creating_client(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    model = GeminiModel(AnswerSettings(_env_file=None))
     with pytest.raises(AppError) as caught:
-        GeminiModel(AnswerSettings(_env_file=None))
+        _ = model.client
     assert caught.value.code == "generation_unavailable"
 
 
