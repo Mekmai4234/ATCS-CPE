@@ -35,8 +35,10 @@ x-runtime: &runtime
     WORKER_POLL_SECONDS: "0.05"
     JOB_LEASE_SECONDS: "30"
     ENABLE_STREAMING: "false"
+    GEMINI_FREE_POLICY_FILE: /app/policy/gemini-free-policy.json
   volumes:
     - state:/app/runtime
+    - ${VIDEO_BUDDY_POLICY_DIR:-../runtime/free-tier-20261026}:/app/policy:ro
   cpus: 2
   mem_limit: 3g
   pids_limit: 256

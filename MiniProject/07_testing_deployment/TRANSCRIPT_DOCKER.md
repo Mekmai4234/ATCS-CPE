@@ -36,6 +36,10 @@ localhost API. Local HTTP cookies are deliberately separate from the existing
 production HTTPS overlay and its review gate. Do not use this local profile for
 public hosting. AI requests continue to require the existing broker, verified
 policy and quota; file reads work without a key. No local model is installed.
+The existing operator policy directory is mounted read-only at `/app/policy`
+(`VIDEO_BUDDY_POLICY_DIR` overrides the host directory). This translates the
+host's relative policy file into a container path without copying policy or
+secrets into image layers. Missing/expired policy blocks AI, never local reads.
 
 ## Per-module tests
 
