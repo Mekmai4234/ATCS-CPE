@@ -109,6 +109,20 @@ def test_probe_rejects_token_overflow_before_reserving():
     assert budget.calls == 0
 
 
+def test_probe_budget_fits_a_full_research_run_but_stays_bounded():
+    probe = load("learning_probe")
+    # Six agent calls admit countTokens + generateContent each, plus a fallback admission.
+    budget = probe.ProbeBudget(13, 1000)
+    for _ in range(13):
+        budget.admit(1)
+    with pytest.raises(AppError, match="budget exhausted"):
+        budget.admit(1)
+    probe.ProbeBudget(probe.ProbeBudget.MAX_CALLS, 1)
+    for invalid in (0, probe.ProbeBudget.MAX_CALLS + 1, True, 1.0):
+        with pytest.raises(ValueError, match="bounded probe budget"):
+            probe.ProbeBudget(invalid, 1)
+
+
 async def test_local_benchmark_keeps_misses_and_distinct_question_scenarios(monkeypatch):
     import sys
     from types import SimpleNamespace
