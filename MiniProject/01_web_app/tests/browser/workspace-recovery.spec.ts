@@ -115,6 +115,28 @@ async function fixture(page: Page) {
   return posts;
 }
 
+test('document-first mode is shared by floating and full chat and AI needs selection', async ({
+  page,
+}) => {
+  const posts = await fixture(page);
+  await page.goto(base);
+  await page.getByRole('checkbox', { name: `เลือก ${video.title}`, exact: true }).check();
+  await page.getByRole('button', { name: 'เปิดแชต Buddy แบบลอย', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Buddy AI แชตจากคลิป' });
+  await expect(dialog.getByLabel('โหมดคำตอบ')).toHaveValue('local');
+  await dialog.getByLabel('ข้อความถึง Buddy', { exact: true }).fill('เพลงนี้ชื่ออะไร');
+  await dialog.getByRole('button', { name: 'ส่งข้อความถึง Buddy', exact: true }).click();
+  await expect.poll(() => posts.length).toBe(1);
+  expect(posts[0].response_mode).toBe('local');
+  await dialog.getByLabel('โหมดคำตอบ').selectOption('ai');
+  await dialog.getByRole('button', { name: 'ไปหน้าแชตเต็ม ↗', exact: true }).click();
+  await expect(page.getByLabel('โหมดคำตอบ').first()).toHaveValue('ai');
+  await page.getByLabel('คำถามของคุณ', { exact: true }).fill('ช่วยอธิบายความหมาย');
+  await page.getByRole('button', { name: 'ส่งคำถาม', exact: true }).click();
+  await expect.poll(() => posts.length).toBe(2);
+  expect(posts[1].response_mode).toBe('ai');
+});
+
 test('leaving a slow archive keeps the new chat and Buddy usable', async ({ page }) => {
   await fixture(page);
   let release!: () => void;

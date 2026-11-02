@@ -92,10 +92,37 @@ export function videoIdFromUrl(value: string): string | null {
   }
 }
 export function citationUrl(citation: Citation): string | null {
+  if (citation.kind?.startsWith('document_')) {
+    if (
+      !/^[\w-]{11}$/.test(citation.video_id) ||
+      citation.source_available === false ||
+      !citation.document_id ||
+      !/^[a-f0-9]{64}$/.test(citation.document_version || '') ||
+      !/^[a-f0-9]{64}$/.test(citation.source_hash || '')
+    )
+      return null;
+    const base = `https://www.youtube.com/watch?v=${citation.video_id}`;
+    if (citation.kind === 'document_metadata')
+      return citation.start_seconds === null && citation.end_seconds === null ? base : null;
+    if (
+      citation.start_seconds === null ||
+      !Number.isFinite(citation.start_seconds) ||
+      citation.start_seconds < 0
+    )
+      return null;
+    if (
+      citation.end_seconds !== null &&
+      (!Number.isFinite(citation.end_seconds) || citation.end_seconds <= citation.start_seconds)
+    )
+      return null;
+    return `${base}&t=${Math.floor(citation.start_seconds)}s`;
+  }
   if (
     !/^[\w-]{11}$/.test(citation.video_id) ||
     !Number.isFinite(citation.start_seconds) ||
     !Number.isFinite(citation.end_seconds) ||
+    citation.start_seconds === null ||
+    citation.end_seconds === null ||
     citation.start_seconds < 0 ||
     citation.end_seconds <= citation.start_seconds ||
     citation.source_available === false
@@ -103,7 +130,8 @@ export function citationUrl(citation: Citation): string | null {
     return null;
   return `https://www.youtube.com/watch?v=${citation.video_id}&t=${Math.floor(citation.start_seconds)}s`;
 }
-export function timestamp(seconds: number): string {
+export function timestamp(seconds: number | null): string {
+  if (seconds === null) return 'ไม่ระบุ';
   const value = Math.max(0, Math.floor(seconds));
   return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
 }

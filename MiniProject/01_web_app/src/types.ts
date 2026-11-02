@@ -49,15 +49,20 @@ export interface ImportItem {
   error_code: string | null;
 }
 export interface Citation {
-  kind?: 'transcript' | 'video';
+  kind?: 'transcript' | 'video' | 'document_metadata' | 'document_transcript';
   observation_cache_id?: string | null;
   presentation?: CitationPresentation;
   citation_id: string;
   chunk_id: string;
   video_id: string;
   title: string;
-  start_seconds: number;
-  end_seconds: number;
+  start_seconds: number | null;
+  end_seconds: number | null;
+  document_id?: string | null;
+  document_version?: string | null;
+  document_line?: number | null;
+  source_hash?: string | null;
+  metadata_field?: string | null;
   url: string;
   source_available?: boolean;
 }
