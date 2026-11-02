@@ -14,6 +14,8 @@ POLICY = "transcript-first-v1"
 
 
 def metadata_intent(question):
+    if re.search(r"คำว่า|ประโยค|ตรงไหน|ช่วง|\d:\d", question):
+        return None
     question = re.sub(r"\s+", "", question).casefold()
     for field, aliases in {
         "single": ("ชื่อเพลง", "เพลงนี้ชื่อ", "เพลงอะไร", "songtitle"),
@@ -60,6 +62,8 @@ def document_answer(request, sources, history, context):
                 paragraphs.append(f"เอกสารของคลิป {document['video_id']} ไม่ระบุ{labels[field]}")
     elif requires_visual(question) or re.search(r"สีเสื้อ|ใส่เสื้อ|แต่งกาย|ภาพใน|ใน\s*mv", question, re.I):
         paragraphs.append("บทถอดเสียงยืนยันภาพในคลิปไม่ได้ ต้องตรวจหลักฐานภาพก่อน จึงไม่เดาคำตอบจากไฟล์ข้อความ")
+    elif re.search(r"ใครร้อง|ผู้ร้อง|ศิลปิน", question) and time_window(question, sources[0]):
+        paragraphs.append("ข้อมูลศิลปินในเอกสารไม่ระบุว่าใครร้องแต่ละช่วง จึงยังยืนยันผู้ร้องตามเวลาที่ถามไม่ได้")
     elif is_followup(question) or re.search(
         r"ยกตัวอย่าง|สื่อความหมาย|วิเคราะห์|สรุป|กำไรสุทธิ|อธิบายใหม่", question
     ):
