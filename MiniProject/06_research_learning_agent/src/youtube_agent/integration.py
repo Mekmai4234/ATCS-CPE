@@ -15,20 +15,49 @@ class RagKnowledge:
         self.rag = rag
 
     async def inventory(self, sources, context):
+        from youtube_rag.document_knowledge import page
+
+        document = page(context, sources, limit=1)
+        if document is not None:
+            return document.total
         return await self.rag.inventory(sources, BackendExecution(context))
 
     async def search(self, query, sources, context, **kwargs):
+        from youtube_rag.document_knowledge import search
+
+        document = search(context, sources, query, **kwargs)
+        if document is not None:
+            return document
         return await self.rag.search(query, sources, BackendExecution(context), **kwargs)
 
     async def read(self, sources, context, **kwargs):
+        from youtube_rag.document_knowledge import page
+
+        document = page(context, sources, **kwargs)
+        if document is not None:
+            return document
         return await self.rag.read_video_chunks(sources, BackendExecution(context), **kwargs)
 
     async def evidence(self, sources, ids, context):
+        from youtube_rag.document_knowledge import evidence
+
+        document = evidence(context, sources, ids)
+        if document is not None:
+            return document
         return await self.rag.evidence(sources, ids, BackendExecution(context))
 
 
 class AgentAdapters(RagAdapters):
     fresh_generation = ("artifact", "research")
+
+    async def inventory(self, sources, context):
+        job = context.repository.check_execution(context.job_id, context.lease_token)
+        if job["kind"] in {"import", "reindex"}:
+            return await super().inventory(sources, context)
+        return await RagKnowledge(self.rag).inventory(sources, context)
+
+    async def evidence(self, sources, ids, context):
+        return await RagKnowledge(self.rag).evidence(sources, ids, context)
 
     def __init__(
         self,

@@ -60,10 +60,18 @@ class GeminiModel:
 
     def __init__(self, settings, *, client=None):
         self.settings = settings
-        if client is None and not settings.gemini_api_key.get_secret_value():
+        self._client = client
+        self._http = None
+
+    @property
+    def client(self):
+        if self._client is not None:
+            return self._client
+        settings = self.settings
+        if not settings.gemini_api_key.get_secret_value():
             raise error("generation_unavailable", "GEMINI_API_KEY is required", status=503)
-        self._http = httpx.AsyncClient() if client is None else None
-        self.client = client or genai.Client(
+        self._http = httpx.AsyncClient()
+        self._client = genai.Client(
             api_key=settings.gemini_api_key.get_secret_value(),
             vertexai=False,
             http_options=types.HttpOptions(
@@ -72,6 +80,7 @@ class GeminiModel:
                 httpx_async_client=self._http,
             ),
         )
+        return self._client
 
     async def _call(self, contents, config, timeout, context):
         started = time.monotonic()
@@ -350,9 +359,11 @@ class GeminiModel:
             raise error("invalid_grading", "Grading response is invalid") from None
 
     async def close(self):
+        if self._client is None:
+            return
         try:
-            await self.client.aio.aclose()
-            self.client.close()
+            await self._client.aio.aclose()
+            self._client.close()
         finally:
             if self._http is not None:
                 await self._http.aclose()
