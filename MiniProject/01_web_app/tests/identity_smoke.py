@@ -5,6 +5,7 @@ python tests/identity_smoke.py --ref origin/develop
 Uses actual checkout source or a Git archive; never existing databases/real providers.
 """
 import argparse
+import hashlib
 import io
 import json
 import os
@@ -23,7 +24,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--ref", default="origin/develop")
     parser.add_argument("--checkout", action="store_true", help="Use module-02 source from this actual checkout with an isolated DB")
+    parser.add_argument("--local-evidence", action="store_true", help="Use actual05 fallback with synthetic providers, never live AI")
+    parser.add_argument("--answers-ref", default="origin/feature/05_ai_answers_analysis")
     args = parser.parse_args()
+    if args.local_evidence and not args.checkout:
+        parser.error("Local evidence integration uses checkout backend plus an explicit05 source ref")
     web = Path(__file__).resolve().parents[1]
     repo = Path(subprocess.check_output(["git", "rev-parse", "--show-toplevel"], cwd=web, text=True).strip())
     commit = subprocess.check_output(["git", "rev-parse", "HEAD" if args.checkout else args.ref], cwd=repo, text=True).strip()
@@ -54,8 +59,28 @@ def main():
                WORKER_POLL_SECONDS="0.05", JOB_RETRY_BASE_SECONDS="0.01", PYTHONDONTWRITEBYTECODE="1",
                WEB_IDENTITY_TEST="true", WEB_IDENTITY_API_URL=api_url,
                CHAT_REVIEW_ENABLED="true", CHAT_REVIEW_ADMIN_IDS='["fixture-admin"]')
+    answers_commit = None
+    if args.local_evidence:
+        answers_commit = subprocess.check_output(["git", "rev-parse", args.answers_ref], cwd=repo, text=True).strip()
+        archive = subprocess.check_output(["git", "archive", "--format=zip", answers_commit, "MiniProject/05_ai_answers_analysis"], cwd=repo)
+        with ZipFile(io.BytesIO(archive)) as bundle:
+            if any(not (run / name).resolve().is_relative_to(run.resolve()) for name in bundle.namelist()):
+                raise RuntimeError("Unsafe answer source archive")
+            bundle.extractall(run)
+        env.update(
+            PYTHONPATH=os.pathsep.join([str(backend_source), str(web / "tests"), str(root / "05_ai_answers_analysis" / "src")]),
+            ADAPTER_MODE="custom", ADAPTER_FACTORY="local_evidence_fixture:create_adapters",
+            WEB_LOCAL_EVIDENCE_TEST="true", GENERATION_PROVIDER="gemini",
+            EMBEDDING_PROVIDER="fixture", EMBEDDING_MODEL="fixture-hash-v1", EMBEDDING_DIMENSIONS="64",
+        )
     handles, processes = [], []
     outcome = {"backend_commit": commit, "source_mode": "actual_checkout" if args.checkout else "git_archive", "auth_enabled": True, "adapter_mode": "fixture", "external_verifier": "fixture", "real_google_tested": False, "paid_providers_called": False}
+    outcome["frontend_files"] = {
+        path.relative_to(web).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted((web / "src").rglob("*")) if path.is_file()
+    }
+    if args.local_evidence:
+        outcome.update(adapter_mode="actual05_with_synthetic_outage", answers_commit=answers_commit)
     try:
         for role, command in (
             ("api", [sys.executable, "-B", str(web / "tests" / "identity_server.py")]),
@@ -78,7 +103,8 @@ def main():
         node = shutil.which("node")
         if not node:
             raise RuntimeError("Node.js must be on PATH")
-        result = subprocess.run([node, str(web / "node_modules" / "@playwright" / "test" / "cli.js"), "test", "identity.spec.ts", "--workers=1", *(["--grep", os.environ["WEB_IDENTITY_GREP"]] if os.environ.get("WEB_IDENTITY_GREP") else [])], cwd=web, env=env)
+        grep = os.environ.get("WEB_IDENTITY_GREP") or ("actual05 local excerpts" if args.local_evidence else None)
+        result = subprocess.run([node, str(web / "node_modules" / "@playwright" / "test" / "cli.js"), "test", "identity.spec.ts", "--workers=1", *(["--grep", grep] if grep else []), *(["--output", str(run / "browser-results")] if args.local_evidence else [])], cwd=web, env=env)
         outcome["browser_exit_code"] = result.returncode
         return result.returncode
     finally:
