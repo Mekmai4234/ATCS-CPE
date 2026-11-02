@@ -27,10 +27,14 @@ def stop_owned(repo, job, error):
 
 
 class ProbeBudget:
+    # Each model call admits countTokens and generateContent, and a rate-limited
+    # primary adds a fallback admission, so one six-call research run needs over 12.
+    MAX_CALLS = 32
+
     def __init__(self, max_calls, max_tokens):
         if (
             type(max_calls) is not int
-            or not 1 <= max_calls <= 12
+            or not 1 <= max_calls <= self.MAX_CALLS
             or type(max_tokens) is not int
             or not 1 <= max_tokens <= 500000
         ):
