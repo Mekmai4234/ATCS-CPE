@@ -20,7 +20,10 @@ def test_real_video_question_plan_is_explicitly_unreviewed_and_blocks_release():
     result = load("evidence_review").review_gate(data)
     assert result["case_count"] == 36 and not result["gold_ready"]
     assert result["semantic_quality_verified"] is False
-    assert len({v for c in data["cases"] for v in c["video_ids"]}) == 6
+    # The five transcript documents in Transcript/manifest.json (not copied into test images).
+    thai = {v for c in data["cases"] if c["language"] == "th" for v in c["video_ids"]}
+    assert thai == {"C0DXctGPWxw", "B-zaXo-skGo", "NZImGB4O-X4", "cWVse_LuFO0", "f0SQzjp3QzM"}
+    assert len({v for c in data["cases"] for v in c["video_ids"]}) == 7
     assert all(c["expected_answer"] is None for c in data["cases"])
     assert len([r for r in result["reasons"] if r.startswith("human_gold_required:")]) == 36
 
