@@ -49,6 +49,22 @@ const api = new Api('', async (input, init) => {
       stats: {},
     });
   if (path === '/api/admin/chat-reviews/case' && init?.method === 'PATCH') {
+    if (new URLSearchParams(location.search).has('slowSave')) {
+      document.documentElement.dataset.savePending = 'true';
+      await new Promise<void>((resolve, reject) => {
+        const release = () => {
+          init.signal?.removeEventListener('abort', abort);
+          resolve();
+        };
+        const abort = () => {
+          window.removeEventListener('release-review-save', release);
+          document.documentElement.dataset.saveAborted = 'true';
+          reject(new DOMException('Aborted', 'AbortError'));
+        };
+        window.addEventListener('release-review-save', release, { once: true });
+        init.signal?.addEventListener('abort', abort, { once: true });
+      });
+    }
     const data = JSON.parse(String(init.body));
     notes = data.notes;
     status = data.status;
