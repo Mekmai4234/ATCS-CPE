@@ -1,6 +1,9 @@
+import time
+
 import pytest
 from conftest import VIDEO_A, import_ready
 
+from youtube_backend import database as db
 from youtube_backend.errors import AppError
 
 
@@ -89,6 +92,58 @@ def test_quota_paused_chat_returns_a_durable_accepted_job(env):
     response = env.client.post("/api/chat", json={"question": "ทำอะไรอยู่", "mode": "general"})
     assert response.status_code == 202, response.text
     assert env.repo.get_job(response.json()["job_id"])["state"] == "paused"
+
+
+@pytest.mark.asyncio
+async def test_quota_paused_chat_resumes_by_itself_after_the_wait(env):
+    original = env.adapters.companion
+
+    async def unavailable(*args):
+        raise AppError(
+            "quota_wait",
+            "daily limit",
+            429,
+            True,
+            retry_after_seconds=3600,
+            retry_time_source="estimate",
+        )
+
+    env.adapters.companion = unavailable
+    response = env.client.post("/api/chat", json={"question": "ทำอะไรอยู่", "mode": "general"})
+    job_id = response.json()["job_id"]
+    paused = env.repo.get_job(job_id)
+    assert paused["state"] == "paused"
+    # Not before the quota window ends.
+    assert await env.worker.run_once(job_id) is False
+    env.adapters.companion = original
+    with env.repo.db.write() as connection:
+        connection.execute(
+            db.jobs.update().where(db.jobs.c.job_id == job_id).values(available_at=time.time() - 1)
+        )
+    await env.worker.run_once(job_id)
+    resumed = env.repo.get_job(job_id)
+    assert resumed["state"] == "completed", resumed.get("error_code")
+    assert resumed["result"]["assistant_message_id"]
+    assert env.repo.public_job(resumed).get("wait") is None
+
+
+@pytest.mark.asyncio
+async def test_quota_paused_import_still_waits_for_an_explicit_retry(env):
+    item = env.repo.import_urls([f"https://youtu.be/{VIDEO_A}"])[0]
+    job = env.repo.claim(item["job_id"])
+    env.repo.fail(
+        job["job_id"],
+        job["lease_token"],
+        AppError("quota_wait", "wait", 429, True, retry_after_seconds=3600),
+    )
+    with env.repo.db.write() as connection:
+        connection.execute(
+            db.jobs.update()
+            .where(db.jobs.c.job_id == job["job_id"])
+            .values(available_at=time.time() - 1)
+        )
+    assert env.repo.claim(job["job_id"]) is None
+    assert env.repo.get_job(job["job_id"])["state"] == "paused"
 
 
 @pytest.mark.asyncio
