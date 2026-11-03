@@ -39,7 +39,7 @@ from different PR heads cannot certify one integrated release candidate.
 
 Before dispatch, choose an approved primary and backup with currently readable
 English captions. Follow the ingestion preflight in
-[the module 03 procedure](../03_video_ingestion/PHASE2_ACCEPTANCE.md).
+[the ingestion README](../03_video_ingestion/README.md).
 Record approvals and per-run caption outcomes outside Git; do not substitute an
 unapproved source after failure.
 
