@@ -14,7 +14,15 @@ from pydantic import ValidationError
 from youtube_backend.errors import AppError
 from youtube_backend.schemas import ProviderMetadata
 
-from .models import DESCRIPTIONS, TOOL_MODELS, Generated, ModelReply, error
+from .models import (
+    ARTIFACT_CREATED,
+    DESCRIPTIONS,
+    NO_ARTIFACT,
+    TOOL_MODELS,
+    Generated,
+    ModelReply,
+    error,
+)
 
 THINKING_LEVEL = re.compile(r"^(?:models/)?gemini-3(?:\.\d+)?-flash(?:-|$)")
 # Bucket exhaustion, a model-side outage (5xx, transport) or a model that does not answer
@@ -84,6 +92,21 @@ def constrain_citations(schema_json, ids):
 
     visit(schema_json)
     return schema_json
+
+
+def finish_description(history):
+    """State whether this run created an artifact.
+
+    flash-lite claimed a lesson had been created when the run created none, because the
+    description only said what to do if one had been.
+    """
+    created = any(
+        entry.get("role") == "tool"
+        and isinstance(entry.get("result"), dict)
+        and entry["result"].get("created") is True
+        for entry in history
+    )
+    return DESCRIPTIONS["finish_research"] + (ARTIFACT_CREATED if created else NO_ARTIFACT)
 
 
 def finish_schema(schema_json, history):
@@ -339,9 +362,9 @@ class GeminiModel:
         declarations = [
             types.FunctionDeclaration(
                 name=name,
-                description=DESCRIPTIONS.get(
-                    name, "Use only authorized stored evidence and frame IDs."
-                ),
+                description=finish_description(history)
+                if name == "finish_research"
+                else DESCRIPTIONS.get(name, "Use only authorized stored evidence and frame IDs."),
                 parameters_json_schema=finish_schema(provider_schema(schema), history)
                 if name == "finish_research"
                 else provider_schema(schema),

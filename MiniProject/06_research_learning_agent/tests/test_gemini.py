@@ -541,6 +541,34 @@ async def test_finish_declaration_on_the_wire_lists_observed_ids(make_model):
     assert finish["parameters_json_schema"]["properties"]["citation_ids"]["items"]["enum"] == [
         "doc:7"
     ]
+    assert "No learning artifact was created" in finish["description"]
+
+
+def test_finish_description_states_whether_an_artifact_was_created():
+    """Regression: flash-lite said a lesson was created when the run created none."""
+    from youtube_agent.gemini import finish_description
+
+    searched = [
+        {"role": "user", "data": {}},
+        {"role": "tool", "name": "search_evidence", "result": {"evidence": []}},
+    ]
+    assert "No learning artifact was created" in finish_description(searched)
+    assert "A learning artifact was created" not in finish_description(searched)
+    created = [
+        *searched,
+        {
+            "role": "tool",
+            "name": "create_learning_artifact",
+            "result": {"artifact_type": "quiz", "created": True, "citation_ids": ["c1"]},
+        },
+    ]
+    assert "A learning artifact was created" in finish_description(created)
+    assert "No learning artifact" not in finish_description(created)
+    failed = [
+        *searched,
+        {"role": "tool", "name": "create_learning_artifact", "result": {"error": "x"}},
+    ]
+    assert "No learning artifact was created" in finish_description(failed)
 
 
 @pytest.mark.parametrize("code", ["provider_timeout", "generation_timeout"])
