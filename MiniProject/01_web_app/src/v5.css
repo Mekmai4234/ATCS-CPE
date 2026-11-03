@@ -741,6 +741,62 @@ body .v5-workspace .chat-panel > .section-heading h2 {
 body .v5-workspace .chat-panel label {
   font-size: 16px;
 }
+/* Question label on the left, answer-mode pill on the right; wraps on narrow screens. */
+body .v5-workspace .chat-panel .question-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+}
+body .v5-workspace .chat-panel .question-head > label[for='question'] {
+  margin: 0;
+  font-weight: 600;
+}
+body .v5-workspace .chat-panel .answer-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  color: var(--v5-muted);
+}
+body .v5-workspace .chat-panel .answer-mode select {
+  min-width: 0;
+  max-width: 100%;
+  height: 38px;
+  padding: 0 32px 0 14px;
+  border: 1px solid #cfe5da;
+  border-radius: 999px;
+  background-color: #f1faf6;
+  color: #1c6a54;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+body .v5-workspace .chat-panel .answer-mode select:focus-visible {
+  outline: 3px solid #00866e40;
+  outline-offset: 1px;
+}
+body .v5-workspace .chat-panel .answer-mode select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+body .v5-workspace .chat-panel .answer-mode > span,
+body .v5-workspace .chat-panel .form-footer .primary {
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  body .v5-workspace .chat-panel .answer-mode {
+    width: 100%;
+  }
+  body .v5-workspace .chat-panel .answer-mode select {
+    flex: 1;
+  }
+}
 body .v5-workspace .chat-panel textarea {
   font-size: 16px;
   min-height: 100px;
