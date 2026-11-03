@@ -3,21 +3,22 @@
   "status": "draft_requires_human_review",
   "semantic_quality_verified": false,
   "notes": [
-    "36 proposed questions tied to real public video IDs; availability and gold answers require human review.",
-    "English clips are planned additions, not imports or verified live sources.",
+    "36 proposed questions. The 24 Thai cases use the five imported transcript documents in Transcript/manifest.json.",
+    "The 12 English cases are placeholders until approved English clips are imported; replace their video IDs and questions then.",
+    "Visual and on-screen-text questions may correctly be answered as insufficient: the system reads transcripts only.",
     "Do not invent reviewed answers or timestamps. Include captions/audio mismatch and replay checks during review."
   ],
   "cases": [
     {
       "id": "vb-01",
       "video_ids": [
-        "C0DXctGPWxw"
+        "cWVse_LuFO0"
       ],
-      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
-      "clip_type": "music_video",
+      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
+      "clip_type": "tutorial",
       "language": "th",
       "category": "speech",
-      "question": "ในช่วงที่ตรวจ ผู้พูดอธิบายเรื่องใดบ้าง? อ้างช่วงเวลาและแยกคำพูดจากภาพ",
+      "question": "Keyword Search มีข้อจำกัดอะไร และ Semantic Search แก้ข้อจำกัดนั้นอย่างไรตามที่ผู้พูดอธิบาย? อ้างช่วงเวลา",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -31,13 +32,13 @@
     {
       "id": "vb-02",
       "video_ids": [
-        "C0DXctGPWxw"
+        "cWVse_LuFO0"
       ],
-      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
-      "clip_type": "music_video",
+      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
+      "clip_type": "tutorial",
       "language": "th",
-      "category": "screen_text",
-      "question": "ข้อความบนจอที่อ่านได้ชัดในช่วงที่ตรวจคืออะไร? ถ้าอ่านไม่ชัดให้ระบุข้อจำกัด",
+      "category": "sequence",
+      "question": "คลิปอธิบายขั้น Retrieval, Augmented และ Generation ตามลำดับอย่างไร แต่ละขั้นทำอะไร? อ้างช่วงเวลาของแต่ละขั้น",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -51,13 +52,13 @@
     {
       "id": "vb-03",
       "video_ids": [
-        "C0DXctGPWxw"
+        "cWVse_LuFO0"
       ],
-      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
-      "clip_type": "music_video",
+      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
+      "clip_type": "tutorial",
       "language": "th",
-      "category": "visual",
-      "question": "ในช่วง 00:00–00:10 มีสิ่งใดมองเห็นได้โดยตรง โดยไม่เดาชื่อหรือเจตนาบุคคล?",
+      "category": "screen_text",
+      "question": "ช่วงที่อธิบาย Semantic Search บนจอแสดงข้อความหรือแผนภาพอะไร? ถ้าบทถอดเสียงยืนยันไม่ได้ให้ตอบว่าข้อมูลไม่พอ",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -71,13 +72,13 @@
     {
       "id": "vb-04",
       "video_ids": [
-        "C0DXctGPWxw"
+        "cWVse_LuFO0"
       ],
-      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
-      "clip_type": "music_video",
+      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
+      "clip_type": "tutorial",
       "language": "th",
-      "category": "sequence",
-      "question": "จากช่วงที่ตรวจ เหตุการณ์ที่เห็นเกิดก่อนและหลังกันอย่างไร? แยกภาพย้อนถ้ามี",
+      "category": "visual",
+      "question": "ช่วงที่สาธิตการค้นหาแบบทั่วไปที่ไม่มี RAG มองเห็นอะไรบนจอ? แยกสิ่งที่ได้ยินออกจากสิ่งที่เห็น",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -91,13 +92,13 @@
     {
       "id": "vb-05",
       "video_ids": [
-        "C0DXctGPWxw"
+        "cWVse_LuFO0"
       ],
-      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
-      "clip_type": "music_video",
+      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
+      "clip_type": "tutorial",
       "language": "th",
       "category": "count",
-      "question": "ระบุจำนวนที่ผู้พูดหรือจอบอกไว้อย่างชัดเจน พร้อมเวลา ถ้าไม่มีอย่าเดายอดรวมจากภาพสุ่ม",
+      "question": "ก่อนเข้าเรื่อง RAG ผู้พูดยกปัญหาของ AI ที่ไม่รู้ข้อมูลธุรกิจไว้กี่ข้อ? นับเฉพาะที่พูดในคลิปและอ้างช่วงเวลา",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -111,13 +112,13 @@
     {
       "id": "vb-06",
       "video_ids": [
-        "C0DXctGPWxw"
+        "cWVse_LuFO0"
       ],
-      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
-      "clip_type": "music_video",
+      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
+      "clip_type": "tutorial",
       "language": "th",
       "category": "insufficient",
-      "question": "จากหลักฐานที่ตรวจ ยืนยันได้หรือไม่ว่าจำนวนเหตุการณ์ตลอดทั้งคลิปครบถ้วน? อธิบายช่องว่าง",
+      "question": "คลิประบุไหมว่าควรใช้ Vector Database ยี่ห้อใดและมีค่าใช้จ่ายเท่าไร? ถ้าไม่มีหลักฐานให้ตอบว่าข้อมูลไม่พอ",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -131,13 +132,13 @@
     {
       "id": "vb-07",
       "video_ids": [
-        "B-zaXo-skGo"
+        "f0SQzjp3QzM"
       ],
-      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
-      "clip_type": "music_video",
+      "source_url": "https://www.youtube.com/watch?v=f0SQzjp3QzM",
+      "clip_type": "tutorial",
       "language": "th",
       "category": "speech",
-      "question": "ในช่วงที่ตรวจ ผู้พูดอธิบายเรื่องใดบ้าง? อ้างช่วงเวลาและแยกคำพูดจากภาพ",
+      "question": "ผู้พูดบอกว่า GPT ทั่วไปมีปัญหาอะไรเมื่อต้องตอบคำถามเกี่ยวกับข้อมูลเฉพาะองค์กร? อ้างช่วงเวลา",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -151,13 +152,13 @@
     {
       "id": "vb-08",
       "video_ids": [
-        "B-zaXo-skGo"
+        "f0SQzjp3QzM"
       ],
-      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
-      "clip_type": "music_video",
+      "source_url": "https://www.youtube.com/watch?v=f0SQzjp3QzM",
+      "clip_type": "tutorial",
       "language": "th",
-      "category": "screen_text",
-      "question": "ข้อความบนจอที่อ่านได้ชัดในช่วงที่ตรวจคืออะไร? ถ้าอ่านไม่ชัดให้ระบุข้อจำกัด",
+      "category": "count",
+      "question": "องค์ประกอบของ RAG ที่คลิปกล่าวถึงมีกี่ส่วน และแต่ละส่วนคืออะไร? อ้างช่วงเวลา",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -171,13 +172,13 @@
     {
       "id": "vb-09",
       "video_ids": [
-        "B-zaXo-skGo"
+        "f0SQzjp3QzM"
       ],
-      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
-      "clip_type": "music_video",
+      "source_url": "https://www.youtube.com/watch?v=f0SQzjp3QzM",
+      "clip_type": "tutorial",
       "language": "th",
-      "category": "visual",
-      "question": "ในช่วง 00:00–00:10 มีสิ่งใดมองเห็นได้โดยตรง โดยไม่เดาชื่อหรือเจตนาบุคคล?",
+      "category": "sequence",
+      "question": "การสาธิตสร้าง Assistant ด้วย Custom GPT มีขั้นตอนตามลำดับอย่างไร ตั้งแต่สร้างจนทดสอบกับคำถามพนักงาน?",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -191,13 +192,13 @@
     {
       "id": "vb-10",
       "video_ids": [
-        "B-zaXo-skGo"
+        "f0SQzjp3QzM"
       ],
-      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
-      "clip_type": "music_video",
+      "source_url": "https://www.youtube.com/watch?v=f0SQzjp3QzM",
+      "clip_type": "tutorial",
       "language": "th",
-      "category": "sequence",
-      "question": "จากช่วงที่ตรวจ เหตุการณ์ที่เห็นเกิดก่อนและหลังกันอย่างไร? แยกภาพย้อนถ้ามี",
+      "category": "screen_text",
+      "question": "ตอนอัปโหลดนโยบายบริษัท ชื่อไฟล์หรือข้อความบนหน้าจอคืออะไร? ถ้าบทถอดเสียงยืนยันไม่ได้ให้ตอบว่าข้อมูลไม่พอ",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -211,13 +212,13 @@
     {
       "id": "vb-11",
       "video_ids": [
-        "B-zaXo-skGo"
+        "f0SQzjp3QzM"
       ],
-      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
-      "clip_type": "music_video",
+      "source_url": "https://www.youtube.com/watch?v=f0SQzjp3QzM",
+      "clip_type": "tutorial",
       "language": "th",
-      "category": "count",
-      "question": "ระบุจำนวนที่ผู้พูดหรือจอบอกไว้อย่างชัดเจน พร้อมเวลา ถ้าไม่มีอย่าเดายอดรวมจากภาพสุ่ม",
+      "category": "visual",
+      "question": "ตอนทดสอบ Assistant ด้วยคำถามพนักงาน หน้าจอแสดงคำตอบอย่างไร? แยกสิ่งที่ผู้พูดอ่านออกเสียงออกจากสิ่งที่เห็น",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -231,13 +232,13 @@
     {
       "id": "vb-12",
       "video_ids": [
-        "B-zaXo-skGo"
+        "f0SQzjp3QzM"
       ],
-      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
-      "clip_type": "music_video",
+      "source_url": "https://www.youtube.com/watch?v=f0SQzjp3QzM",
+      "clip_type": "tutorial",
       "language": "th",
       "category": "insufficient",
-      "question": "จากหลักฐานที่ตรวจ ยืนยันได้หรือไม่ว่าจำนวนเหตุการณ์ตลอดทั้งคลิปครบถ้วน? อธิบายช่องว่าง",
+      "question": "คลิประบุค่าใช้จ่ายรายเดือนของการใช้ Custom GPT ในองค์กรหรือไม่? ถ้าไม่มีหลักฐานให้ตอบว่าข้อมูลไม่พอ",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -257,7 +258,7 @@
       "clip_type": "general",
       "language": "th",
       "category": "speech",
-      "question": "ในช่วงที่ตรวจ ผู้พูดอธิบายเรื่องใดบ้าง? อ้างช่วงเวลาและแยกคำพูดจากภาพ",
+      "question": "ทำไมกายหงิดต้องมาช่วยเฝ้าร้านในตอนนี้? อ้างช่วงเวลาที่ผู้พูดบอกเหตุผล",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -276,8 +277,8 @@
       "source_url": "https://www.youtube.com/watch?v=NZImGB4O-X4",
       "clip_type": "general",
       "language": "th",
-      "category": "screen_text",
-      "question": "ข้อความบนจอที่อ่านได้ชัดในช่วงที่ตรวจคืออะไร? ถ้าอ่านไม่ชัดให้ระบุข้อจำกัด",
+      "category": "sequence",
+      "question": "การแข่งยิม Pokémon กับการเปิดกล่องการ์ดเกิดขึ้นก่อนหลังกันอย่างไรในคลิป? อ้างช่วงเวลาของแต่ละช่วง",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -296,8 +297,8 @@
       "source_url": "https://www.youtube.com/watch?v=NZImGB4O-X4",
       "clip_type": "general",
       "language": "th",
-      "category": "visual",
-      "question": "ในช่วง 00:00–00:10 มีสิ่งใดมองเห็นได้โดยตรง โดยไม่เดาชื่อหรือเจตนาบุคคล?",
+      "category": "count",
+      "question": "ในคลิปเปิดกล่องการ์ดไปกี่กล่อง และสรุปว่าได้กำไรหรือไม่? นับเฉพาะที่พูดในคลิปและอ้างช่วงเวลา",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -316,8 +317,8 @@
       "source_url": "https://www.youtube.com/watch?v=NZImGB4O-X4",
       "clip_type": "general",
       "language": "th",
-      "category": "sequence",
-      "question": "จากช่วงที่ตรวจ เหตุการณ์ที่เห็นเกิดก่อนและหลังกันอย่างไร? แยกภาพย้อนถ้ามี",
+      "category": "insufficient",
+      "question": "คลิประบุราคาขายต่อที่แน่นอนของการ์ดใบที่ดีที่สุดที่เปิดได้หรือไม่? ถ้าไม่มีตัวเลขที่ยืนยันได้ให้ตอบว่าข้อมูลไม่พอ",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -331,13 +332,13 @@
     {
       "id": "vb-17",
       "video_ids": [
-        "NZImGB4O-X4"
+        "C0DXctGPWxw"
       ],
-      "source_url": "https://www.youtube.com/watch?v=NZImGB4O-X4",
-      "clip_type": "general",
+      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
+      "clip_type": "music_video",
       "language": "th",
-      "category": "count",
-      "question": "ระบุจำนวนที่ผู้พูดหรือจอบอกไว้อย่างชัดเจน พร้อมเวลา ถ้าไม่มีอย่าเดายอดรวมจากภาพสุ่ม",
+      "category": "speech",
+      "question": "ในเพลงนี้ ผู้ร้องบอกว่าจะทำหรือไม่ทำอะไรระหว่างรออีกฝ่าย? อ้างช่วงเวลา",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -351,13 +352,13 @@
     {
       "id": "vb-18",
       "video_ids": [
-        "NZImGB4O-X4"
+        "C0DXctGPWxw"
       ],
-      "source_url": "https://www.youtube.com/watch?v=NZImGB4O-X4",
-      "clip_type": "general",
+      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
+      "clip_type": "music_video",
       "language": "th",
-      "category": "insufficient",
-      "question": "จากหลักฐานที่ตรวจ ยืนยันได้หรือไม่ว่าจำนวนเหตุการณ์ตลอดทั้งคลิปครบถ้วน? อธิบายช่องว่าง",
+      "category": "count",
+      "question": "ท่อนที่ผู้ร้องถามว่าอีกฝ่ายจะไปที่ไหนกับใคร ปรากฏกี่ครั้งในคลิป และอยู่ช่วงเวลาใดบ้าง?",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -371,13 +372,13 @@
     {
       "id": "vb-19",
       "video_ids": [
-        "cWVse_LuFO0"
+        "C0DXctGPWxw"
       ],
-      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
-      "clip_type": "tutorial",
+      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
+      "clip_type": "music_video",
       "language": "th",
-      "category": "speech",
-      "question": "ในช่วงที่ตรวจ ผู้พูดอธิบายเรื่องใดบ้าง? อ้างช่วงเวลาและแยกคำพูดจากภาพ",
+      "category": "screen_text",
+      "question": "ชื่อเพลงและชื่อศิลปินที่ระบุในเอกสารคืออะไร และยืนยันได้ไหมว่าปรากฏเป็นข้อความบนจอ ณ เวลาใด?",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -391,13 +392,13 @@
     {
       "id": "vb-20",
       "video_ids": [
-        "cWVse_LuFO0"
+        "C0DXctGPWxw"
       ],
-      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
-      "clip_type": "tutorial",
+      "source_url": "https://www.youtube.com/watch?v=C0DXctGPWxw",
+      "clip_type": "music_video",
       "language": "th",
-      "category": "screen_text",
-      "question": "ข้อความบนจอที่อ่านได้ชัดในช่วงที่ตรวจคืออะไร? ถ้าอ่านไม่ชัดให้ระบุข้อจำกัด",
+      "category": "visual",
+      "question": "MV แสดงฉากหรือสถานที่ใดบ้าง? ถ้าบทถอดเสียงยืนยันไม่ได้ให้ตอบว่าข้อมูลไม่พอ",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -411,13 +412,13 @@
     {
       "id": "vb-21",
       "video_ids": [
-        "cWVse_LuFO0"
+        "B-zaXo-skGo"
       ],
-      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
-      "clip_type": "tutorial",
+      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
+      "clip_type": "music_video",
       "language": "th",
-      "category": "visual",
-      "question": "ในช่วง 00:00–00:10 มีสิ่งใดมองเห็นได้โดยตรง โดยไม่เดาชื่อหรือเจตนาบุคคล?",
+      "category": "speech",
+      "question": "ท่อนฮุคบอกว่าผู้ร้องรู้สึกอย่างไรเมื่อเห็นอีกฝ่ายมีความรักที่ดี? อ้างช่วงเวลา",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -431,13 +432,13 @@
     {
       "id": "vb-22",
       "video_ids": [
-        "cWVse_LuFO0"
+        "B-zaXo-skGo"
       ],
-      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
-      "clip_type": "tutorial",
+      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
+      "clip_type": "music_video",
       "language": "th",
       "category": "sequence",
-      "question": "จากช่วงที่ตรวจ เหตุการณ์ที่เห็นเกิดก่อนและหลังกันอย่างไร? แยกภาพย้อนถ้ามี",
+      "question": "ช่วง 02:34–03:25 ในบทถอดเสียงยาวกว่าท่อนอื่นมาก ช่วงนั้นมีเนื้อร้องอะไร และหลังจากนั้นเพลงกลับไปท่อนใด?",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -451,13 +452,13 @@
     {
       "id": "vb-23",
       "video_ids": [
-        "cWVse_LuFO0"
+        "B-zaXo-skGo"
       ],
-      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
-      "clip_type": "tutorial",
+      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
+      "clip_type": "music_video",
       "language": "th",
-      "category": "count",
-      "question": "ระบุจำนวนที่ผู้พูดหรือจอบอกไว้อย่างชัดเจน พร้อมเวลา ถ้าไม่มีอย่าเดายอดรวมจากภาพสุ่ม",
+      "category": "visual",
+      "question": "ในท่อนที่พูดถึงรูปถ่ายคู่ MV แสดงภาพอะไร? แยกเนื้อร้องออกจากสิ่งที่เห็น",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -471,13 +472,13 @@
     {
       "id": "vb-24",
       "video_ids": [
-        "cWVse_LuFO0"
+        "B-zaXo-skGo"
       ],
-      "source_url": "https://www.youtube.com/watch?v=cWVse_LuFO0",
-      "clip_type": "tutorial",
+      "source_url": "https://www.youtube.com/watch?v=B-zaXo-skGo",
+      "clip_type": "music_video",
       "language": "th",
       "category": "insufficient",
-      "question": "จากหลักฐานที่ตรวจ ยืนยันได้หรือไม่ว่าจำนวนเหตุการณ์ตลอดทั้งคลิปครบถ้วน? อธิบายช่องว่าง",
+      "question": "เพลงนี้ระบุไหมว่าทั้งสองคนเลิกกันเพราะอะไร? ถ้าไม่มีหลักฐานให้ตอบว่าข้อมูลไม่พอ",
       "expected_answer": null,
       "source_version": null,
       "references": [],

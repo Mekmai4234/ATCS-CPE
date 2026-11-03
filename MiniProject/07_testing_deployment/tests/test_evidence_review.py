@@ -20,7 +20,10 @@ def test_real_video_question_plan_is_explicitly_unreviewed_and_blocks_release():
     result = load("evidence_review").review_gate(data)
     assert result["case_count"] == 36 and not result["gold_ready"]
     assert result["semantic_quality_verified"] is False
-    assert len({v for c in data["cases"] for v in c["video_ids"]}) == 6
+    # The five transcript documents in Transcript/manifest.json (not copied into test images).
+    thai = {v for c in data["cases"] if c["language"] == "th" for v in c["video_ids"]}
+    assert thai == {"C0DXctGPWxw", "B-zaXo-skGo", "NZImGB4O-X4", "cWVse_LuFO0", "f0SQzjp3QzM"}
+    assert len({v for c in data["cases"] for v in c["video_ids"]}) == 7
     assert all(c["expected_answer"] is None for c in data["cases"])
     assert len([r for r in result["reasons"] if r.startswith("human_gold_required:")]) == 36
 
@@ -107,6 +110,20 @@ def test_probe_rejects_token_overflow_before_reserving():
     with pytest.raises(AppError, match="budget exhausted"):
         budget.admit(11)
     assert budget.calls == 0
+
+
+def test_probe_budget_fits_a_full_research_run_but_stays_bounded():
+    probe = load("learning_probe")
+    # Six agent calls admit countTokens + generateContent each, plus a fallback admission.
+    budget = probe.ProbeBudget(13, 1000)
+    for _ in range(13):
+        budget.admit(1)
+    with pytest.raises(AppError, match="budget exhausted"):
+        budget.admit(1)
+    probe.ProbeBudget(probe.ProbeBudget.MAX_CALLS, 1)
+    for invalid in (0, probe.ProbeBudget.MAX_CALLS + 1, True, 1.0):
+        with pytest.raises(ValueError, match="bounded probe budget"):
+            probe.ProbeBudget(invalid, 1)
 
 
 async def test_local_benchmark_keeps_misses_and_distinct_question_scenarios(monkeypatch):
