@@ -109,3 +109,25 @@ test('an empty review queue is hidden and saved messages remain accessible', asy
   await page.getByRole('button', { name: 'เปิดดู', exact: true }).click();
   await expect(page.getByText('normal answer', { exact: true })).toBeVisible();
 });
+
+test('review filters and tabs wait for a pending save instead of aborting it', async ({ page }) => {
+  await page.goto('/tests/review-regression.html?admin=1&slowSave=1');
+  await page.getByRole('button', { name: 'เปิดดู', exact: true }).click();
+  await page.getByLabel('หมายเหตุ', { exact: true }).fill('persist despite immediate filtering');
+  await page.getByRole('button', { name: 'เริ่มตรวจ', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-save-pending', 'true');
+  await expect(page.getByLabel('สถานะ', { exact: true })).toBeDisabled();
+  await expect(page.getByLabel('ค้นคำถาม', { exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'แชทที่บันทึกทั้งหมด', exact: true }),
+  ).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'คำตอบที่ถูกใจ', exact: true })).toBeDisabled();
+  await page.evaluate(() => window.dispatchEvent(new Event('release-review-save')));
+  await expect(page.getByLabel('สถานะ', { exact: true })).toBeEnabled();
+  await expect(page.locator('html')).not.toHaveAttribute('data-save-aborted', 'true');
+  await page.getByLabel('สถานะ', { exact: true }).selectOption('in_review');
+  await page.getByRole('button', { name: 'เปิดดู', exact: true }).click();
+  await expect(page.getByLabel('หมายเหตุ', { exact: true })).toHaveValue(
+    'persist despite immediate filtering',
+  );
+});
