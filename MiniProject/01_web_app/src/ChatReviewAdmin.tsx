@@ -61,6 +61,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
     [loading, setLoading] = useState(false),
     [revision, setRevision] = useState(0);
   const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
   const failure = (e: unknown) => {
     if (e instanceof ApiError && [401, 403, 404].includes(e.status || 0)) {
       setItems([]);
@@ -160,6 +161,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
   async function save(outcome?: string) {
     if (!detail?.case || loading) return;
     setLoading(true);
+    setSaving(true);
     setError('');
     request.current?.abort();
     const c = new AbortController();
@@ -201,6 +203,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
     } catch (e) {
       if (!c.signal.aborted) failure(e);
     } finally {
+      setSaving(false);
       if (!c.signal.aborted) setLoading(false);
     }
   }
@@ -209,6 +212,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
       <h1>ตรวจสอบแชท</h1>
       {(hasCases || mode === 'cases') && (
         <button
+          disabled={saving}
           aria-pressed={mode === 'cases'}
           onClick={() => {
             if (mode === 'cases') return;
@@ -223,6 +227,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
         </button>
       )}
       <button
+        disabled={saving}
         aria-pressed={mode === 'messages' && !rating}
         onClick={() => {
           if (mode === 'messages' && !rating) return;
@@ -236,6 +241,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
         แชทที่บันทึกทั้งหมด
       </button>
       <button
+        disabled={saving}
         aria-pressed={mode === 'messages' && rating === 'like'}
         onClick={() => {
           if (mode === 'messages' && rating === 'like') return;
@@ -261,7 +267,7 @@ export default function ChatReviewAdmin({ api }: { api: Api }) {
         ))}
       </div>
       {mode === 'cases' && (
-        <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+        <fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0 }}>
           <legend>ตัวกรองคิวตรวจ</legend>
           <label>
             ค้นคำถาม
