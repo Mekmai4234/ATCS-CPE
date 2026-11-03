@@ -1,0 +1,216 @@
+import type { Citation, Job, ProgressEvent, Scope, Video } from './types';
+import { serviceMessage, userMessages } from './userMessages';
+export const evidenceLabels = {
+  transcript: 'บทถอดเสียง',
+  ocr: 'ข้อความบนภาพ',
+  visual: 'ภาพวิเคราะห์แล้ว',
+};
+export const enrichmentLabels = {
+  preparing_frames: 'เตรียมภาพ',
+  reading_text: 'อ่านข้อความ',
+  waiting_ai: 'รอคิว AI',
+  quota_paused: 'พักเพราะข้อจำกัดการใช้งาน',
+  partial: 'พร้อมบางส่วน',
+  completed: 'เสร็จแล้ว',
+};
+export const videoQueryable = (video: Video) =>
+  !['deleted', 'deleting'].includes(video.status) &&
+  (video.status === 'ready' ||
+    !!(video.presentation?.queryable && video.presentation.kinds.length));
+export function retryTime(blocker: NonNullable<Job['wait']>, legacyEstimate?: string) {
+  const provider = blocker.time_source === 'provider' ? blocker.retry_at : undefined;
+  const estimate = blocker.time_source === 'estimate' ? blocker.estimated_retry_at : legacyEstimate;
+  const value = provider || estimate;
+  if (!value || !Number.isFinite(Date.parse(value))) return '';
+  const time = new Date(value).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+  return provider
+    ? `เวลาที่ผู้ให้บริการระบุให้ลองใหม่: ${time} · ต้องตรวจสิทธิ์อีกครั้ง`
+    : `ลองทำต่อได้ประมาณ ${time} · เป็นเวลาประมาณของระบบ ไม่รับประกันว่าจะพร้อม`;
+}
+export function jobStatus(job: Job) {
+  // A failed/cancelled job can retain its last processing stage and retry metadata.
+  // The durable terminal state must take precedence over that stale progress.
+  if (terminal(job.state)) {
+    if (job.state === 'cancelled') return statusLabels.cancelled;
+    if (job.state === 'completed' && ['ready', 'no_transcript'].includes(job.stage))
+      return statusLabels[job.stage];
+    const warning = jobWarning(job);
+    return warning ? `${statusLabels[job.state]} · ${warning}` : statusLabels[job.state];
+  }
+  const extra = job.presentation;
+  const provider = serviceMessage(job.error_code);
+  const stage = extra
+    ? enrichmentLabels[extra.stage]
+    : statusLabels[job.stage] || statusLabels[job.state] || 'กำลังตรวจสอบสถานะ';
+  const when = retryTime(job.wait || {}, extra?.retryAt);
+  return `${stage}${provider ? ` · ${provider}` : ''}${when ? ` · ${when}` : ''}`;
+}
+
+export function jobShouldPark(job: Job): boolean {
+  // Queued retries are still being processed by the server. Keep observing the
+  // original job so its eventual answer arrives without another user action.
+  // Only an explicit pause requires a manual follow-up; terminal state wins
+  // over presentation metadata left behind by a previous attempt.
+  return (
+    !terminal(job.state) && (job.state === 'paused' || job.presentation?.stage === 'quota_paused')
+  );
+}
+
+export const terminal = (state: string) =>
+  ['completed', 'partial', 'failed', 'cancelled'].includes(state);
+export const statusLabels: Record<string, string> = {
+  queued: 'รอคิว',
+  running: 'กำลังทำงาน',
+  paused: 'พักงานไว้',
+  fetching_transcript: 'กำลังดึงบทถอดเสียง',
+  indexing: 'กำลังสร้างฐานความรู้',
+  reviewing_video: 'กำลังตรวจภาพและเสียงของคลิป',
+  expanding_evidence: 'กำลังค้นหลักฐานเพิ่มเติม',
+  ready: 'พร้อมใช้งาน',
+  no_transcript: 'ไม่มีบทถอดเสียง',
+  completed: 'เสร็จแล้ว',
+  partial: 'ได้ผลบางส่วน',
+  failed: 'ไม่สำเร็จ',
+  cancelled: 'ยกเลิกแล้ว',
+  deleting: 'กำลังลบ',
+  deleted: 'ลบแล้ว',
+};
+export function videoIdFromUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || url.username || url.password || url.port) return null;
+    const id =
+      url.hostname === 'youtu.be' && /^\/[\w-]{11}\/?$/.test(url.pathname)
+        ? url.pathname.split('/')[1]
+        : ['youtube.com', 'www.youtube.com', 'm.youtube.com'].includes(url.hostname) &&
+            url.pathname === '/watch'
+          ? url.searchParams.get('v')
+          : null;
+    return id && /^[\w-]{11}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+export function citationUrl(citation: Citation): string | null {
+  if (citation.kind?.startsWith('document_')) {
+    if (
+      !/^[\w-]{11}$/.test(citation.video_id) ||
+      citation.source_available === false ||
+      !citation.document_id ||
+      !/^[a-f0-9]{64}$/.test(citation.document_version || '') ||
+      !/^[a-f0-9]{64}$/.test(citation.source_hash || '')
+    )
+      return null;
+    const base = `https://www.youtube.com/watch?v=${citation.video_id}`;
+    if (citation.kind === 'document_metadata')
+      return citation.start_seconds === null && citation.end_seconds === null ? base : null;
+    if (
+      citation.start_seconds === null ||
+      !Number.isFinite(citation.start_seconds) ||
+      citation.start_seconds < 0
+    )
+      return null;
+    if (
+      citation.end_seconds !== null &&
+      (!Number.isFinite(citation.end_seconds) || citation.end_seconds <= citation.start_seconds)
+    )
+      return null;
+    return `${base}&t=${Math.floor(citation.start_seconds)}s`;
+  }
+  if (
+    !/^[\w-]{11}$/.test(citation.video_id) ||
+    !Number.isFinite(citation.start_seconds) ||
+    !Number.isFinite(citation.end_seconds) ||
+    citation.start_seconds === null ||
+    citation.end_seconds === null ||
+    citation.start_seconds < 0 ||
+    citation.end_seconds <= citation.start_seconds ||
+    citation.source_available === false
+  )
+    return null;
+  return `https://www.youtube.com/watch?v=${citation.video_id}&t=${Math.floor(citation.start_seconds)}s`;
+}
+export function timestamp(seconds: number | null): string {
+  if (seconds === null) return 'ไม่ระบุ';
+  const value = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
+}
+export function buildScope(
+  ids: string[],
+  videos: Video[],
+  channel: string,
+  from: string,
+  to: string,
+): Scope {
+  if (!ids.length) throw new Error('เลือกคลิปที่พร้อมใช้งานอย่างน้อย 1 คลิป');
+  if (ids.length > 100) throw new Error('เลือกแหล่งข้อมูลได้สูงสุด 100 คลิป');
+  if (from && to && from > to) throw new Error('วันเริ่มต้นต้องไม่อยู่หลังวันสิ้นสุด');
+  const selected = ids.map((id) => videos.find((video) => video.video_id === id));
+  if (selected.some((video) => !video || !videoQueryable(video)))
+    throw new Error('คลิปที่เลือกยังไม่พร้อมใช้งาน กรุณาตรวจสอบอีกครั้ง');
+  const eligible = selected.filter(
+    (video) =>
+      video &&
+      (!channel || video.channel_id === channel) &&
+      (!from || (!!video.published_at && video.published_at.slice(0, 10) >= from)) &&
+      (!to || (!!video.published_at && video.published_at.slice(0, 10) <= to)),
+  );
+  if (!eligible.length)
+    throw new Error('ไม่มีคลิปที่เลือกตรงกับตัวกรอง กรุณาปรับตัวกรองหรือเลือกคลิปใหม่');
+  return {
+    video_ids: [...new Set(ids)],
+    channel_ids: channel ? [channel] : [],
+    date_from: from || null,
+    date_to: to || null,
+  };
+}
+export function jobWarning(job: Job): string | null {
+  if (job.state === 'failed') {
+    const message = serviceMessage(job.error_code);
+    if (message) return message;
+  }
+  if (job.state === 'failed' && job.error_code === 'transcript_too_large')
+    return 'บทถอดเสียงยาวเกินขีดจำกัดการแสดงผล กรุณาเลือกคลิปเดียวหรือถามเฉพาะช่วงที่ต้องการ';
+  if (job.state === 'failed' && job.error_code === 'transcript_unavailable')
+    return 'ไม่พบบทถอดเสียงต้นฉบับของคลิป กรุณาตรวจสอบการนำเข้าวิดีโอ';
+  if (job.state === 'failed' && job.error_code === 'generation_output_truncated')
+    return 'คำตอบยาวเกินขีดจำกัดและถูกตัด กรุณาถามให้เจาะจงขึ้นหรือขอสรุปสั้น ๆ';
+  if (job.state === 'failed') return userMessages.failed;
+  if (job.state === 'cancelled') return 'งานถูกยกเลิกแล้ว';
+  if (job.stage === 'no_transcript') return 'ไม่พบบทถอดเสียงที่ใช้งานได้';
+  return null;
+}
+
+const progressTools: Record<string, string> = {
+  search_evidence: 'ค้นหลักฐาน',
+  read_video_chunks: 'อ่านเนื้อหาคลิป',
+  compare_videos: 'เปรียบเทียบคลิป',
+  create_learning_artifact: 'สร้างแผนเรียน/แบบฝึก',
+  finish_research: 'เขียนคำตอบสุดท้าย',
+  run_controller: 'สรุปผล',
+};
+const progressSummaries: Record<string, string> = {
+  'Executing validated scoped action': 'กำลังทำงาน',
+  'Scoped observation recorded': 'ได้ผลแล้ว',
+  'Rechecking final sources': 'ตรวจหลักฐานก่อนส่งคำตอบ',
+  'Invalid tool arguments': 'คำสั่งไม่ถูกต้อง ข้ามขั้นนี้',
+  'Collecting scoped evidence': 'รวบรวมหลักฐาน',
+};
+
+/** Thai wording for research progress; unknown events keep their original text. */
+export function progressText(event: Pick<ProgressEvent, 'tool_name' | 'state' | 'summary'>) {
+  const tool = progressTools[event.tool_name] || event.tool_name;
+  const value = (key: string) => event.summary.match(new RegExp(`${key}=(\\w+)`))?.[1];
+  let summary = progressSummaries[event.summary];
+  if (!summary && event.summary.startsWith('Validated output')) {
+    const read = value('processed_chunks');
+    const calls = value('model_calls');
+    summary = [read && `อ่านเนื้อหาแล้ว ${read} ช่วง`, calls && `เรียก AI ${calls} ครั้ง`]
+      .filter(Boolean)
+      .join(' · ');
+  }
+  if (!summary && event.summary.startsWith('Read authorized page'))
+    summary = `อ่านเนื้อหาแล้ว ${value('selected_chunks') ?? '?'} ช่วง`;
+  if (event.state === 'rejected' && !summary) summary = 'ไม่สำเร็จ';
+  return { tool, summary: summary || event.summary };
+}

@@ -1,0 +1,50 @@
+[USER_INPUT]
+MASCOT_NAME: RAG Buddy (YouTube Video Q&A Mascot)
+CHARACTER_MAIN_FEATURES: A chubby, round, jelly-like mint-aqua creature with huge round white eyes with thick teal outlines and small glossy teal pupils, a wide flat pink duck-bill-style snout, soft pink blush cheeks, translucent sky-blue fin-like frills on both sides of the head and one on the back, short stubby arms and legs, and a seated baby-like pose. Thick deep-teal rounded outlines in a cute sticker style.
+ACCESSORY_DETAILS: Glossy coral-pink over-ear headphones with rounded ear cups, plus a coral-pink rounded tablet showing a video player UI (a play button, a progress bar with a slider dot, two text lines, and a small timestamp badge)
+TOP_BANNER_BG_COLOR: Vibrant coral-red gradient
+MIDDLE_BG_COLOR: Clean off-white
+BOTTOM_BG_COLOR: Soft slate gray studio gradient
+PRIMARY_BODY_COLOR: Glossy mint-aqua body with sky-blue fins and pastel pink snout
+ACCENT_ACCESSORY_COLOR: Coral-pink headphones and tablet with deep teal outlines
+
+[ROLE & TASK]
+Act as a master character designer, 3D toy modeler, and web mascot rigging artist. Create a professional IP mascot design model sheet and turnaround guide for a "YouTube RAG" web app (chat with and search inside videos), presented across three stacked horizontal panels. The design must be built as a production-ready base asset that will be further developed into an interactive animated mascot on a website.
+
+[VISUAL HIERARCHY]
+Primary focal point: Top hero teaser banner featuring a dynamic 3D close-up render of the mascot wearing its headphones and waving cheerfully with one hand, the tablet tucked under the other arm.
+Secondary focal point: Bottom section presenting a complete 3D glossy vinyl toy turnaround in front, side, and back views, seated pose, with the headphones and tablet shown.
+Tertiary focal point: Middle section showing clean 2D vector orthographic turnaround views, an exploded parts breakdown, a UI state and expression row, and callout illustrations of ACCESSORY_DETAILS.
+Supporting visual elements: Subtle blue-grey horizontal dotted measurement alignment lines indicating height proportions across the turnaround sections.
+
+[COMPOSITION]
+Arrangement: Vertically stacked three-tier brand identity presentation layout.
+Top Tier: Dynamic hero banner over TOP_BANNER_BG_COLOR with a bold tilted orange circular speech bubble containing a white play-button icon and a small question-mark icon (icons only, no text), with motion lines anchoring the close-up mascot render.
+Middle Tier: 2D vector technical orthographic model sheet over MIDDLE_BG_COLOR, split into three rows:
+  Row 1: front, side profile, and back views aligned precisely with dotted measurement guide lines.
+  Row 2: exploded parts breakdown with each part drawn separately and cleanly, with thin leader lines: head, eyes (open and blink), pupils, snout/mouth, blush cheeks, left and right fins, back fin, body, left arm, right arm (waving and holding poses), legs, headphones, and tablet with screen.
+  Row 3: UI state and expression strip showing the same character in six small poses: Idle (calm blink), Listening (hand on headphone), Thinking (eyes looking up, tablet loading), Searching (pointing at the tablet screen), Answering (happy open snout, waving), and Error/Confused (tilted head, question mark).
+Bottom Tier: Full 3D rendered toy turnaround over BOTTOM_BG_COLOR showcasing front, side, and rear views of the vinyl figurine with natural grounding contact shadows.
+
+[WEB & INTERACTIVE USE]
+Design the mascot so it can be split into layers and animated on a website (SVG, Lottie, Rive, CSS, or Three.js/GLB):
+- Clean, closed, flat-color vector shapes with consistent thick teal outlines, easy to separate into layers.
+- Every moving part is a separate, non-overlapping-ambiguity piece with a clear pivot point (eyelids, pupils, snout, arms, fins, headphones, tablet screen).
+- Strong, readable silhouette that stays recognizable at small sizes (64px chat avatar up to a large hero image).
+- A limited, consistent palette that works on both light and dark website themes.
+- Simple expression set designed for UI states: idle, listening, thinking, searching, answering, error.
+- Interactive-ready behaviors: eyes that can follow the cursor, blinking, fins that gently wiggle, arm that waves on hover, tablet screen that can swap content (play, loading, timestamp).
+- Provide the mascot with a transparent-background-friendly design (no background elements touching or baked into the character) and consistent proportions across all views and poses.
+- The 3D vinyl turnaround must match the 2D proportions exactly so it can be used as a modeling reference for a GLB/Three.js version.
+
+[STYLE & REALISM]
+Style: Hybrid 2D vector art guide and smooth 3D designer vinyl toy rendering, kawaii sticker-style thick rounded outlines in deep teal.
+Lighting: Clean commercial studio lighting with soft specular highlights on glossy jelly-vinyl surfaces and balanced warm ambient fill.
+Surfaces & Textures: Smooth injection-molded glossy vinyl with a slightly translucent jelly finish on the fins, glossy plastic headphones and tablet, and flat clean 2D vector linework.
+
+[COLOR & MOOD]
+Color Palette: TOP_BANNER_BG_COLOR, MIDDLE_BG_COLOR, and BOTTOM_BG_COLOR background hierarchy, paired with PRIMARY_BODY_COLOR and ACCENT_ACCESSORY_COLOR.
+Mood: Cheerful, playful, curious, techy-friendly, and professional industrial IP design presentation.
+
+[NEGATIVE PROMPT]
+Perspective distortion on turnaround figures, inconsistent character proportions between tiers or between poses, inconsistent snout/fin/eye shapes between views, overlapping parts that cannot be separated into layers, gradients or shadows baked into the 2D parts, photorealistic furry textures, rough painterly textures, grunge, messy sketching lines, dark dramatic shadows, crowded busy backgrounds, readable brand logos, text watermarks, logo signatures, garbled text, low resolution.

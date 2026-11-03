@@ -2,8 +2,8 @@
 
 ระบบผู้ช่วยค้นคว้าและเรียนรู้จากวิดีโอ YouTube ด้วย RAG, LLM และ Agentic AI
 
-> สถานะปัจจุบัน: โครงสร้างงานและเอกสารเริ่มต้น ยังไม่มีเว็บหรือบริการที่รันได้
-> เอกสารนี้อธิบายสิ่งที่จะพัฒนา ไม่ใช่การยืนยันว่าฟีเจอร์เสร็จแล้ว
+> สถานะปัจจุบัน: หมวด 01–07 รันได้ครบและมีชุดทดสอบ ระบบทั้งหมดรันในเครื่องด้วย Docker ตาม [LOCAL_STACK.md](07_testing_deployment/LOCAL_STACK.md)
+> ยังไม่ได้ประเมินคุณภาพคำตอบโดยคน และยังไม่พร้อม deploy สาธารณะ ดู [MAIN_RELEASE.md](07_testing_deployment/MAIN_RELEASE.md)
 
 ## เป้าหมาย
 
@@ -11,15 +11,15 @@
 
 ## แบ่งงาน 01–07
 
-| โฟลเดอร์ | หน้าที่ |
-|---|---|
-| [01_web_app](01_web_app/) | หน้าวางลิงก์ คลังคลิป ตัวเล่น แชต และหน้าผลการเรียนรู้ |
-| [02_api_backend](02_api_backend/) | API ฐานข้อมูล ประวัติ และคิวงาน |
-| [03_video_ingestion](03_video_ingestion/) | ตรวจลิงก์ ดึงข้อมูลและบทถอดเสียงพร้อมเวลา |
-| [04_rag_knowledge](04_rag_knowledge/) | แบ่งข้อความ ทำ Embeddings และค้นคืนความรู้ |
-| [05_ai_answers_analysis](05_ai_answers_analysis/) | ตอบ สรุป เปรียบเทียบ และแนบหลักฐาน |
-| [06_research_learning_agent](06_research_learning_agent/) | วางแผนและค้นคว้าหลายขั้นตอน สร้างสื่อช่วยเรียน |
-| [07_testing_deployment](07_testing_deployment/) | ทดสอบ ประเมิน AI และเตรียมระบบขึ้นใช้งาน |
+| โฟลเดอร์ | หน้าที่ | GitHub |
+|---|---|---|
+| [01_web_app](01_web_app/) | หน้าวางลิงก์ คลังคลิป ตัวเล่น แชต และหน้าผลการเรียนรู้ | [marisa46054](https://github.com/marisa46054) |
+| [02_api_backend](02_api_backend/) | API ฐานข้อมูล ประวัติ และคิวงาน | [Mekmai4234](https://github.com/Mekmai4234) |
+| [03_video_ingestion](03_video_ingestion/) | ตรวจลิงก์ ดึงข้อมูลและบทถอดเสียงพร้อมเวลา | [marisa46054](https://github.com/marisa46054) |
+| [04_rag_knowledge](04_rag_knowledge/) | แบ่งข้อความ ทำ Embeddings และค้นคืนความรู้ | [Mekmai4234](https://github.com/Mekmai4234) |
+| [05_ai_answers_analysis](05_ai_answers_analysis/) | ตอบ สรุป เปรียบเทียบ และแนบหลักฐาน | [marisa46054](https://github.com/marisa46054) |
+| [06_research_learning_agent](06_research_learning_agent/) | วางแผนและค้นคว้าหลายขั้นตอน สร้างสื่อช่วยเรียน | [Mekmai4234](https://github.com/Mekmai4234) |
+| [07_testing_deployment](07_testing_deployment/) | ทดสอบ ประเมิน AI และเตรียมระบบขึ้นใช้งาน | [Mekmai4234](https://github.com/Mekmai4234) |
 
 แต่ละโฟลเดอร์มีเอกสารภาษาอังกฤษ 3 ไฟล์:
 - `env.txt` — เครื่องมือ สภาพแวดล้อม และค่าตั้งค่าที่วางแผนใช้
@@ -32,7 +32,7 @@
 
 ส่วน 05 และ 06 ใช้ Gemini ผ่าน Google GenAI SDK (`google-genai`) โดยตั้งค่า `GEMINI_API_KEY` และ `LLM_MODEL`
 คงชื่อรุ่นที่ผู้ใช้ระบุ `gemini-3.5-flash` เป็นตัวอย่างแบบ configurable พร้อมหมายเหตุการเปลี่ยนเส้นทางรุ่นตาม Google ใน [05/env.txt](05_ai_answers_analysis/env.txt)
-ส่วน 04 คงข้อเสนอ Embeddings เดิมไว้แยกจาก Gemini การเปลี่ยนโมเดลสร้างคำตอบจึงไม่ใช่การเปลี่ยน vector index
+ส่วน 04 ใช้ Gemini embeddings (`gemini-embedding-2`) แยกจากโมเดลสร้างคำตอบ การเปลี่ยนโมเดลสร้างคำตอบหรือรุ่นสำรอง (`LLM_FALLBACK_MODELS`) จึงไม่ใช่การเปลี่ยน vector index
 
 ## เริ่มต้นสำหรับสมาชิก
 
@@ -42,7 +42,10 @@
 4. ทำตาม [คู่มือทำงานร่วมกัน](CONTRIBUTING.md) เพื่อสร้าง branch และส่ง Pull Request
 5. เมื่อต้องตั้งค่าจริง ให้คัดลอก `.env.example` เป็น `.env` และเติมเฉพาะเครื่องของตนเอง
 
-ยังไม่ต้องติดตั้งหรือรันคำสั่งของแอป: manifest, dependency lockfile และคำสั่งเริ่มระบบจะเพิ่มในงาน implementation ของแต่ละหมวด
+การติดตั้งและรันหน้าเว็บดู [คู่มือส่วน 01](01_web_app/README.md) ซึ่งมี manifest, pnpm-lock.yaml และคำสั่งทดสอบแล้ว
+การติดตั้งและรันหมวด 02 ดู [คู่มือ Backend](02_api_backend/README.md) และ [ข้อตกลง API](docs/backend_api_contract.md)
+การรันระบบเต็มในเครื่อง, backup และการต่ออายุ policy ของ Gemini ทุก 7 วัน ดู [LOCAL_STACK.md](07_testing_deployment/LOCAL_STACK.md)
+หมวด 02 มี manifest, uv.lock, migration, คำสั่งทดสอบ และ Docker Compose สำหรับ Backend แล้ว
 
 ## Branch
 

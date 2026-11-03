@@ -41,4 +41,6 @@
 
 ## สถานะปัจจุบัน
 
-ทุกหมวดอยู่สถานะวางแผน โครงสร้างนี้ยังไม่มี application source, deployment หรือการเชื่อมต่อบริการ AI จริง
+หมวด 02 มี application source, migration, durable worker และชุดทดสอบ Backend แล้ว
+หมวดอื่นยังเป็นข้อกำหนดออกแบบ การทดสอบใช้ fixture แทน 03–06 จึงยังไม่ถือว่าการนำเข้า YouTube, vector search, Gemini หรือ Agent จริงเสร็จแล้ว
+ยังไม่มี deployment หรือผลประเมิน AI ของระบบรวม

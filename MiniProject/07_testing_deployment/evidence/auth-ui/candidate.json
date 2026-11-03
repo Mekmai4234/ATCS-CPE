@@ -1,0 +1,13 @@
+{
+  "base": "69f534730669f59051a453d9833a0be88695f263",
+  "modules": {
+    "01_web_app": "b2319f7e328905876fb864679420d0987e20cc46",
+    "02_api_backend": "f406d326a8545d1f2468a7ea3c074c5144a80a9b",
+    "03_video_ingestion": "4b051318b5816c6bc247a038f48eff6d21b7e741",
+    "04_rag_knowledge": "d4aa52d137b44f9217923bd18afc77b6a00881ef",
+    "05_ai_answers_analysis": "69f534730669f59051a453d9833a0be88695f263",
+    "06_research_learning_agent": "84fb1b6e40f3dd685df4c8d300ba058612de6c09"
+  },
+  "status": "candidate only; not merged develop",
+  "live_google_verified": false
+}

@@ -1,0 +1,17 @@
+**
+!01_web_app/
+!01_web_app/src/
+!01_web_app/src/**
+!01_web_app/public/
+!01_web_app/public/**
+!01_web_app/package.json
+!01_web_app/pnpm-lock.yaml
+!01_web_app/tsconfig*.json
+!01_web_app/vite.config.ts
+!01_web_app/index.html
+!07_testing_deployment/
+!07_testing_deployment/Caddyfile
+**/.env
+**/.env.*
+**/node_modules/
+**/runtime/

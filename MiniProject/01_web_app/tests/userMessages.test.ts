@@ -1,0 +1,92 @@
+import { describe, expect, it } from 'vitest';
+import { Api, ApiError } from '../src/api';
+import { jobStatus, jobWarning } from '../src/domain';
+import type { Job } from '../src/types';
+import { serviceMessage, userMessages } from '../src/userMessages';
+
+describe('public service error messages', () => {
+  it('explains local queue, model mismatch and text-only capability without Google quota claims', () => {
+    expect(serviceMessage('local_busy', 429)).toContain('คิว AI ในเครื่องเต็ม');
+    expect(serviceMessage('local_model_changed', 503)).toContain('ไม่ตรงกับรุ่น');
+    expect(serviceMessage('local_unsupported', 409)).toContain('ข้อความเท่านั้น');
+    expect(serviceMessage('execution_changed', 409)).toContain('เปลี่ยนไป');
+    expect(serviceMessage('local_busy', 429)).not.toContain('Google');
+  });
+  it.each(['free_tier_unverified', 'free_model_unverified', 'quota_pending'])(
+    'keeps %s out of failed and paused task copy',
+    (code) => {
+      const job = { state: 'failed', stage: 'failed', error_code: code } as Job;
+      expect(jobWarning(job)).toBe(userMessages.aiUnavailable);
+      expect(jobStatus({ ...job, state: 'paused', stage: 'paused' })).toContain(
+        userMessages.aiUnavailable,
+      );
+      expect(jobWarning(job)).not.toMatch(/Gemini|Free Tier|โปรเจกต์|โมเดล|ผู้ดูแล/);
+      expect(job.error_code).toBe(code);
+    },
+  );
+  it('retains retry guidance without exposing provider or HTTP diagnostics', () => {
+    expect(serviceMessage('generation_rate_limited', 429)).toBe(userMessages.providerLimited);
+    expect(serviceMessage('provider_unavailable', 503)).toBe(userMessages.unavailable);
+    expect(serviceMessage('unrecognized_backend_error', 502)).toBe(userMessages.unavailable);
+    expect(jobWarning({ state: 'failed', error_code: 'database_internal_detail' } as Job)).toBe(
+      userMessages.failed,
+    );
+  });
+  it('keeps underlying diagnostic fields intact for internal error handling', async () => {
+    const api = new Api(
+      '',
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              code: 'free_tier_unverified',
+              message: 'Internal project verification details',
+              request_id: 'diagnostic-request',
+              retryable: false,
+            },
+          }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    let caught: ApiError | undefined;
+    try {
+      await api.submit('/api/chat', {}, 'diagnostic-key');
+    } catch (error) {
+      caught = error as ApiError;
+    }
+    expect(caught).toBeInstanceOf(ApiError);
+    expect(caught).toMatchObject({
+      code: 'free_tier_unverified',
+      requestId: 'diagnostic-request',
+      retryable: false,
+    });
+    expect(serviceMessage(caught!.code, caught!.status)).toBe(userMessages.aiUnavailable);
+  });
+});
+
+it.each([
+  'invalid_video_time',
+  'invalid_video_time_range',
+  'video_time_out_of_bounds',
+  'ambiguous_video_time',
+])('explains video time validation %s', (code) => {
+  expect(serviceMessage(code, 422)).toBeTruthy();
+  expect(jobWarning({ state: 'failed', error_code: code } as Job)).toBe(serviceMessage(code, 422));
+});
+
+it('distinguishes internal quota, provider throttling, worker and connection failures', () => {
+  const messages = [
+    'quota_wait',
+    'provider_rate_limited',
+    'worker_unavailable',
+    'network_error',
+  ].map((code) => serviceMessage(code, 503));
+  expect(new Set(messages).size).toBe(4);
+  expect(messages.every(Boolean)).toBe(true);
+});
+
+it('explains learning failures instead of the generic failure text', () => {
+  for (const code of ['invalid_citation', 'invalid_artifact', 'invalid_model_output'])
+    expect(serviceMessage(code)).toBe('AI ส่งผลลัพธ์ไม่สมบูรณ์ กรุณาลองสร้างใหม่');
+  expect(serviceMessage('insufficient_evidence')).toContain('ยังไม่พบหลักฐาน');
+});

@@ -1,31 +1,62 @@
 ### 06_research_learning_agent - Workflow Steps
 
-A) Multi-step Research
-----------------------
-1. Receive { goal, scope, level, days } and a persisted run_id from 02_api_backend.
-2. Validate the selected sources, allowed task, and available run budget.
-3. Give Gemini the goal, evidence policy, remaining budget, and allowed tool schemas.
-4. Let the agent choose a relevant tool, such as search_evidence or read_video_chunks.
-5. Validate the requested tool/arguments and execute it within the original scope.
-6. Store a concise progress event and return the observation to the agent.
-7. Assess coverage and missing prerequisites; select another search/read/analysis action
-   when intermediate results show it is needed.
-8. Repeat only while step and total-time budgets remain.
-9. Compose a grounded research result or request a learning artifact.
-10. Validate citations/coverage and persist a completed or partial result through 02.
+A) Multi-step Research (implemented)
+1. 02 persists a job and invokes research(request, sources, execution_context).
+2. Validate the request and distinct authorized sources; read real index inventory from 04.
+3. Check remaining job/run time, reserve, context guard and decision iteration budget.
+4. Ask Gemini for one native function call with allowed tool declarations.
+5. Preserve native content/signatures; validate the tool name and strict argument schema.
+6. Execute search/read through 04, optional comparison through 05, or artifact generation.
+7. Persist a concise action/outcome event through context.event; return the observation.
+8. Let the next decision depend on that observation; credit evidence actually submitted.
+9. Stop duplicate actions and enforce limits. On finish, validate known citation IDs and coverage.
+10. Re-read exported citations and inventory; reject changed/missing sources before delivery.
+11. Return completed only with complete coverage, otherwise partial, and emit a terminal
+    run_controller event using the current step after validation.
+12. 02 revalidates current sources/citations/inventory and durably stores the result/artifacts.
 
-B) Learning Artifact Tools
---------------------------
-1. Receive an artifact request directly from 02 or as an allowed agent tool call.
-2. Gather evidence for the requested topic and explicit video scope.
-3. For a study plan, order supported topics and attach cited video intervals.
-4. For a quiz, generate questions, supported answers, explanations, and citations.
-5. For flashcards, create short question/answer pairs linked to source passages.
-6. Validate the output schema and sources, then return the artifact for storage.
+B) Direct Learning Artifacts (implemented)
+1. 02 invokes artifact(request, sources, execution_context); no decision loop is required.
+2. Enumerate authorized chunks from 04 in bounded pages; detect nonprogressing cursors.
+3. Reject input that exceeds the explicit context guard instead of silently truncating it.
+4. Generate a study plan, quiz with explanations, or flashcard set using the type's JSON schema.
+5. Check item citation IDs against the actual supplied evidence, and exact requested plan days.
+6. Count processed evidence after valid generation and return ArtifactResult for 02 to persist.
 
-C) Budget and Failure Handling
-------------------------------
-1. Before every call, check remaining time and steps; tool/model calls must respect both.
-2. On insufficient evidence, return the known findings and describe the gap.
-3. On exhausted budget, persist partial findings rather than claiming the task is complete.
-4. On fatal errors, persist failed with a classified reason; handle cancellation when supported.
+C) Failures and Delivery
+- Every awaited model/tool call has a timeout bounded by remaining run time minus reserve.
+- Cancellation/lost leases/source invalidation propagate and prevent publication.
+- Step/context/time exhaustion returns honest partial research before the hard deadline.
+- Partial findings preserve source excerpts and already validated artifacts, with coverage notes.
+- Direct artifact generation with inadequate evidence/invalid output returns a classified error.
+- Missing 05 is an explicit observation, allowing the agent to choose another supported action.
+- SDK transport/provider errors are redacted; no raw messages, credentials or private reasoning.
+- No automatic research replay/checkpoint resume is implemented.
+
+Installation, evaluation commands and limits: README.md. Current validation: DEPENDENCY_REVIEW_REPORT.md.
+Core tests remain installable without module 05; the two real-05 checks use the separately
+locked acceptance/ environment. Both sets run with --locked, including Docker.
+
+Member execution integration
+- Use the account-aware 02 execution context and authorized 04 source contract before multi-user deployment.
+- The 05 team factory may keep constructing AgentService directly: research/artifact auto-wrap authenticated contexts.
+- The additive agent06_permits table is initialized on first member execution in the backend database.
+- For custom quotas, inject a trusted repository.agent_authority using the documented permit interface.
+- Run core and acceptance Docker targets; run acceptance/backend_contract explicitly against the member backend snapshot.
+- Do not expose legacy unauthenticated APIs as member-safe endpoints. 02 must enforce session/owner checks and atomic publication.
+- See MEMBER_AUTHORIZATION.md for test commands and MEMBER_TEST_REPORT.md for results.
+
+Auth candidate verification (2026-10-22)
+- Assemble the 02/04/05 dependency revisions recorded in AUTH_REVIEW_REPORT.md before running the refreshed core/acceptance locks.
+- Run uv lock --check --offline and uv sync --locked for core and acceptance on that same candidate.
+- Run core, combined acceptance and optional backend_contract tests; Docker Compose now provides tests, acceptance and contracts services.
+- Run python -m youtube_agent.evaluation in a NEW state directory; its default report must label isolated-member-fixture and preserve durable owners.
+- Use --legacy-test only for explicitly isolated offline regression; never combine it with --live or change production auth to make a test pass.
+
+Free Tier candidate checks (2026-10-25)
+- Assemble the exact 02/04/05 heads in FREE_TIER_REPORT.md with this module; do not edit other module source to make a check pass.
+- Run locked core, acceptance and contracts environments and Docker targets on that same candidate.
+- SDK wire tests use explicit mocked admission; backend_contract/test_free_agent.py separately tests the real shared broker and project credential binding.
+- On Windows keep UV_PROJECT_ENVIRONMENT short (for example module 06/runtime/c and runtime/a); nested candidate environments can exceed dependency import path limits.
+- Enable internal research_media only with an authorized bridge; current 04 reads require enrichment scope and cannot silently grant the agent planning role.
+- Do not call a live model until the operator verifies its Free Tier policy; no live billing/quota check was performed here.

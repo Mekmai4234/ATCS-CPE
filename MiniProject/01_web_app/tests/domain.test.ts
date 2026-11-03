@@ -1,0 +1,177 @@
+import { describe, expect, it } from 'vitest';
+import {
+  buildScope,
+  citationUrl,
+  jobStatus,
+  jobWarning,
+  progressText,
+  retryTime,
+  terminal,
+  videoIdFromUrl,
+} from '../src/domain';
+import type { Citation, Job, Video } from '../src/types';
+
+const video = {
+  video_id: 'dQw4w9WgXcQ',
+  title: 'Test',
+  channel_id: 'c1',
+  published_at: '2026-10-01',
+  status: 'ready',
+} as Video;
+describe('YouTube and citation validation', () => {
+  it.each([
+    'https://youtu.be/dQw4w9WgXcQ',
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://m.youtube.com/watch?v=dQw4w9WgXcQ',
+  ])('accepts supported URL %s', (url) => {
+    expect(videoIdFromUrl(url)).toBe(video.video_id);
+  });
+  it.each([
+    'http://youtu.be/dQw4w9WgXcQ',
+    'https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ',
+    'https://youtu.be/dQw4w9WgXcQ/extra',
+    'https://youtu.be:8443/dQw4w9WgXcQ',
+    'https://user@youtu.be/dQw4w9WgXcQ',
+    'javascript:alert(1)',
+    'https://youtube.com/playlist?list=123',
+  ])('rejects unsupported URL %s', (url) => {
+    expect(videoIdFromUrl(url)).toBeNull();
+  });
+  it('builds citation URL from validated ID/time, ignoring returned URL', () => {
+    expect(
+      citationUrl({
+        video_id: video.video_id,
+        start_seconds: 14.9,
+        end_seconds: 20,
+        url: 'javascript:alert(1)',
+      } as Citation),
+    ).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=14s');
+  });
+  it.each([
+    { start_seconds: -1 },
+    { end_seconds: 2 },
+    { start_seconds: NaN },
+    { video_id: 'bad' },
+    { source_available: false },
+  ])('disables invalid/unavailable citations %j', (patch) => {
+    expect(
+      citationUrl({
+        video_id: video.video_id,
+        start_seconds: 3,
+        end_seconds: 9,
+        ...patch,
+      } as Citation),
+    ).toBeNull();
+  });
+});
+describe('source scope', () => {
+  it('never labels a bridge estimate as provider evidence', () => {
+    const value = retryTime({}, '2099-01-01T00:00:00Z');
+    expect(value).toContain('เป็นเวลาประมาณของระบบ');
+    expect(value).not.toContain('ผู้ให้บริการระบุ');
+    expect(retryTime({ time_source: 'provider', retry_at: 'invalid' })).toBe('');
+  });
+  it.each(['failed', 'cancelled', 'completed', 'partial'])(
+    'shows terminal %s rather than a stale processing stage or retry time',
+    (state) => {
+      const text = jobStatus({
+        state,
+        stage: 'indexing',
+        error_code: 'generation_rate_limited',
+        wait: { time_source: 'provider', retry_at: '2099-01-01T00:00:00Z' },
+      } as Job);
+      expect(text).not.toContain('กำลังสร้างฐานความรู้');
+      expect(text).not.toContain('ลองอีกครั้งได้หลัง');
+      if (state === 'failed') expect(text).toContain('ไม่สำเร็จ');
+      if (state === 'cancelled') expect(text).toBe('ยกเลิกแล้ว');
+      if (state === 'completed') expect(text).toBe('เสร็จแล้ว');
+      if (state === 'partial') expect(text).toBe('ได้ผลบางส่วน');
+    },
+  );
+  it('requires explicit ready videos', () => {
+    expect(() => buildScope([], [video], '', '', '')).toThrow();
+    expect(() =>
+      buildScope([video.video_id], [{ ...video, status: 'indexing' }], '', '', ''),
+    ).toThrow();
+  });
+  it('preserves selection and filters without widening scope or adding playlists', () => {
+    expect(buildScope([video.video_id], [video], 'c1', '2026-10-01', '2026-10-01')).toEqual({
+      video_ids: [video.video_id],
+      channel_ids: ['c1'],
+      date_from: '2026-10-01',
+      date_to: '2026-10-01',
+    });
+  });
+  it('rejects reversed ranges and empty intersections', () => {
+    expect(() => buildScope([video.video_id], [video], '', '2026-10-02', '2026-10-01')).toThrow();
+    expect(() => buildScope([video.video_id], [video], 'other', '', '')).toThrow();
+    expect(() =>
+      buildScope([video.video_id], [{ ...video, published_at: null }], '', '2026-01-01', ''),
+    ).toThrow();
+  });
+  it('treats all four terminal job states as terminal', () => {
+    expect(['completed', 'partial', 'failed', 'cancelled'].every(terminal)).toBe(true);
+    expect(terminal('running')).toBe(false);
+    expect(terminal('no_transcript')).toBe(false);
+  });
+  it('explains truncated answers without presenting them as completed', () => {
+    const job = { state: 'failed', error_code: 'generation_output_truncated' } as Job;
+    expect(jobWarning(job)).toContain('ถูกตัด');
+    expect(jobWarning({ ...job, state: 'completed' })).toBeNull();
+    expect(jobWarning({ ...job, error_code: 'invalid_citation' })).toBe(
+      'AI ส่งผลลัพธ์ไม่สมบูรณ์ กรุณาลองสร้างใหม่',
+    );
+    expect(jobWarning({ ...job, error_code: 'some_unknown_failure' })).toBe(
+      'ทำรายการไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+    );
+  });
+  it('explains transcript size and availability failures', () => {
+    expect(jobWarning({ state: 'failed', error_code: 'transcript_too_large' } as Job)).toContain(
+      'ยาวเกินขีดจำกัด',
+    );
+    expect(jobWarning({ state: 'failed', error_code: 'transcript_unavailable' } as Job)).toContain(
+      'ไม่พบบทถอดเสียง',
+    );
+  });
+  it('distinguishes provider downtime from quota limits', () => {
+    expect(
+      jobWarning({ state: 'failed', error_code: 'generation_provider_busy' } as Job),
+    ).toContain('ไม่พร้อมให้บริการชั่วคราว');
+    expect(jobWarning({ state: 'failed', error_code: 'generation_rate_limited' } as Job)).toContain(
+      'ผู้ให้บริการจำกัดการใช้งาน',
+    );
+    expect(
+      jobWarning({ state: 'queued', error_code: 'generation_provider_busy' } as Job),
+    ).toBeNull();
+  });
+});
+
+describe('research progress text', () => {
+  it('translates tool steps and run summaries into Thai', () => {
+    const step = { tool_name: 'search_evidence', state: 'running' };
+    expect(progressText({ ...step, summary: 'Executing validated scoped action' })).toEqual({
+      tool: 'ค้นหลักฐาน',
+      summary: 'กำลังทำงาน',
+    });
+    expect(
+      progressText({
+        tool_name: 'run_controller',
+        state: 'partial',
+        summary:
+          'Validated output; processed_chunks=194; complete=False; model_calls=5; tool_calls=19',
+      }),
+    ).toEqual({ tool: 'สรุปผล', summary: 'อ่านเนื้อหาแล้ว 194 ช่วง · เรียก AI 5 ครั้ง' });
+    expect(
+      progressText({
+        tool_name: 'read_video_chunks',
+        state: 'completed',
+        summary: 'Read authorized page; selected_chunks=8',
+      }).summary,
+    ).toBe('อ่านเนื้อหาแล้ว 8 ช่วง');
+  });
+  it('keeps unknown tools and summaries unchanged', () => {
+    expect(
+      progressText({ tool_name: 'search_prepared_media', state: 'running', summary: 'New text' }),
+    ).toEqual({ tool: 'search_prepared_media', summary: 'New text' });
+  });
+});

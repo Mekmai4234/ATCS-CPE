@@ -1,0 +1,367 @@
+import QuizContent from './Quiz';
+import ProviderNotice from './ProviderNotice';
+import { StoredFeedback } from './feedbackSession';
+import { useState } from 'react';
+import { citationUrl, timestamp } from './domain';
+import type { Artifact, Citation, Coverage, TaskResult, TaskType } from './types';
+import { evidenceLabels } from './domain';
+import { FrameEvidence, validFrame, VisualCoverageNotice } from './Evidence';
+import { BuddyArt } from './BuddyArt';
+import './results-v5.css';
+
+export function Citations({
+  citations,
+  available = true,
+}: {
+  citations: Citation[];
+  available?: boolean;
+}) {
+  return (
+    <div className="citations">
+      {citations.map((citation, i) => {
+        const visual = citation.presentation && citation.presentation.kind !== 'transcript';
+        const frame = citation.presentation?.frame;
+        const active =
+          (citation.source_available ?? available) &&
+          (!visual || (validFrame(frame) && frame.videoId === citation.video_id));
+        const url = active
+          ? visual && validFrame(frame)
+            ? `https://www.youtube.com/watch?v=${frame.videoId}&t=${Math.floor(frame.timeSeconds)}s`
+            : visual
+              ? null
+              : citationUrl(citation)
+          : null;
+        return (
+          <div className="citation" key={`${citation.citation_id}-${i}`}>
+            <span className="source-number">{i + 1}</span>
+            <div>
+              <strong>{citation.title}</strong>
+              <small>
+                {citation.kind === 'video'
+                  ? 'ภาพและเสียง · AI วิเคราะห์'
+                  : citation.kind?.startsWith('document_')
+                    ? 'ไฟล์ผู้ใช้ · ยังไม่ได้เทียบเสียงจริง'
+                    : evidenceLabels[citation.presentation?.kind || 'transcript']}
+              </small>
+              <span>
+                {citation.kind === 'document_metadata'
+                  ? 'ข้อมูลเอกสาร · ไม่มีเวลาเสียง'
+                  : visual && validFrame(frame)
+                    ? timestamp(frame.timeSeconds)
+                    : citation.kind === 'document_transcript' && citation.end_seconds === null
+                      ? `ตั้งแต่ ${timestamp(citation.start_seconds)} · ไม่ทราบเวลาจบ`
+                      : `${timestamp(citation.start_seconds)}–${timestamp(citation.end_seconds)}`}
+                {citation.document_line && ` · บรรทัด ${citation.document_line}`}
+              </span>
+            </div>
+            {url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={
+                  citation.kind === 'document_metadata'
+                    ? `เปิดคลิปจากเอกสาร ${citation.title}`
+                    : `เปิดหลักฐาน ${citation.title} ที่ ${timestamp(visual && validFrame(frame) ? frame.timeSeconds : citation.start_seconds)}`
+                }
+              >
+                เปิดคลิป ↗
+              </a>
+            ) : (
+              <small>แหล่งข้อมูลใช้ไม่ได้</small>
+            )}
+            {visual && citation.presentation && (
+              <FrameEvidence
+                key={`${frame?.generation}:${frame?.evidenceVersion}:${frame?.frameId}`}
+                evidence={citation.presentation}
+                available={active}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+export function CoverageNotice({
+  coverage,
+  insufficient = false,
+  localEvidence = false,
+}: {
+  coverage?: Coverage;
+  insufficient?: boolean;
+  localEvidence?: boolean;
+}) {
+  if (!coverage) return null;
+  if (coverage.expected_videos === 0)
+    return <p className="notice">คุยทั่วไป · ไม่ได้อ้างอิงเนื้อหาวิดีโอ</p>;
+  return (
+    <div className={`coverage ${coverage.complete ? '' : 'warning'}`}>
+      <strong>
+        {localEvidence
+          ? 'ค้นข้อความบางส่วน ไม่ยืนยันว่าตรวจครบทั้งคลิป'
+          : coverage.complete
+            ? insufficient
+              ? 'ตรวจข้อมูลครบแล้ว แต่ยังยืนยันคำตอบไม่ได้'
+              : 'ตรวจสอบแหล่งข้อมูลแล้ว'
+            : 'ข้อมูลยังไม่ครอบคลุมทั้งหมด'}
+      </strong>
+      {!localEvidence && (
+        <span>
+          คลิป {coverage.processed_videos}/{coverage.expected_videos}
+          {coverage.expected_chunks !== null
+            ? ` · ข้อความ ${coverage.processed_chunks}/${coverage.expected_chunks}`
+            : ''}
+        </span>
+      )}
+      {coverage.notes?.map((note, i) => (
+        <span key={i}>
+          {note.startsWith('Only evidence actually')
+            ? 'นับเฉพาะข้อมูลที่ส่งให้ AI สำเร็จแล้ว บางช่วงอาจยังไม่ได้อ่าน'
+            : note.startsWith('Stopped: context_budget_exceeded')
+              ? 'ข้อมูลเกินงบต่อคำขอ ลองระบุหัวข้อให้แคบลง'
+              : note.startsWith('Lexical relevance only')
+                ? 'ผลค้นใช้คำในบทถอดเสียง ไม่ใช่การยืนยันความหมายหรือการตรวจภาพทั้งคลิป'
+                : note.startsWith('Collection bound reached')
+                  ? 'ขอบเขตการค้นยังไม่ครบ การค้นไม่พบไม่ได้ยืนยันว่าไม่มีข้อมูลทั้งคลิป'
+                  : note}
+        </span>
+      ))}
+    </div>
+  );
+}
+function ArtifactReferences({ artifact, ids }: { artifact: Artifact; ids: string[] }) {
+  return (
+    <Citations
+      citations={artifact.citations.filter((c) => ids.includes(c.citation_id))}
+      available={artifact.sources_available !== false}
+    />
+  );
+}
+
+function ArtifactPager({
+  index,
+  count,
+  change,
+  noun,
+}: {
+  index: number;
+  count: number;
+  change: (value: number) => void;
+  noun: 'ข้อ' | 'การ์ด';
+}) {
+  return (
+    <nav className="v5r-pager" aria-label={`เปลี่ยน${noun}`}>
+      <button type="button" disabled={index === 0} onClick={() => change(index - 1)}>
+        <span aria-hidden="true">←</span> {noun}ก่อนหน้า
+      </button>
+      <span aria-live="polite" aria-atomic="true">
+        {noun} {index + 1} / {count}
+      </span>
+      <button type="button" disabled={index >= count - 1} onClick={() => change(index + 1)}>
+        {noun}ถัดไป <span aria-hidden="true">→</span>
+      </button>
+    </nav>
+  );
+}
+
+function FlashcardContent({ artifact }: { artifact: Artifact }) {
+  const [index, setIndex] = useState(0);
+  const cards = artifact.content.cards || [];
+  const current = Math.min(index, Math.max(0, cards.length - 1));
+  const card = cards[current];
+  if (!card) return <p className="v5r-empty">ยังไม่มีการ์ดในผลลัพธ์นี้</p>;
+  return (
+    <div className="v5r-flash-content">
+      <div className="v5r-flash-stack">
+        <details className="learning-item v5r-flash-card" key={current}>
+          <summary>
+            <span className="v5r-position">
+              {current + 1} / {cards.length}
+            </span>
+            <strong>{card.front}</strong>
+            <span className="v5r-flip-hint">
+              พลิกดูคำตอบ <span aria-hidden="true">↔</span>
+            </span>
+          </summary>
+          <div className="v5r-flash-back">
+            <p>{card.back}</p>
+            <ArtifactReferences artifact={artifact} ids={card.citations} />
+          </div>
+        </details>
+      </div>
+      <ArtifactPager index={current} count={cards.length} change={setIndex} noun="การ์ด" />
+    </div>
+  );
+}
+
+export function ArtifactView({
+  artifact,
+  attached = false,
+}: {
+  artifact: Artifact;
+  // Created by a research run: part of that result, not a separate learning page.
+  attached?: boolean;
+}) {
+  const isQuiz = artifact.type === 'quiz';
+  const isCards = artifact.type === 'flashcards';
+  const label = isQuiz ? 'ทดสอบ' : isCards ? 'ทบทวน' : 'วางแผน';
+  const fullLabel = isQuiz ? 'แบบทดสอบ' : isCards ? 'แฟลชการ์ด' : 'แผนเรียน';
+  return (
+    <section className={`artifact v5r-artifact v5r-artifact-${artifact.type}`}>
+      {attached ? (
+        <h3 className="v5r-attached-title">{fullLabel}ที่แนบมากับการค้นคว้า</h3>
+      ) : (
+        <h3 className="v5r-title" aria-label={fullLabel}>
+          {label}
+          <span aria-hidden="true">.</span>
+        </h3>
+      )}
+      {artifact.sources_available === false && (
+        <p className="notice warning">แหล่งข้อมูลเดิมถูกลบหรือเปลี่ยนแปลงแล้ว</p>
+      )}
+      <div className="v5r-artifact-layout">
+        <div className="v5r-art-stage" aria-hidden="true">
+          <BuddyArt pose={artifact.type} />
+        </div>
+        {isQuiz && (
+          <QuizContent
+            artifact={artifact}
+            references={(ids) => <ArtifactReferences artifact={artifact} ids={ids} />}
+          />
+        )}
+        {isCards && <FlashcardContent artifact={artifact} />}
+        {artifact.type === 'study_plan' && (
+          <div className="v5r-plan-list">
+            {artifact.content.days?.map((day) => (
+              <article className="learning-item v5r-plan-day" key={day.day}>
+                <strong>วันที่ {day.day}</strong>
+                <p>{day.topic}</p>
+                <ArtifactReferences artifact={artifact} ids={day.citations} />
+              </article>
+            ))}
+            {!artifact.content.days?.length && <p className="v5r-empty">ยังไม่มีแผนในผลลัพธ์นี้</p>}
+          </div>
+        )}
+      </div>
+      <CoverageNotice coverage={artifact.coverage} />
+    </section>
+  );
+}
+/** Models sometimes emit Markdown **bold**; show it as bold text, never as raw markup. */
+export function BoldText({ text }: { text: string }) {
+  return (
+    <>
+      {text
+        .split(/\*\*(.+?)\*\*/g)
+        .map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : part))}
+    </>
+  );
+}
+
+export function ResultView({
+  result,
+  partial = false,
+  kind = 'chat',
+}: {
+  result: TaskResult;
+  partial?: boolean;
+  kind?: TaskType;
+}) {
+  if (result.visibility === 'withheld')
+    return (
+      <p className="notice" role="status">
+        ระบบระงับคำตอบนี้ กรุณาปรับคำถามแล้วส่งใหม่
+      </p>
+    );
+  const illustrated =
+    ['summary', 'compare', 'research'].includes(kind) && !result.artifacts?.length;
+  const answer = result.answer || (typeof result.content === 'string' ? result.content : '');
+  const label = kind === 'compare' ? 'เทียบ' : kind === 'research' ? 'ค้นคว้า' : 'สรุป';
+  const localEvidence = result.provider_metadata?.provider === 'local-evidence';
+  const read = result.coverage?.processed_chunks;
+  const total = result.coverage?.expected_chunks;
+  // A finished research answer stays "partial" while it has read only part of the clip;
+  // say how much was read instead of implying the task itself did not finish.
+  const answeredFromPart =
+    kind === 'research' &&
+    typeof read === 'number' &&
+    typeof total === 'number' &&
+    read > 0 &&
+    read < total &&
+    !answer.startsWith('การค้นคว้าหยุดก่อนเสร็จ');
+  return (
+    <div className={`result-content v5r-result v5r-result-${kind}`}>
+      {partial &&
+        (answeredFromPart ? (
+          <p className="notice" role="status">
+            ได้คำตอบแล้ว — อ้างอิงเนื้อหาคลิป {read}/{total} ช่วง ยังไม่ได้อ่านครบทุกช่วง
+          </p>
+        ) : (
+          <p className="notice warning" role="status">
+            ได้ผลบางส่วน — งานนี้ยังไม่สำเร็จครบถ้วน
+          </p>
+        ))}
+      {result.status === 'insufficient_evidence' && (
+        <h3 className="insufficient">หลักฐานไม่เพียงพอ</h3>
+      )}
+      {result.sources_available === false && (
+        <p className="notice warning">แหล่งข้อมูลเดิมถูกลบหรือเปลี่ยนแปลงแล้ว</p>
+      )}
+      <ProviderNotice metadata={result.provider_metadata} />
+      <div className={illustrated ? 'v5r-answer-layout' : 'v5r-answer-plain'}>
+        <div className="v5r-answer-copy">
+          {illustrated && (
+            <h3 className="v5r-title">
+              {label}
+              <span aria-hidden="true">.</span>
+            </h3>
+          )}
+          {answer && (
+            <p className="answer-text">
+              <BoldText text={answer} />
+            </p>
+          )}
+          {!!result.citations?.length && (
+            <>
+              <h4>
+                {localEvidence
+                  ? 'ข้อความต้นทางที่ค้นพบ'
+                  : result.status === 'insufficient_evidence'
+                    ? 'แหล่งข้อมูลที่ตรวจสอบ'
+                    : 'หลักฐานจากคลิป'}
+              </h4>
+              <Citations
+                citations={result.citations}
+                available={result.sources_available !== false}
+              />
+            </>
+          )}
+        </div>
+        {illustrated && (
+          <aside className="v5r-answer-art" aria-hidden="true">
+            <BuddyArt pose={kind} />
+          </aside>
+        )}
+      </div>
+      {!result.artifacts?.length && (
+        <CoverageNotice
+          coverage={result.coverage}
+          insufficient={result.status === 'insufficient_evidence'}
+          localEvidence={localEvidence}
+        />
+      )}
+      <VisualCoverageNotice value={result.visualCoverage} />
+      {kind === 'chat' && result.assistant_message_id && (
+        <StoredFeedback key={result.assistant_message_id} id={result.assistant_message_id} />
+      )}
+      {result.artifacts?.map((artifact, i) => (
+        <ArtifactView
+          artifact={artifact}
+          attached={kind === 'research'}
+          key={artifact.artifact_id || i}
+        />
+      ))}
+    </div>
+  );
+}
