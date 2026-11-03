@@ -16,6 +16,9 @@ from .telemetry import request_id
 from .urls import canonical_url, normalize_url
 
 ACTIVE = {"queued", "running"}
+# Member requests parked by a quota window resume on their own once it has passed.
+# Import/delete keep their explicit retry; enrich follows the media pause flow.
+RESUMABLE = ("chat", "analysis", "artifact", "research", "quiz_grade")
 TERMINAL = {"completed", "partial", "failed", "cancelled"}
 
 
@@ -531,7 +534,13 @@ class Repository(Ownership):
                     )
                 )
                 self._video_failure(connection, job, "failed" if terminal else "queued")
-            conditions = [db.jobs.c.state == "queued", db.jobs.c.available_at <= now]
+            conditions = [
+                sa.or_(
+                    db.jobs.c.state == "queued",
+                    sa.and_(db.jobs.c.state == "paused", db.jobs.c.kind.in_(RESUMABLE)),
+                ),
+                db.jobs.c.available_at <= now,
+            ]
             if job_id:
                 conditions.append(db.jobs.c.job_id == job_id)
             if self.settings.auth_enabled:
@@ -608,7 +617,8 @@ class Repository(Ownership):
                         continue
                 token = uid()
                 deadline = candidate["deadline_at"]
-                if deadline is None:
+                # A job paused past its deadline gets a fresh one when the quota window ends.
+                if deadline is None or candidate["state"] == "paused":
                     duration = (
                         self.settings.agent_timeout_seconds
                         if candidate["kind"] == "research"
