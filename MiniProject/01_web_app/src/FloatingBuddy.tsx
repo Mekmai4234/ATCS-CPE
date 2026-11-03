@@ -539,7 +539,6 @@ export default function FloatingBuddy(props: Props) {
                 </button>
               ))}
             </div>
-            {props.responseControl}
             <form
               className="buddy-composer"
               onSubmit={(event) => {
@@ -580,20 +579,24 @@ export default function FloatingBuddy(props: Props) {
                   props.selected.length ? 'ถาม Buddy เกี่ยวกับคลิป…' : 'คุยกับ Buddy ได้เลย…'
                 }
               />
-              <button
-                className="primary"
-                disabled={
-                  props.locked ||
-                  (!!props.scopeHelp &&
-                    props.selected.length > 0 &&
-                    !smallTalkReply(props.question)) ||
-                  !props.question.trim()
-                }
-                aria-label="ส่งข้อความถึง Buddy"
-                aria-describedby="buddy-scope-help"
-              >
-                ➤
-              </button>
+              {/* Mode and send share one row inside the box, like a chat composer toolbar. */}
+              <div className="buddy-composer-bar">
+                {props.responseControl}
+                <button
+                  className="primary"
+                  disabled={
+                    props.locked ||
+                    (!!props.scopeHelp &&
+                      props.selected.length > 0 &&
+                      !smallTalkReply(props.question)) ||
+                    !props.question.trim()
+                  }
+                  aria-label="ส่งข้อความถึง Buddy"
+                  aria-describedby="buddy-scope-help"
+                >
+                  ➤
+                </button>
+              </div>
             </form>
             <small id="buddy-scope-help" className="buddy-scope-help" role="status">
               {!props.selected.length ? 'คุยทั่วไป · เลือกคลิปเมื่อถามเนื้อหา' : props.scopeHelp}
