@@ -13,17 +13,47 @@ from .question_scope import is_followup, requires_visual, retrieval_query, time_
 POLICY = "transcript-first-v1"
 
 
-def metadata_intent(question):
+METADATA_ALIASES = {
+    # The document header is "SINGLE : <title>", so its own label also asks for the title.
+    "single": (
+        "ชื่อเพลง",
+        "เพลงชื่อ",
+        "เพลงนี้ชื่อ",
+        "เพลงอะไร",
+        "ซิงเกิล",
+        "ซิงเกิ้ล",
+        "single",
+        "songtitle",
+        "songname",
+        "whatsong",
+        "nameofthesong",
+        "titleofthesong",
+    ),
+    "artist": (
+        "ใครร้อง",
+        "ใครเป็นคนร้อง",
+        "ร้องโดย",
+        "ศิลปิน",
+        "นักร้อง",
+        "วงอะไร",
+        "whosings",
+        "whosang",
+        "singer",
+        "artist",
+    ),
+    "channel": ("เจ้าของคลิป", "ช่องอะไร", "ชื่อช่อง", "ใครทำคลิป", "channel"),
+    "shop": ("ร้านอะไร", "ชื่อร้าน", "ร้านในคลิป"),
+}
+
+
+def metadata_fields(question):
+    """Every document header the question asks for, e.g. song title and artist together."""
     question = re.sub(r"\s+", "", question).casefold()
-    for field, aliases in {
-        "single": ("ชื่อเพลง", "เพลงนี้ชื่อ", "เพลงอะไร", "songtitle"),
-        "artist": ("ใครร้อง", "ศิลปิน", "นักร้อง", "whosings", "artist"),
-        "channel": ("เจ้าของคลิป", "ช่องอะไร", "ชื่อช่อง", "ใครทำคลิป", "channel"),
-        "shop": ("ร้านอะไร", "ชื่อร้าน", "ร้านในคลิป"),
-    }.items():
-        if any(alias in question for alias in aliases):
-            return field
-    return None
+    return [
+        field
+        for field, aliases in METADATA_ALIASES.items()
+        if any(alias in question for alias in aliases)
+    ]
 
 
 def document_answer(request, sources, history, context):
@@ -36,28 +66,29 @@ def document_answer(request, sources, history, context):
     if not documents:
         return None
     question = request["question"]
-    field = metadata_intent(question)
+    fields = metadata_fields(question)
     citations, paragraphs, notes = [], [], ["ตอบจากไฟล์ในเครื่อง · ไม่ใช้ AI · provider calls 0"]
-    if field:
+    if fields:
         labels = dict(single="ชื่อเพลง", artist="ศิลปิน", channel="เจ้าของคลิปตามเอกสาร", shop="ร้านในคลิป")
         for document in documents:
-            value = document["data"]["metadata"].get(field)
-            if value:
-                citation = Citation(
-                    citation_id=str(len(citations) + 1),
-                    chunk_id="metadata:" + field,
-                    video_id=document["video_id"],
-                    title=document["data"]["relative_path"],
-                    kind="document_metadata",
-                    document_id=document["document_id"],
-                    document_version=document["version"],
-                    source_hash=document["source_hash"],
-                    metadata_field=field,
-                )
-                citations.append(citation)
-                paragraphs.append(f"{labels[field]}: {value} [{citation.citation_id}]")
-            else:
-                paragraphs.append(f"เอกสารของคลิป {document['video_id']} ไม่ระบุ{labels[field]}")
+            for field in fields:
+                value = document["data"]["metadata"].get(field)
+                if value:
+                    citation = Citation(
+                        citation_id=str(len(citations) + 1),
+                        chunk_id="metadata:" + field,
+                        video_id=document["video_id"],
+                        title=document["data"]["relative_path"],
+                        kind="document_metadata",
+                        document_id=document["document_id"],
+                        document_version=document["version"],
+                        source_hash=document["source_hash"],
+                        metadata_field=field,
+                    )
+                    citations.append(citation)
+                    paragraphs.append(f"{labels[field]}: {value} [{citation.citation_id}]")
+                else:
+                    paragraphs.append(f"เอกสารของคลิป {document['video_id']} ไม่ระบุ{labels[field]}")
     elif requires_visual(question) or re.search(r"สีเสื้อ|ใส่เสื้อ|แต่งกาย|ภาพใน|ใน\s*mv", question, re.I):
         paragraphs.append("บทถอดเสียงยืนยันภาพในคลิปไม่ได้ ต้องตรวจหลักฐานภาพก่อน จึงไม่เดาคำตอบจากไฟล์ข้อความ")
     elif is_followup(question) or re.search(
