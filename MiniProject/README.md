@@ -11,15 +11,15 @@
 
 ## แบ่งงาน 01–07
 
-| โฟลเดอร์ | หน้าที่ |
-|---|---|
-| [01_web_app](01_web_app/) | หน้าวางลิงก์ คลังคลิป ตัวเล่น แชต และหน้าผลการเรียนรู้ |
-| [02_api_backend](02_api_backend/) | API ฐานข้อมูล ประวัติ และคิวงาน |
-| [03_video_ingestion](03_video_ingestion/) | ตรวจลิงก์ ดึงข้อมูลและบทถอดเสียงพร้อมเวลา |
-| [04_rag_knowledge](04_rag_knowledge/) | แบ่งข้อความ ทำ Embeddings และค้นคืนความรู้ |
-| [05_ai_answers_analysis](05_ai_answers_analysis/) | ตอบ สรุป เปรียบเทียบ และแนบหลักฐาน |
-| [06_research_learning_agent](06_research_learning_agent/) | วางแผนและค้นคว้าหลายขั้นตอน สร้างสื่อช่วยเรียน |
-| [07_testing_deployment](07_testing_deployment/) | ทดสอบ ประเมิน AI และเตรียมระบบขึ้นใช้งาน |
+| โฟลเดอร์ | หน้าที่ | GitHub |
+|---|---|---|
+| [01_web_app](01_web_app/) | หน้าวางลิงก์ คลังคลิป ตัวเล่น แชต และหน้าผลการเรียนรู้ | [marisa46054](https://github.com/marisa46054) |
+| [02_api_backend](02_api_backend/) | API ฐานข้อมูล ประวัติ และคิวงาน | [Mekmai4234](https://github.com/Mekmai4234) |
+| [03_video_ingestion](03_video_ingestion/) | ตรวจลิงก์ ดึงข้อมูลและบทถอดเสียงพร้อมเวลา | [marisa46054](https://github.com/marisa46054) |
+| [04_rag_knowledge](04_rag_knowledge/) | แบ่งข้อความ ทำ Embeddings และค้นคืนความรู้ | [Mekmai4234](https://github.com/Mekmai4234) |
+| [05_ai_answers_analysis](05_ai_answers_analysis/) | ตอบ สรุป เปรียบเทียบ และแนบหลักฐาน | [marisa46054](https://github.com/marisa46054) |
+| [06_research_learning_agent](06_research_learning_agent/) | วางแผนและค้นคว้าหลายขั้นตอน สร้างสื่อช่วยเรียน | [Mekmai4234](https://github.com/Mekmai4234) |
+| [07_testing_deployment](07_testing_deployment/) | ทดสอบ ประเมิน AI และเตรียมระบบขึ้นใช้งาน | [Mekmai4234](https://github.com/Mekmai4234) |
 
 แต่ละโฟลเดอร์มีเอกสารภาษาอังกฤษ 3 ไฟล์:
 - `env.txt` — เครื่องมือ สภาพแวดล้อม และค่าตั้งค่าที่วางแผนใช้
