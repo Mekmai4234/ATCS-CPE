@@ -488,9 +488,10 @@ def test_decoder_outcome_contract_matches_publication_validator(content, valid):
 class LimitedBroker(OfflineBroker):
     """Rate-limit chosen model buckets; refuse models absent from the policy."""
 
-    def __init__(self, limited, unapproved=()):
+    def __init__(self, limited, unapproved=(), waits=None):
         super().__init__()
         self.limited, self.unapproved = set(limited), set(unapproved)
+        self.waits = waits or {}
 
     def authorize(self, *, model, purpose, credential_sha256):
         if model in self.unapproved:
@@ -499,8 +500,15 @@ class LimitedBroker(OfflineBroker):
 
     @asynccontextmanager
     async def reserve(self, **kwargs):
-        if kwargs["grant"].requested_model in self.limited:
-            raise AppError("quota_wait", "Local project budget is unavailable", 429, True)
+        model = kwargs["grant"].requested_model
+        if model in self.limited:
+            raise AppError(
+                "quota_wait",
+                "Local project budget is unavailable",
+                429,
+                True,
+                retry_after_seconds=self.waits.get(model),
+            )
         async with super().reserve(**kwargs) as lease:
             yield lease
 
@@ -561,6 +569,22 @@ async def test_all_models_limited_reports_primary_limit_without_network():
         await model.close()
         await http.aclose()
     assert caught.value.code == "quota_wait" and paths == []
+
+
+async def test_all_models_limited_reports_the_limit_that_clears_first():
+    # Primary out for the day, fallback only for this minute: the job should retry soon.
+    broker = LimitedBroker(
+        {"gemini-3.5-flash", "gemini-fallback-lite"},
+        waits={"gemini-3.5-flash": 60000, "gemini-fallback-lite": 60},
+    )
+    model, http = fallback_model(sdk_handler([]), broker)
+    try:
+        with pytest.raises(AppError) as caught:
+            await model.generate({}, 5)
+    finally:
+        await model.close()
+        await http.aclose()
+    assert caught.value.code == "quota_wait" and caught.value.retry_after_seconds == 60
 
 
 async def test_unapproved_fallback_is_skipped_and_primary_limit_reported():
