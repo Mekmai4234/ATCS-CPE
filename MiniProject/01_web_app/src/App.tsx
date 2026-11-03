@@ -2069,8 +2069,8 @@ export default function App({
             question={question}
             responseControl={
               selected.length > 0 ? (
-                <label>
-                  โหมดคำตอบ
+                <label className="buddy-mode">
+                  <span className="visually-hidden">โหมดคำตอบ</span>
                   <select
                     aria-label="โหมดคำตอบ"
                     disabled={taskLocked}
@@ -2082,7 +2082,7 @@ export default function App({
                   </select>
                 </label>
               ) : (
-                <small>คุยทั่วไปใช้ AI ตามโควตาปัจจุบัน</small>
+                <small className="buddy-mode-note">คุยทั่วไปใช้ AI ตามโควตาปัจจุบัน</small>
               )
             }
             change={setQuestion}
