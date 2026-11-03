@@ -312,16 +312,23 @@ async def test_grading_uses_structured_marks_and_same_broker_gate(make_model):
 class LimitedBrokerContext(MockBrokerContext):
     """Broker double: rate-limit chosen model buckets, refuse models absent from policy."""
 
-    def __init__(self, limited=(), unapproved=()):
+    def __init__(self, limited=(), unapproved=(), waits=None):
         super().__init__()
         self.limited, self.unapproved, self.requests = set(limited), set(unapproved), []
+        self.waits = waits or {}
 
     async def gemini_call(self, callback, **request):
         self.requests.append((request["model"], request["endpoint"]))
         if request["model"] in self.unapproved:
             raise AppError("free_model_unverified", "Model is not explicitly approved", 503)
         if request["model"] in self.limited:
-            raise AppError("quota_wait", "Local project budget is unavailable", 429, True)
+            raise AppError(
+                "quota_wait",
+                "Local project budget is unavailable",
+                429,
+                True,
+                retry_after_seconds=self.waits.get(request["model"]),
+            )
         return await super().gemini_call(callback, **request)
 
 
@@ -442,6 +449,25 @@ async def test_artifact_generation_falls_back_on_primary_outage():
     assert result.metadata.requested_model == "gemini-3.8-flash"
     assert result.metadata.fallback_from == "gemini-3.5-flash"
     assert sum(p.endswith(":generateContent") for p in paths) == 2
+
+
+async def test_all_models_limited_reports_the_limit_that_clears_first():
+    # Primary out for the day, fallback only for this minute: the job should retry soon.
+    paths, context = (
+        [],
+        LimitedBrokerContext(
+            limited={"gemini-3.5-flash", "gemini-3.8-flash"},
+            waits={"gemini-3.5-flash": 60000, "gemini-3.8-flash": 60},
+        ),
+    )
+    model, http = fallback_agent(wire(paths), context)
+    try:
+        with pytest.raises(AppError) as caught:
+            await model.decide([{"role": "user", "data": {}}], 5, context=context)
+    finally:
+        await model.close()
+        await http.aclose()
+    assert caught.value.code == "quota_wait" and caught.value.retry_after_seconds == 60
 
 
 async def test_unapproved_fallback_is_skipped_and_primary_limit_reported():
