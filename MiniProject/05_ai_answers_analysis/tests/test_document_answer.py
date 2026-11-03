@@ -61,6 +61,11 @@ async def test_five_real_documents_local_http_worker_never_dispatches_provider(
         ),
         ("ฉันดีใจ ที่ตรงนั้นมันไม่ใช่เรา", ["B-zaXo-skGo"], "ฉันดีใจ", "document_transcript"),
         ("ใครร้อง", ["C0DXctGPWxw", "B-zaXo-skGo"], "Only Monday", "document_metadata"),
+        # Word orders and the document's own "SINGLE" label, as members actually ask.
+        ("เพลงชื่อ", ["C0DXctGPWxw"], "รอ SIS (TER)", "document_metadata"),
+        ("SINGLE อะไร", ["C0DXctGPWxw"], "รอ SIS (TER)", "document_metadata"),
+        ("วงอะไร", ["C0DXctGPWxw"], "DICEBLUE", "document_metadata"),
+        ("what song is this", ["B-zaXo-skGo"], "ดีใจที่ตรงนั้นไม่ใช่เรา", "document_metadata"),
     ]
     for question, videos, expected, kind in cases:
         result = await ask(env, question, videos)
@@ -74,6 +79,9 @@ async def test_five_real_documents_local_http_worker_never_dispatches_provider(
             )
         if "63,000" in question:
             assert result["citations"][0]["end_seconds"] is None
+    both = await ask(env, "ชื่อเพลงและชื่อศิลปินที่ระบุในเอกสารคืออะไร", ["C0DXctGPWxw"])
+    assert "รอ SIS (TER)" in both["answer"] and "DICEBLUE" in both["answer"]
+    assert [c["metadata_field"] for c in both["citations"]] == ["single", "artist"]
     for question in ("สีเสื้อใน MV", "ช่วยยกตัวอย่างให้เข้าใจง่าย", "สูตรขนมครก", "กำไรสุทธิเท่าไร"):
         result = await ask(env, question, ["C0DXctGPWxw"])
         assert result["status"] == "insufficient_evidence" and not result["citations"]
