@@ -274,7 +274,11 @@ async def test_full_factory_import_chat_analysis_research_and_reopen(full):
     adapters = env.runtime.adapter
     assert adapters.answers.rag is adapters.agent.knowledge.rag
     assert str(adapters.answers.rag.settings.chroma_persist_dir) == env.settings.chroma_persist_dir
-    body = {"question": "What does RAG retrieve?", "scope": {"video_ids": [VIDEO_A]}}
+    body = {
+        "question": "What does RAG retrieve?",
+        "scope": {"video_ids": [VIDEO_A]},
+        "response_mode": "ai",
+    }
     headers = {"Idempotency-Key": "full-test-chat"}
     answer = await env.client.post("/api/chat", json=body, headers=headers)
     assert answer.status_code in {200, 202}, answer.text
