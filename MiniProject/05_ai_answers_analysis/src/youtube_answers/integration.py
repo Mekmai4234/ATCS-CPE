@@ -27,6 +27,22 @@ from .service import AnswerService
 from .timing import measured_operation, timed_stage
 from .trusted_local import TrustedLocalModel
 
+# Native video access is not approved yet: answer from the transcript instead.
+VIDEO_UNVERIFIED = frozenset({"free_tier_unverified", "free_model_unverified", "quota_pending"})
+# The vision model is limited or unavailable right now: the transcript answer still runs
+# and may use LLM_FALLBACK_MODELS before the caller's local fallback is considered.
+VIDEO_LIMITED = frozenset(
+    {
+        "quota_wait",
+        "provider_rate_limited",
+        "provider_unavailable",
+        "provider_timeout",
+        "generation_rate_limited",
+        "generation_provider_busy",
+        "generation_timeout",
+    }
+)
+
 
 class RagKnowledge:
     def __init__(self, rag):
@@ -477,13 +493,14 @@ class AnswerAdapters(RagAdapters):
                 native_insufficient = native
                 video_note = "ภาพและเสียงยังยืนยันคำตอบไม่ได้ จึงตรวจบทถอดเสียงเพิ่มเติม"
             except AppError as exc:
-                if exc.code not in {
-                    "free_tier_unverified",
-                    "free_model_unverified",
-                    "quota_pending",
-                }:
+                if exc.code in VIDEO_LIMITED:
+                    # Vision is approved for LLM_MODEL only; its quota running out must not
+                    # skip the transcript answer, which can still use the fallback models.
+                    video_note = "คลิปนี้ยังตอบจากบทถอดเสียง: โควตาวิเคราะห์ภาพและเสียงหมดชั่วคราว"
+                elif exc.code in VIDEO_UNVERIFIED:
+                    video_note = "คลิปนี้ยังตอบจากบทถอดเสียง: สิทธิ์วิเคราะห์ภาพและเสียงยังไม่พร้อม"
+                else:
                     raise
-                video_note = "คลิปนี้ยังตอบจากบทถอดเสียง: สิทธิ์วิเคราะห์ภาพและเสียงยังไม่พร้อม"
         if isinstance(getattr(self.answers.model, "broker", None), ExecutionBroker):
             with self.answers.model.broker.bind(context):
                 result = await self.answers.answer(request, sources, history, context)
@@ -504,11 +521,7 @@ class AnswerAdapters(RagAdapters):
                     if native is not None:
                         return native
                 except AppError as exc:
-                    if exc.code not in {
-                        "free_tier_unverified",
-                        "free_model_unverified",
-                        "quota_pending",
-                    }:
+                    if exc.code not in VIDEO_UNVERIFIED | VIDEO_LIMITED:
                         raise
         if result.status == "insufficient_evidence" and native_insufficient is not None:
             return native_insufficient
