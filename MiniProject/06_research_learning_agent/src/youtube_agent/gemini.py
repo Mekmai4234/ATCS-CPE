@@ -39,6 +39,20 @@ FALLBACK_ERRORS = {
 # A fallback missing from the operator policy is skipped, not reported as the failure.
 UNAPPROVED_FALLBACK = {"free_model_unverified"}
 
+
+def sooner(current, candidate):
+    """Of two limits, keep the one the job can retry first (no stated wait = default retry).
+
+    Reporting the primary's daily limit would park the job until tomorrow even though a
+    fallback frees up within a minute.
+    """
+    if current is None:
+        return candidate
+    if (candidate.retry_after_seconds or 0) < (current.retry_after_seconds or 0):
+        return candidate
+    return current
+
+
 POLICY = """You research ONLY the authorized imported YouTube evidence.
 OCR is text on sampled images, not speech. Visual descriptions are uncertain samples.
 Never infer identities, singers, lyrics or unobserved events from faces or mouth movements.
@@ -202,7 +216,7 @@ class GeminiModel:
                     continue
                 if exc.code not in FALLBACK_ERRORS:
                     raise
-                limited = limited or exc
+                limited = sooner(limited, exc)
         raise limited
 
     def _mark_fallback(self, metadata, model):
