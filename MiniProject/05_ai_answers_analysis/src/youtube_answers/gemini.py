@@ -29,6 +29,20 @@ RATE_LIMITED = {
 UNAPPROVED_FALLBACK = {"free_model_unverified"}
 
 
+def sooner(current, candidate):
+    """Of two limits, keep the one the job can retry first.
+
+    When every model is limited, the job's retry time comes from the reported error.
+    Reporting the primary's daily limit would park the job until tomorrow even though a
+    fallback frees up within a minute. No stated wait means the short default retry.
+    """
+    if current is None:
+        return candidate
+    if (candidate.retry_after_seconds or 0) < (current.retry_after_seconds or 0):
+        return candidate
+    return current
+
+
 class GeminiModel:
     def __init__(self, settings, *, client=None, broker=None):
         self.settings = settings
@@ -95,7 +109,7 @@ class GeminiModel:
                 transient = exc.code == "generation_provider_error" and exc.retryable
                 if exc.code not in RATE_LIMITED and not transient:
                     raise
-                limited = limited or exc
+                limited = sooner(limited, exc)
         raise limited
 
     async def _attempt(
