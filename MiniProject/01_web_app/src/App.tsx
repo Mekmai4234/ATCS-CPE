@@ -1722,20 +1722,6 @@ export default function App({
                     archiveLoading
                   }
                 >
-                  {tab === 'chat' && selected.length > 0 && (
-                    <label>
-                      โหมดคำตอบ
-                      <select
-                        aria-label="โหมดคำตอบ"
-                        disabled={taskLocked}
-                        value={responseMode}
-                        onChange={(event) => setResponseMode(event.target.value as 'local' | 'ai')}
-                      >
-                        <option value="local">ตอบจากไฟล์ (ไม่ใช้ AI)</option>
-                        <option value="ai">ให้ AI ช่วยอธิบาย (ใช้โควตา)</option>
-                      </select>
-                    </label>
-                  )}
                   {tab === 'learn' && (
                     <details className="v5-learning-settings">
                       <summary>ปรับรายละเอียด</summary>
@@ -1788,13 +1774,32 @@ export default function App({
                       </div>
                     </details>
                   )}
-                  <label htmlFor="question">
-                    {tab === 'chat'
-                      ? 'คำถามของคุณ'
-                      : taskType === 'research'
-                        ? 'เป้าหมายค้นคว้า'
-                        : 'หัวข้อหรือคำแนะนำเพิ่มเติม'}
-                  </label>
+                  {/* Chat keeps the question label and the answer mode on one header row. */}
+                  <div className="question-head">
+                    <label htmlFor="question">
+                      {tab === 'chat'
+                        ? 'คำถามของคุณ'
+                        : taskType === 'research'
+                          ? 'เป้าหมายค้นคว้า'
+                          : 'หัวข้อหรือคำแนะนำเพิ่มเติม'}
+                    </label>
+                    {tab === 'chat' && selected.length > 0 && (
+                      <label className="answer-mode">
+                        <span>โหมดคำตอบ</span>
+                        <select
+                          aria-label="โหมดคำตอบ"
+                          disabled={taskLocked}
+                          value={responseMode}
+                          onChange={(event) =>
+                            setResponseMode(event.target.value as 'local' | 'ai')
+                          }
+                        >
+                          <option value="local">ตอบจากไฟล์ (ไม่ใช้ AI)</option>
+                          <option value="ai">ให้ AI ช่วยอธิบาย (ใช้โควตา)</option>
+                        </select>
+                      </label>
+                    )}
+                  </div>
                   <textarea
                     id="question"
                     value={question}
