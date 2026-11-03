@@ -4,7 +4,7 @@
   "semantic_quality_verified": false,
   "notes": [
     "36 proposed questions. The 24 Thai cases use the five imported transcript documents in Transcript/manifest.json.",
-    "The 12 English cases are placeholders until approved English clips are imported; replace their video IDs and questions then.",
+    "The 12 English cases use the approved clips T-D1OfcDW1M (main, IBM) and IwvdDtN1gs8 (backup); both returned English captions in a read-only preflight on 3 Nov 2026. Import them before review.",
     "Visual and on-screen-text questions may correctly be answered as insufficient: the system reads transcripts only.",
     "Do not invent reviewed answers or timestamps. Include captions/audio mismatch and replay checks during review."
   ],
@@ -492,13 +492,13 @@
     {
       "id": "vb-25",
       "video_ids": [
-        "aircAruvnKk"
+        "T-D1OfcDW1M"
       ],
-      "source_url": "https://www.youtube.com/watch?v=aircAruvnKk",
+      "source_url": "https://www.youtube.com/watch?v=T-D1OfcDW1M",
       "clip_type": "tutorial",
       "language": "en",
       "category": "speech",
-      "question": "What does the speaker explicitly explain in a reviewed interval? Cite speech separately from visual evidence.",
+      "question": "According to the speaker, what were the two problems with her first answer to her children's question about which planet has the most moons?",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -512,13 +512,13 @@
     {
       "id": "vb-26",
       "video_ids": [
-        "aircAruvnKk"
+        "T-D1OfcDW1M"
       ],
-      "source_url": "https://www.youtube.com/watch?v=aircAruvnKk",
+      "source_url": "https://www.youtube.com/watch?v=T-D1OfcDW1M",
       "clip_type": "tutorial",
       "language": "en",
       "category": "screen_text",
-      "question": "Which on-screen words can be read clearly in the reviewed interval? Abstain if they are unclear.",
+      "question": "What does the presenter write on the board when she lays out the RAG framework? Use only text that is visibly written; abstain if captions alone cannot confirm it.",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -532,13 +532,13 @@
     {
       "id": "vb-27",
       "video_ids": [
-        "aircAruvnKk"
+        "T-D1OfcDW1M"
       ],
-      "source_url": "https://www.youtube.com/watch?v=aircAruvnKk",
+      "source_url": "https://www.youtube.com/watch?v=T-D1OfcDW1M",
       "clip_type": "tutorial",
       "language": "en",
       "category": "visual",
-      "question": "What is directly visible in 00:00–00:10? Do not infer identities or intentions.",
+      "question": "What is directly visible around the presenter during 00:00–00:20? Do not infer anything that is not shown or stated.",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -552,13 +552,13 @@
     {
       "id": "vb-28",
       "video_ids": [
-        "aircAruvnKk"
+        "T-D1OfcDW1M"
       ],
-      "source_url": "https://www.youtube.com/watch?v=aircAruvnKk",
+      "source_url": "https://www.youtube.com/watch?v=T-D1OfcDW1M",
       "clip_type": "tutorial",
       "language": "en",
       "category": "sequence",
-      "question": "What is the observed order of events in the reviewed interval? Flag any replay rather than counting it again.",
+      "question": "In the RAG flow she describes, in what order are the instruction, retrieval of relevant content and generation of the answer handled?",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -572,13 +572,13 @@
     {
       "id": "vb-29",
       "video_ids": [
-        "aircAruvnKk"
+        "T-D1OfcDW1M"
       ],
-      "source_url": "https://www.youtube.com/watch?v=aircAruvnKk",
+      "source_url": "https://www.youtube.com/watch?v=T-D1OfcDW1M",
       "clip_type": "tutorial",
       "language": "en",
       "category": "count",
-      "question": "Is a numerical total explicitly spoken or displayed? Cite it, or abstain instead of inferring a whole-video total from samples.",
+      "question": "How many moons does the speaker say Saturn has, and what planet and number of moons did her original, out-of-date answer give?",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -592,13 +592,13 @@
     {
       "id": "vb-30",
       "video_ids": [
-        "aircAruvnKk"
+        "T-D1OfcDW1M"
       ],
-      "source_url": "https://www.youtube.com/watch?v=aircAruvnKk",
+      "source_url": "https://www.youtube.com/watch?v=T-D1OfcDW1M",
       "clip_type": "tutorial",
       "language": "en",
       "category": "insufficient",
-      "question": "Can the inspected evidence establish an exhaustive event total for the entire clip? Explain any unobserved intervals.",
+      "question": "Does the video name the specific retriever, vector database or product IBM uses for RAG? Abstain if the clip does not say.",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -612,13 +612,13 @@
     {
       "id": "vb-31",
       "video_ids": [
-        "jNQXAC9IVRw"
+        "IwvdDtN1gs8"
       ],
-      "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
-      "clip_type": "general",
+      "source_url": "https://www.youtube.com/watch?v=IwvdDtN1gs8",
+      "clip_type": "tutorial",
       "language": "en",
       "category": "speech",
-      "question": "What does the speaker explicitly explain in a reviewed interval? Cite speech separately from visual evidence.",
+      "question": "Which example question about a company policy does the narrator use to show how a RAG system answers?",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -632,13 +632,13 @@
     {
       "id": "vb-32",
       "video_ids": [
-        "jNQXAC9IVRw"
+        "IwvdDtN1gs8"
       ],
-      "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
-      "clip_type": "general",
+      "source_url": "https://www.youtube.com/watch?v=IwvdDtN1gs8",
+      "clip_type": "tutorial",
       "language": "en",
       "category": "screen_text",
-      "question": "Which on-screen words can be read clearly in the reviewed interval? Abstain if they are unclear.",
+      "question": "Which words appear as on-screen titles when the three parts of RAG are introduced? Abstain if the transcript cannot confirm on-screen text.",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -652,13 +652,13 @@
     {
       "id": "vb-33",
       "video_ids": [
-        "jNQXAC9IVRw"
+        "IwvdDtN1gs8"
       ],
-      "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
-      "clip_type": "general",
+      "source_url": "https://www.youtube.com/watch?v=IwvdDtN1gs8",
+      "clip_type": "tutorial",
       "language": "en",
       "category": "visual",
-      "question": "What is directly visible in 00:00–00:10? Do not infer identities or intentions.",
+      "question": "What is directly visible during 00:00–00:15? Describe only what is shown, without guessing.",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -672,13 +672,13 @@
     {
       "id": "vb-34",
       "video_ids": [
-        "jNQXAC9IVRw"
+        "IwvdDtN1gs8"
       ],
-      "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
-      "clip_type": "general",
+      "source_url": "https://www.youtube.com/watch?v=IwvdDtN1gs8",
+      "clip_type": "tutorial",
       "language": "en",
       "category": "sequence",
-      "question": "What is the observed order of events in the reviewed interval? Flag any replay rather than counting it again.",
+      "question": "What are the three parts of RAG in the order the narrator introduces them, and what does each part do?",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -692,13 +692,13 @@
     {
       "id": "vb-35",
       "video_ids": [
-        "jNQXAC9IVRw"
+        "IwvdDtN1gs8"
       ],
-      "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
-      "clip_type": "general",
+      "source_url": "https://www.youtube.com/watch?v=IwvdDtN1gs8",
+      "clip_type": "tutorial",
       "language": "en",
       "category": "count",
-      "question": "Is a numerical total explicitly spoken or displayed? Cite it, or abstain instead of inferring a whole-video total from samples.",
+      "question": "In the narrator's example answer, how many days per week may employees work remotely?",
       "expected_answer": null,
       "source_version": null,
       "references": [],
@@ -712,13 +712,13 @@
     {
       "id": "vb-36",
       "video_ids": [
-        "jNQXAC9IVRw"
+        "IwvdDtN1gs8"
       ],
-      "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
-      "clip_type": "general",
+      "source_url": "https://www.youtube.com/watch?v=IwvdDtN1gs8",
+      "clip_type": "tutorial",
       "language": "en",
       "category": "insufficient",
-      "question": "Can the inspected evidence establish an exhaustive event total for the entire clip? Explain any unobserved intervals.",
+      "question": "Does the video state which AI model or vendor powers the assistant in its example? Abstain if it is not stated.",
       "expected_answer": null,
       "source_version": null,
       "references": [],
