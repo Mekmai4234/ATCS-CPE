@@ -1,0 +1,26 @@
+{$PUBLIC_HOST} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Cache-Control "no-store"
+	}
+	@backend path /api /api/* /health /ready
+	handle @backend {
+		reverse_proxy api:8000
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Container-internal health check only (port 8081 is not published).
+:8081 {
+	handle /ready {
+		reverse_proxy api:8000
+	}
+	respond 404
+}
