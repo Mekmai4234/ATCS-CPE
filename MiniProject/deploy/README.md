@@ -10,6 +10,7 @@ Caddy obtains a Let's Encrypt certificate for `PUBLIC_HOST` automatically.
 | `compose.server.yaml` | Production overlay: auth on, secure cookies, ports 80/443, Caddy |
 | `Caddyfile.server` | Static web app + `/api` reverse proxy, security headers |
 | `setup-warp.sh` | One-time Cloudflare WARP caption proxy (see below) |
+| `warp-watchdog.sh` | Auto-reconnects WARP when YouTube returns HTTP 429 (see below) |
 
 ## Prerequisites
 
@@ -65,3 +66,20 @@ If both are healthy and imports are still blocked, YouTube is blocking WARP's IP
 too: point `YOUTUBE_PROXY_URL` at a residential/home proxy, or use
 `YOUTUBE_WEBSHARE_USERNAME` / `YOUTUBE_WEBSHARE_PASSWORD`
 (see `03_video_ingestion/README.md`). No code change is needed.
+
+### Auto-reconnect on HTTP 429
+
+WARP exit IPs are shared, so YouTube sometimes rate-limits them (`youtube_rate_limited`,
+"เครือข่ายหรือบริการคำบรรยายยังไม่พร้อม"). A new exit IP usually fixes it:
+`warp-cli --accept-tos disconnect && warp-cli --accept-tos connect`.
+
+To do that automatically, once per server as root: `bash deploy/warp-watchdog.sh install`
+
+- a systemd timer runs every 30 s on the host and reads the worker's logs
+- on any `error_code=youtube_rate_limited` it reconnects WARP, then checks `warp=on`
+- at most one reconnect per 5 minutes (`WARP_WATCHDOG_COOLDOWN` seconds)
+- failed imports are not retried; users import again after the reconnect
+
+Logs: `journalctl -u warp-watchdog`. Remove: `bash deploy/warp-watchdog.sh uninstall`.
+If it reconnects every few minutes, WARP's IPs are no longer enough; use a
+residential proxy (above).
