@@ -186,6 +186,11 @@ class Worker:
                 raise AppError(
                     "adapter_invalid_output", "Study plan day count does not match request", 502
                 )
+            if result.type in {"quiz", "flashcards"}:
+                field = "questions" if result.type == "quiz" else "cards"
+                items = getattr(result.content, field)
+                # Adapters should already respect the requested count; trim defensively.
+                setattr(result.content, field, items[: request.get("count", 5)])
         elif kind == "research":
             result = ResearchResult.model_validate(
                 await self.adapters.research(request, sources, context)

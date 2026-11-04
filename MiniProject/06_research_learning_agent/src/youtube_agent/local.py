@@ -54,6 +54,12 @@ class LocalModel:
                 field = shape.get("properties", {}).get("days")
                 if isinstance(field, dict):
                     field.update(minItems=days, maxItems=days)
+        elif isinstance(task, dict) and task.get("type") in {"quiz", "flashcards"}:
+            count = task.get("count", 5)
+            key = "questions" if task["type"] == "quiz" else "cards"
+            field = shape.get("properties", {}).get(key)
+            if type(count) is int and 1 <= count <= 5 and isinstance(field, dict):
+                field.update(minItems=1, maxItems=count)
         body = {
             "think": False,
             "messages": [

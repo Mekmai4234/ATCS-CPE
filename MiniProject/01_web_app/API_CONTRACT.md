@@ -16,7 +16,7 @@ The branch was subsequently synchronized with develop before the PR; backend fil
 | Analysis            | POST /api/analysis { type, instruction, scope }                  | 202; summary/compare; compare needs >=2 filtered ready videos |
 | Research            | POST /api/research { goal, level, days, scope }                  | 202 job_id/run_id                                             |
 | Research events     | GET /api/research/{run_id}?after_event_id=N&limit=100            | events[] with monotonically increasing event_id               |
-| Learning            | POST /api/learning-artifacts { type, topic, level, days, scope } | 202; read result.artifact_ids[]                               |
+| Learning            | POST /api/learning-artifacts { type, topic, level, days, count (1-5, default 5), scope } | 202; read result.artifact_ids[] |
 | Saved artifact      | GET /api/learning-artifacts/{id}                                 | typed content, citations, coverage, sources_available         |
 | Cancel              | POST /api/jobs/{id}/cancel                                       | state/cancel_requested; continue polling until terminal       |
 | Retry import/delete | POST /api/jobs/{id}/retry                                        | 202 replacement job_id for eligible failed retryable work     |

@@ -73,10 +73,9 @@ async def video_artifact(service, request, run, schema):
         model=True,
     )
     content = schema.model_validate(generated.content)
-    items = getattr(
-        content, {"quiz": "questions", "flashcards": "cards", "study_plan": "days"}[request["type"]]
-    )
-    from .quality import validate_learning_items
+    from .quality import limit_learning_items, validate_learning_items
+
+    items = limit_learning_items(request, content)
 
     validate_learning_items(request["type"], items)
     ids = {cid for item in items for cid in item.citations}
