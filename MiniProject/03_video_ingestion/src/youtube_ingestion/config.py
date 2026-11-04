@@ -1,6 +1,7 @@
 import re
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,6 +13,8 @@ class IngestionSettings(BaseSettings):
         env_file=(PROJECT_ROOT / ".env", PROJECT_ROOT / "03_video_ingestion" / ".env"),
         extra="ignore",
         env_file_encoding="utf-8",
+        # Validation errors must not echo proxy credentials or API keys.
+        hide_input_in_errors=True,
     )
     transcript_languages: str = "th,en"
     ingest_timeout_seconds: float = Field(default=30, gt=0, le=300)
@@ -19,6 +22,25 @@ class IngestionSettings(BaseSettings):
     metadata_provider: Literal["auto", "oembed", "youtube_api", "none"] = "auto"
     youtube_api_key: SecretStr = SecretStr("")
     enable_transcription_fallback: bool = False
+    # Optional caption proxy for hosts whose IP YouTube blocks (cloud/VPS ranges).
+    # Either one generic http(s) proxy URL, or Webshare rotating residential credentials.
+    youtube_proxy_url: SecretStr = SecretStr("")
+    youtube_webshare_username: str = ""
+    youtube_webshare_password: SecretStr = SecretStr("")
+
+    @property
+    def caption_proxy(self):
+        """Proxy request for the caption subprocess; None means a direct connection."""
+        url = self.youtube_proxy_url.get_secret_value()
+        if url:
+            return {"kind": "generic", "url": url}
+        if self.youtube_webshare_username:
+            return {
+                "kind": "webshare",
+                "username": self.youtube_webshare_username,
+                "password": self.youtube_webshare_password.get_secret_value(),
+            }
+        return None
 
     @property
     def languages(self):
@@ -34,6 +56,17 @@ class IngestionSettings(BaseSettings):
             raise ValueError("Speech-to-text fallback is not implemented; keep it disabled")
         if self.metadata_provider == "youtube_api" and not self.youtube_api_key.get_secret_value():
             raise ValueError("YouTube Data API metadata requires YOUTUBE_API_KEY")
+        url = self.youtube_proxy_url.get_secret_value()
+        webshare = self.youtube_webshare_username, self.youtube_webshare_password.get_secret_value()
+        if url and any(webshare):
+            raise ValueError("Set YOUTUBE_PROXY_URL or YOUTUBE_WEBSHARE_*, not both")
+        if any(webshare) and not all(webshare):
+            raise ValueError("Webshare proxy requires username and password")
+        if url:
+            # Never echo the URL: it usually embeds credentials.
+            parts = urlsplit(url)
+            if parts.scheme not in {"http", "https"} or not parts.hostname:
+                raise ValueError("YOUTUBE_PROXY_URL must be http(s)://[user:pass@]host:port")
         return self
 
 

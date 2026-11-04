@@ -33,6 +33,9 @@ class FullSettings(Settings):
     metadata_provider: str = "auto"
     youtube_api_key: SecretStr = SecretStr("")
     enable_transcription_fallback: bool = False
+    youtube_proxy_url: SecretStr = SecretStr("")
+    youtube_webshare_username: str = ""
+    youtube_webshare_password: SecretStr = SecretStr("")
     answer_read_page_size: int = 100
     answer_max_chunks: int = 5000
     answer_max_model_calls: int = 64
