@@ -2,8 +2,9 @@
 
 ระบบผู้ช่วยค้นคว้าและเรียนรู้จากวิดีโอ YouTube ด้วย RAG, LLM และ Agentic AI
 
-> สถานะปัจจุบัน: หมวด 01–07 รันได้ครบและมีชุดทดสอบ ระบบทั้งหมดรันในเครื่องด้วย Docker ตาม [LOCAL_STACK.md](07_testing_deployment/LOCAL_STACK.md)
-> ยังไม่ได้ประเมินคุณภาพคำตอบโดยคน และยังไม่พร้อม deploy สาธารณะ ดู [MAIN_RELEASE.md](07_testing_deployment/MAIN_RELEASE.md)
+> สถานะปัจจุบัน: หมวด 01–07 รันได้ครบและมีชุดทดสอบ รันในเครื่องด้วย Docker ตาม [LOCAL_STACK.md](07_testing_deployment/LOCAL_STACK.md)
+> และ deploy บนเซิร์ฟเวอร์จริงแบบ HTTPS ตาม [deploy/README.md](deploy/README.md)
+> ยังไม่ได้ประเมินคุณภาพคำตอบโดยคน ดู [MAIN_RELEASE.md](07_testing_deployment/MAIN_RELEASE.md)
 
 ## เป้าหมาย
 
@@ -45,6 +46,7 @@
 การติดตั้งและรันหน้าเว็บดู [คู่มือส่วน 01](01_web_app/README.md) ซึ่งมี manifest, pnpm-lock.yaml และคำสั่งทดสอบแล้ว
 การติดตั้งและรันหมวด 02 ดู [คู่มือ Backend](02_api_backend/README.md) และ [ข้อตกลง API](docs/backend_api_contract.md)
 การรันระบบเต็มในเครื่อง, backup และการต่ออายุ policy ของ Gemini ทุก 7 วัน ดู [LOCAL_STACK.md](07_testing_deployment/LOCAL_STACK.md)
+การ deploy/อัปเดตเซิร์ฟเวอร์จริง, proxy สำหรับคำบรรยาย และการเปิดหน้าตรวจแชตของแอดมิน ดู [deploy/README.md](deploy/README.md)
 หมวด 02 มี manifest, uv.lock, migration, คำสั่งทดสอบ และ Docker Compose สำหรับ Backend แล้ว
 
 ## Branch
@@ -61,6 +63,8 @@
 
 - ระบบใช้บทถอดเสียงเป็นหลัก ไม่ได้เข้าใจเหตุการณ์ที่มีเฉพาะภาพ
 - คลิปที่ไม่มีคำบรรยายจะต้องแสดงสถานะ การถอดเสียงใหม่เป็นส่วนเสริมที่ยังไม่ได้ทำ
+- YouTube มักบล็อกการดึงคำบรรยายจาก IP ของคลาวด์/VPS (`youtube_access_blocked`) บนเซิร์ฟเวอร์ต้องตั้ง proxy ตาม [deploy/README.md](deploy/README.md)
+- หน้าตรวจแชตของแอดมิน (ดูถูกใจ/ไม่ถูกใจ) ปิดไว้เป็นค่าเริ่มต้น ต้องเปิดด้วย `CHAT_REVIEW_ENABLED` และ `CHAT_REVIEW_ADMIN_IDS`
 - เทคโนโลยีและค่าตั้งค่าในเอกสารเป็นข้อเสนอ ต้องตรวจความเข้ากันได้และล็อกเวอร์ชันเมื่อพัฒนา
 - การสรุปทุกคลิปต้องประมวลผลให้ครอบคลุม ไม่ใช้ top-k แล้วอ้างว่าครบทั้งหมด
 - ห้ามนำรหัสลับจริงมาใส่ `env.txt` หรือ commit `.env`

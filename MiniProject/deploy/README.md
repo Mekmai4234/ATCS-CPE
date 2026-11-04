@@ -19,6 +19,23 @@ Caddy obtains a Let's Encrypt certificate for `PUBLIC_HOST` automatically.
 - Gemini Free Tier policy at `runtime/free-tier-20261026/gemini-free-policy.json`
   (renewal: `07_testing_deployment/LOCAL_STACK.md`).
 
+## Admin chat review (likes/dislikes)
+
+Feedback is always saved, but the admin chat-review page is **off by default** and
+returns 403 `chat_review_disabled` until enabled in `.env.local`:
+
+```
+CHAT_REVIEW_ENABLED=true
+CHAT_REVIEW_ADMIN_IDS=["<admin user_id>","<admin user_id>"]
+```
+
+Each reviewer must be an active admin **and** listed by `user_id` (not email); new
+admins are not granted automatically. Reviewers can read users' questions/answers, so
+grant it deliberately. Find IDs in the `users` table (`role = 'admin'`). Users already
+see the review notice in chat. Only dislikes enter the review queue; likes appear in the
+stats and in the all-messages view filtered by rating. Redeploy after changing it.
+Details: `02_api_backend/CHAT_REVIEW_CONTRACT.md`.
+
 ## Deploy / update
 
 ```bash
