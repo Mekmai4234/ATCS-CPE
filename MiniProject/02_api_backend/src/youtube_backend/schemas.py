@@ -68,6 +68,8 @@ class ArtifactRequest(Schema):
     topic: str = Field(default="", max_length=4000)
     level: str = Field(default="beginner", min_length=1, max_length=100)
     days: int = Field(default=7, ge=1, le=90)
+    # Quiz questions / flashcards to generate; ignored for study plans.
+    count: int = Field(default=5, ge=1, le=5)
 
 
 class Segment(Schema):

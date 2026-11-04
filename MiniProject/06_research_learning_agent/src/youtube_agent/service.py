@@ -480,10 +480,9 @@ class AgentService:
         run.usage.add(generated.metadata)
         try:
             content = schema.model_validate(generated.content)
-            items = getattr(
-                content,
-                {"study_plan": "days", "quiz": "questions", "flashcards": "cards"}[request["type"]],
-            )
+            from .quality import limit_learning_items
+
+            items = limit_learning_items(request, content)
             ids = {cid for item in items for cid in item.citations}
             from .quality import validate_learning_items
 

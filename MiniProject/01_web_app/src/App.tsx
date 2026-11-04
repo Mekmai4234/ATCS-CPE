@@ -218,6 +218,7 @@ export default function App({
   const [taskType, setTaskType] = useState<TaskType>('summary');
   const [learningFocus, setLearningFocus] = useState(false);
   const [days, setDays] = useState(7);
+  const [count, setCount] = useState(5);
   const [level, setLevel] = useState('beginner');
   const prechecking = useRef(false);
   const draftIdentity = useRef('');
@@ -669,7 +670,13 @@ export default function App({
             ? { type, scope, instruction: text }
             : type === 'research'
               ? { goal: text, scope, level, days }
-              : { type, scope, topic: text, level, ...(type === 'study_plan' ? { days } : {}) };
+              : {
+                  type,
+                  scope,
+                  topic: text,
+                  level,
+                  ...(type === 'study_plan' ? { days } : { count }),
+                };
       const path =
         type === 'chat'
           ? '/api/chat'
@@ -1756,6 +1763,22 @@ export default function App({
                                 <option value="advanced">ขั้นสูง</option>
                               </select>
                             </label>
+                            {['quiz', 'flashcards'].includes(taskType) && (
+                              <label>
+                                {taskType === 'quiz' ? 'จำนวนคำถาม' : 'จำนวนการ์ด'}
+                                <select
+                                  value={count}
+                                  disabled={taskLocked}
+                                  onChange={(e) => setCount(Number(e.target.value))}
+                                >
+                                  {[1, 2, 3, 4, 5].map((n) => (
+                                    <option key={n} value={n}>
+                                      {n}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            )}
                             {['research', 'study_plan'].includes(taskType) && (
                               <label>
                                 จำนวนวัน

@@ -19,3 +19,16 @@ def validate_learning_items(kind, items):
         if not normalized or normalized in seen:
             raise error("invalid_artifact", "Learning output repeats a question or card")
         seen.add(normalized)
+
+
+ITEM_FIELDS = {"study_plan": "days", "quiz": "questions", "flashcards": "cards"}
+
+
+def limit_learning_items(request, content):
+    """Trim quiz/flashcard output to the requested count (default 5) and return the items."""
+    field = ITEM_FIELDS[request["type"]]
+    items = getattr(content, field)
+    if request["type"] != "study_plan":
+        items = items[: request.get("count", 5)]
+        setattr(content, field, items)
+    return items
