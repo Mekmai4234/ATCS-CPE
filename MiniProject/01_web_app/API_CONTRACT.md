@@ -7,20 +7,22 @@ and `MiniProject/02_api_backend/src/youtube_backend/schemas.py`. This file recor
 the frontend's integration assumptions; it does not replace the backend contract.
 The branch was subsequently synchronized with develop before the PR; backend files are inherited unchanged from develop.
 
-| Operation           | Request                                                          | Response handling                                             |
-| ------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------- |
-| Library             | GET /api/videos?limit=50&offset=N                                | items[], total; explicit load more                            |
-| Import              | POST /api/videos/import { urls[] }                               | 202; jobs[] mapped by input_index; accepted/existing/rejected |
-| Observe             | GET /api/jobs/{job_id}                                           | state and stage are separate; terminal result lives in result |
-| Chat                | POST /api/chat { question, conversation_id, scope }              | 200 final answer, or 202 job_id                               |
-| Analysis            | POST /api/analysis { type, instruction, scope }                  | 202; summary/compare; compare needs >=2 filtered ready videos |
-| Research            | POST /api/research { goal, level, days, scope }                  | 202 job_id/run_id                                             |
-| Research events     | GET /api/research/{run_id}?after_event_id=N&limit=100            | events[] with monotonically increasing event_id               |
-| Learning            | POST /api/learning-artifacts { type, topic, level, days, scope } | 202; read result.artifact_ids[]                               |
-| Saved artifact      | GET /api/learning-artifacts/{id}                                 | typed content, citations, coverage, sources_available         |
-| Cancel              | POST /api/jobs/{id}/cancel                                       | state/cancel_requested; continue polling until terminal       |
-| Retry import/delete | POST /api/jobs/{id}/retry                                        | 202 replacement job_id for eligible failed retryable work     |
-| Delete              | DELETE /api/videos/{video_id}                                    | 202 cleanup job; remove selected ID and refresh library       |
+| Operation           | Request                                                                 | Response handling                                             |
+| ------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Library             | GET /api/videos?limit=50&offset=N                                       | items[], total; explicit load more                            |
+| Import              | POST /api/videos/import { urls[] }                                      | 202; jobs[] mapped by input_index; accepted/existing/rejected |
+| Observe             | GET /api/jobs/{job_id}                                                  | state and stage are separate; terminal result lives in result |
+| Chat                | POST /api/chat { question, conversation_id, scope }                     | 200 final answer, or 202 job_id                               |
+| Analysis            | POST /api/analysis { type, instruction, scope }                         | 202; summary/compare; compare needs >=2 filtered ready videos |
+| Research            | POST /api/research { goal, level, days, scope }                         | 202 job_id/run_id                                             |
+| Research events     | GET /api/research/{run_id}?after_event_id=N&limit=100                   | events[] with monotonically increasing event_id               |
+| Learning            | POST /api/learning-artifacts { type, topic, level, days, count, scope } | 202; read result.artifact_ids[]                               |
+| Saved artifact      | GET /api/learning-artifacts/{id}                                        | typed content, citations, coverage, sources_available         |
+| Cancel              | POST /api/jobs/{id}/cancel                                              | state/cancel_requested; continue polling until terminal       |
+| Retry import/delete | POST /api/jobs/{id}/retry                                               | 202 replacement job_id for eligible failed retryable work     |
+| Delete              | DELETE /api/videos/{video_id}                                           | 202 cleanup job; remove selected ID and refresh library       |
+
+Learning `count` (quiz questions / flashcards) is 1-5 and defaults to 5; study plans use `days`.
 
 Scope: nonempty explicit video_ids (max 100), channel_ids, date_from/date_to.
 No nonempty playlist filter is sent. The UI applies channel/date filters locally

@@ -450,7 +450,8 @@ class GeminiModel:
             "Adapt difficulty to the requested level without adding facts. Avoid questions "
             "with the same meaning; return fewer items when evidence supports fewer facts. "
             "For study plans return exactly the requested number of days. "
-            "For quizzes return at most 5 questions; for flashcards at most 8 cards. "
+            "For quizzes and flashcards return exactly task.count items (default 5, never more); "
+            "return fewer only when the evidence cannot support that many distinct items. "
             "Keep each answer and explanation short; cite only relevant evidence IDs.",
         }
         response, metadata = await self._call(
