@@ -106,6 +106,8 @@ initialization, API and worker against one SQLite/Chroma volume through the exis
 `youtube_answers.team:create_adapters` factory. The separate `Dockerfile.web` builds module
 01 and serves it through Caddy. The guarded auth overlay is described in
 [AUTH_DEPLOYMENT.md](AUTH_DEPLOYMENT.md); it is not yet accepted for public deployment.
+The running HTTPS server deployment (Caddy + Let's Encrypt, caption proxy, admin chat
+review) is documented in [../deploy/README.md](../deploy/README.md).
 
 Export `GEMINI_API_KEY` securely in your local terminal and choose an account-accessible
 `LLM_MODEL`. No credentials are stored here. From MiniProject:
