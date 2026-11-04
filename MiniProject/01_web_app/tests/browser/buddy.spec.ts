@@ -141,6 +141,21 @@ test('scope changes start a new conversation and suggestions never submit automa
     dialog(page).getByText('ชุดคลิปเปลี่ยนแล้ว คำถามนี้เริ่มบทสนทนาใหม่', { exact: true }),
   ).toBeVisible();
 });
+test('new conversation in floating Buddy clears it without leaving the current page', async ({
+  page,
+}) => {
+  await login(page);
+  const before = page.url();
+  await open(page);
+  const input = dialog(page).getByLabel('ข้อความถึง Buddy', { exact: true });
+  await input.fill('สวัสดี');
+  await input.press('Enter');
+  await expect(dialog(page).locator('.buddy-message')).toHaveCount(1);
+  await dialog(page).getByRole('button', { name: 'เริ่มบทสนทนาใหม่', exact: true }).click();
+  await expect(dialog(page).locator('.buddy-message')).toHaveCount(0);
+  expect(page.url()).toBe(before);
+  await expect(page.getByRole('heading', { name: 'บทสนทนา', exact: true })).toHaveCount(0);
+});
 test('IME and Shift+Enter do not submit; cancellation is available for a pending job', async ({
   page,
 }) => {
