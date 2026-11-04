@@ -32,7 +32,9 @@ def remote_error(code):
 class SubprocessCaptions:
     """One killable process per fetch; no thread can outlive a cancelled job."""
 
-    def __init__(self):
+    def __init__(self, proxy=None):
+        # Sent over stdin, never argv/env, so credentials stay out of process listings.
+        self.proxy = proxy
         self.processes = set()
         self.fetches = set()
         self.stopping = {}
@@ -122,7 +124,9 @@ class SubprocessCaptions:
                 self.processes.add(process)
                 if self.closed:
                     raise remote_error("ingest_unavailable")
-                request = dict(video_id=video_id, languages=languages, timeout=timeout)
+                request = dict(
+                    video_id=video_id, languages=languages, timeout=timeout, proxy=self.proxy
+                )
                 process.stdin.write(json.dumps(request).encode() + b"\n")
                 await process.stdin.drain()
                 process.stdin.close()

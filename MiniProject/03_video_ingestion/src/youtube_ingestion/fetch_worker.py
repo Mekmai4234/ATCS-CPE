@@ -7,6 +7,7 @@ from requests import Session
 from requests.adapters import HTTPAdapter
 from youtube_backend.urls import VIDEO_ID
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
 
 from .errors import classify
 
@@ -28,13 +29,32 @@ class BoundedSession(Session):
         return response
 
 
-def fetch(video_id, languages, timeout):
+# Each blocked retry rotates to a new residential IP; keep it inside the attempt budget.
+WEBSHARE_RETRIES_WHEN_BLOCKED = 3
+
+
+def proxy_config(proxy):
+    if not proxy:
+        return None
+    if proxy["kind"] == "generic":
+        return GenericProxyConfig(http_url=proxy["url"], https_url=proxy["url"])
+    if proxy["kind"] == "webshare":
+        return WebshareProxyConfig(
+            proxy_username=proxy["username"],
+            proxy_password=proxy["password"],
+            retries_when_blocked=WEBSHARE_RETRIES_WHEN_BLOCKED,
+        )
+    raise ValueError("Unsupported proxy kind")
+
+
+def fetch(video_id, languages, timeout, proxy=None):
     if not VIDEO_ID.fullmatch(video_id):
         raise ValueError("Invalid video ID")
     with BoundedSession(timeout) as session:
+        api = YouTubeTranscriptApi(proxy_config=proxy_config(proxy), http_client=session)
         # SDK find_transcript prefers all manual languages over all generated ones.
         # Our policy is language priority FIRST, then manual within that language.
-        tracks = list(YouTubeTranscriptApi(http_client=session).list(video_id))
+        tracks = list(api.list(video_id))
         selected = next(
             (
                 track
@@ -62,7 +82,12 @@ def fetch(video_id, languages, timeout):
 def main():
     try:
         request = json.loads(sys.stdin.buffer.readline(8192))
-        response = fetch(request["video_id"], request["languages"], request["timeout"])
+        response = fetch(
+            request["video_id"],
+            request["languages"],
+            request["timeout"],
+            request.get("proxy"),
+        )
     except Exception as exc:
         response = {"ok": False, "code": classify(exc).code}
     # ASCII JSON survives Windows console encodings and preserves Unicode on decoding.
