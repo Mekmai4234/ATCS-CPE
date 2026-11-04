@@ -85,6 +85,8 @@ not load 03/.env. Set backend variables explicitly in both terminals below.
 | `METADATA_PROVIDER` | `auto`: Data API with key, otherwise oEmbed; also `none` |
 | `YOUTUBE_API_KEY` | Optional server-side metadata key |
 | `ENABLE_TRANSCRIPTION_FALLBACK` | false; true rejected because ASR is not implemented |
+| `YOUTUBE_PROXY_URL` | Optional caption proxy `http(s)://user:pass@host:port`; empty = direct |
+| `YOUTUBE_WEBSHARE_USERNAME` / `YOUTUBE_WEBSHARE_PASSWORD` | Optional Webshare rotating residential proxy (alternative to the URL) |
 | `GEMINI_API_KEY` | Required only for real 04 embeddings through the live factory |
 
 Language priority comes first, then manual before generated in that language. With
@@ -191,7 +193,12 @@ and returns `ingest_cleanup_timeout` rather than silently starting more children
 
 Unknown errors are redacted; no raw provider messages or credentials are returned/logged.
 YouTube can block public caption access. A block is not treated as missing captions.
-There is no proxy rotation, cookie authentication or automatic transcription fallback.
+YouTube commonly blocks cloud/VPS IP ranges (`youtube_access_blocked`). Set one caption
+proxy above to route only caption requests through it; a residential proxy is usually
+required. Webshare retries a blocked request on up to 3 new IPs within the attempt budget.
+Proxy credentials reach the caption subprocess over stdin, never argv or environment, and
+are not echoed in configuration errors. Proxy connection failures are `ingest_unavailable`.
+There is no cookie authentication or automatic transcription fallback.
 No discovery, scheduler, ready-video refresh, ASR, visual understanding or new ownership
 model is implemented in 03. Native membership and job ownership are supplied by 02;
 03 does not implement per-member pending/running quotas or fair worker scheduling.

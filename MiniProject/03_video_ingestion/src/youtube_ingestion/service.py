@@ -21,7 +21,11 @@ logger = logging.getLogger(__name__)
 class IngestionService:
     def __init__(self, settings=None, *, captions=None, metadata=None, media=None):
         self.settings = settings or IngestionSettings()
-        self.captions = captions if captions is not None else SubprocessCaptions()
+        self.captions = (
+            captions
+            if captions is not None
+            else SubprocessCaptions(proxy=self.settings.caption_proxy)
+        )
         self.metadata = metadata if metadata is not None else YouTubeMetadata(self.settings)
         self.closed = False
         self.media = media
