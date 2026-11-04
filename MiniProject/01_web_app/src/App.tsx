@@ -750,7 +750,9 @@ export default function App({
     setArchiveLoading(false);
     setArchiveError('');
     loadedArchive.current = null;
-    onNavigate?.('/chat');
+    // Only leave /chat/<id> so the archive is not reloaded; elsewhere (e.g. floating
+    // Buddy over the library) a new conversation must not change the page.
+    if (initialConversationId) onNavigate?.('/chat');
     updateTurns((previous) => previous.filter((turn) => turn.type !== 'chat'));
   }
   async function resumeChat(deferredOp?: Operation) {
