@@ -154,6 +154,23 @@ class RagKnowledge:
         return await self.rag.evidence(available, ids, execution)
 
 
+def batch_limited(config, settings):
+    """Cap parallel analysis batches at what the 02 quota broker admits at once.
+
+    The broker denies a reservation beyond GEMINI_MAX_CONCURRENT or
+    GEMINI_USER_CONCURRENT with quota_wait, which requeues the whole job for at
+    least a minute. Sending more batches than it admits only adds that wait.
+    """
+    limit = min(
+        config.answer_batch_concurrency,
+        getattr(settings, "gemini_max_concurrent", config.answer_batch_concurrency),
+        getattr(settings, "gemini_user_concurrent", config.answer_batch_concurrency),
+    )
+    if limit == config.answer_batch_concurrency:
+        return config
+    return config.model_copy(update={"answer_batch_concurrency": limit})
+
+
 class AnswerAdapters(RagAdapters):
     async def inventory(self, sources, context):
         job = context.repository.check_execution(context.job_id, context.lease_token)
@@ -171,7 +188,7 @@ class AnswerAdapters(RagAdapters):
         rag_settings=None,
         embedder=None,
     ):
-        config = answer_settings or AnswerSettings()
+        config = batch_limited(answer_settings or AnswerSettings(), settings)
         gateway = model or GeminiModel(config, broker=ExecutionBroker(repository, config))
         super().__init__(
             settings=settings, repository=repository, rag_settings=rag_settings, embedder=embedder

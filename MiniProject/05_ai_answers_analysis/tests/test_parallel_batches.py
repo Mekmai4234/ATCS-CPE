@@ -91,3 +91,25 @@ async def test_failure_stops_queued_batches_and_raises_earliest_error(env):
     sent = [p for p in env.model.payloads if p["task"] == "summarize_batch"]
     assert len(sent) == 2  # Batches waiting for a slot were never sent.
     assert not [p for p in env.model.payloads if p["task"] == "compare"]
+
+
+@pytest.mark.parametrize(
+    ("max_concurrent", "user_concurrent", "expected"),
+    [(1, 1, 1), (3, 1, 1), (3, 2, 2), (3, 3, 3), (8, 8, 3)],
+)
+def test_batch_concurrency_never_exceeds_quota_broker(max_concurrent, user_concurrent, expected):
+    from youtube_backend.config import Settings
+
+    from youtube_answers.config import AnswerSettings
+    from youtube_answers.integration import batch_limited
+
+    # A batch the broker cannot admit is denied with quota_wait and requeues the
+    # whole job for a minute, so the cap must follow the broker's limits.
+    backend = Settings(
+        _env_file=None,
+        gemini_max_concurrent=max_concurrent,
+        gemini_user_concurrent=user_concurrent,
+    )
+    config = AnswerSettings(_env_file=None, answer_batch_concurrency=3)
+    assert batch_limited(config, backend).answer_batch_concurrency == expected
+    assert config.answer_batch_concurrency == 3, "caller's settings stay unchanged"
