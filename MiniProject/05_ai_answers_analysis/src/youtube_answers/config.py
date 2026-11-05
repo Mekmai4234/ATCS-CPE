@@ -28,6 +28,8 @@ class AnswerSettings(BaseSettings):
     answer_read_page_size: int = Field(default=100, ge=1, le=200)
     answer_max_chunks: int = Field(default=5000, ge=1, le=100000)
     answer_max_model_calls: int = Field(default=64, ge=1, le=1000)
+    # Independent analysis batches sent to the model at once; bounded to respect quota.
+    answer_batch_concurrency: int = Field(default=3, ge=1, le=8)
     answer_max_history_messages: int = Field(default=12, ge=0, le=40)
     answer_max_history_bytes: int = Field(default=4000, ge=0, le=20000)
     vision_model: str = Field(default="", max_length=200)

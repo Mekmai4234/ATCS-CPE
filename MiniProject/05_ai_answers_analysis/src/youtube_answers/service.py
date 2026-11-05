@@ -91,7 +91,7 @@ class AnswerService:
         }
 
     @timed_stage("generation")
-    async def _generate(self, run, data):
+    async def _generate(self, run, data, sink=None):
         if input_size(data) > self.settings.max_context_tokens:
             raise error("context_budget_exceeded", "Input exceeds conservative context guard")
         if run.calls >= self.settings.answer_max_model_calls:
@@ -101,10 +101,10 @@ class AnswerService:
         generated = await self._bounded(
             run, lambda timeout: self.model.generate(data, timeout, **options)
         )
-        return self._accept(run, data, generated.content, generated.metadata)
+        return self._accept(run, data, generated.content, generated.metadata, sink)
 
     @staticmethod
-    def _accept(run, data, content, metadata):
+    def _accept(run, data, content, metadata, sink=None):
         try:
             result = GeneratedAnswer.model_validate(content)
             metadata = ProviderMetadata.model_validate(metadata)
@@ -114,10 +114,10 @@ class AnswerService:
         for statement in result.statements:
             if set(statement.citation_ids) - allowed:
                 raise error("invalid_citation", "Model cited evidence absent from this request")
-        run.metadata.append(metadata)
+        (run.metadata if sink is None else sink).append(metadata)
         return result
 
-    async def _generate_checkpointed(self, run, source, data):
+    async def _generate_checkpointed(self, run, source, data, sink=None):
         """Generate one per-video batch, reusing this job's finished result on a retry.
 
         Only member jobs keep checkpoints: they are private rows bound to the durable job,
@@ -125,29 +125,62 @@ class AnswerService:
         passes the same validation as a fresh one and does not use the call budget.
         """
         if not isinstance(run.context, MemberContext):
-            return await self._generate(run, data)
+            return await self._generate(run, data, sink)
         from youtube_backend.answer_checkpoint import AnswerCheckpointStore
         from youtube_backend.repository import digest
 
+        target = run.metadata if sink is None else sink
         store = AnswerCheckpointStore(run.context)
         input_hash = digest(["answer-batch", self.settings.llm_model, data])
         saved = store.load(source, input_hash)
         if saved is not None:
             try:
-                return self._accept(run, data, saved["result"], saved["metadata"])
+                return self._accept(run, data, saved["result"], saved["metadata"], target)
             except (AppError, KeyError, TypeError):
                 pass  # A checkpoint that no longer validates is regenerated, never trusted.
-        result = await self._generate(run, data)
+        own = []  # This batch's metadata only, even while sibling batches finish.
+        result = await self._generate(run, data, own)
         store.save(
             source,
             input_hash,
             self.settings.llm_model,
             {
                 "result": result.model_dump(mode="json"),
-                "metadata": run.metadata[-1].model_dump(mode="json"),
+                "metadata": own[-1].model_dump(mode="json"),
             },
         )
+        target.extend(own)
         return result
+
+    async def _generate_all(self, run, calls):
+        """Run independent model calls concurrently and return results in input order.
+
+        Each call receives its own metadata sink, merged into the run in input order, so
+        the outcome matches running them one by one. After any failure, calls still
+        waiting for a slot are not sent; the earliest failing call's error is raised.
+        """
+        gate = asyncio.Semaphore(self.settings.answer_batch_concurrency)
+        failed = False
+
+        async def one(call):
+            nonlocal failed
+            sink = []
+            async with gate:
+                if failed:
+                    return None, sink
+                try:
+                    return await call(sink), sink
+                except BaseException:
+                    failed = True
+                    raise
+
+        outcomes = await asyncio.gather(*(one(c) for c in calls), return_exceptions=True)
+        for outcome in outcomes:
+            if isinstance(outcome, BaseException):
+                raise outcome
+        for _, sink in outcomes:
+            run.metadata.extend(sink)
+        return [result for result, _ in outcomes]
 
     def _history(self, history, run):
         selected = []
@@ -467,17 +500,31 @@ class AnswerService:
                 full=True,
             )
         # First process bounded batches per video; every original chunk participates.
-        summaries = []
-        for source in run.sources:
-            selected = [n for n in nodes if n["video_id"] == source.video_id]
-            for group in self._groups("summarize_batch", request, selected):
-                result = await self._generate_checkpointed(
-                    run, source, payload("summarize_batch", request, group)
+        # Batches are independent, so they run concurrently; results keep their order.
+        batches = [
+            (source, group)
+            for source in run.sources
+            for group in self._groups(
+                "summarize_batch",
+                request,
+                [n for n in nodes if n["video_id"] == source.video_id],
+            )
+        ]
+        results = await self._generate_all(
+            run,
+            [
+                lambda sink, source=source, group=group: self._generate_checkpointed(
+                    run, source, payload("summarize_batch", request, group), sink
                 )
-                run.processed.update(cid for n in group for cid in n["citation_ids"])
-                summaries.extend(self._nodes(run, result))
-                if result.status == "insufficient_evidence":
-                    run.notes.append(f"สรุปหลักฐานบางช่วงของคลิป {source.video_id} ไม่ได้")
+                for source, group in batches
+            ],
+        )
+        summaries = []
+        for (source, group), result in zip(batches, results, strict=True):
+            run.processed.update(cid for n in group for cid in n["citation_ids"])
+            summaries.extend(self._nodes(run, result))
+            if result.status == "insufficient_evidence":
+                run.notes.append(f"สรุปหลักฐานบางช่วงของคลิป {source.video_id} ไม่ได้")
         # Recursively reduce summaries. Fail explicitly if the model does not compress.
         while summaries:
             data = payload(request["type"], request, summaries)
@@ -485,8 +532,16 @@ class AnswerService:
                 output = await self._generate(run, data)
                 break
             reduced = []
-            for group in self._groups("merge_summaries", request, summaries):
-                result = await self._generate(run, payload("merge_summaries", request, group))
+            results = await self._generate_all(
+                run,
+                [
+                    lambda sink, group=group: self._generate(
+                        run, payload("merge_summaries", request, group), sink
+                    )
+                    for group in self._groups("merge_summaries", request, summaries)
+                ],
+            )
+            for result in results:
                 reduced.extend(self._nodes(run, result))
                 if result.status == "insufficient_evidence":
                     run.notes.append("สรุปขั้นกลางบางส่วนมีหลักฐานไม่เพียงพอ")
