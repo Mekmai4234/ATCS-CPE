@@ -101,9 +101,13 @@ class AnswerService:
         generated = await self._bounded(
             run, lambda timeout: self.model.generate(data, timeout, **options)
         )
+        return self._accept(run, data, generated.content, generated.metadata)
+
+    @staticmethod
+    def _accept(run, data, content, metadata):
         try:
-            result = GeneratedAnswer.model_validate(generated.content)
-            metadata = ProviderMetadata.model_validate(generated.metadata)
+            result = GeneratedAnswer.model_validate(content)
+            metadata = ProviderMetadata.model_validate(metadata)
         except (ValueError, TypeError):
             raise error("invalid_model_output", "Model returned an invalid answer") from None
         allowed = {cid for item in data["untrusted_evidence"] for cid in item["citation_ids"]}
@@ -111,6 +115,38 @@ class AnswerService:
             if set(statement.citation_ids) - allowed:
                 raise error("invalid_citation", "Model cited evidence absent from this request")
         run.metadata.append(metadata)
+        return result
+
+    async def _generate_checkpointed(self, run, source, data):
+        """Generate one per-video batch, reusing this job's finished result on a retry.
+
+        Only member jobs keep checkpoints: they are private rows bound to the durable job,
+        its owner, the frozen source version and the exact model input. A replayed result
+        passes the same validation as a fresh one and does not use the call budget.
+        """
+        if not isinstance(run.context, MemberContext):
+            return await self._generate(run, data)
+        from youtube_backend.answer_checkpoint import AnswerCheckpointStore
+        from youtube_backend.repository import digest
+
+        store = AnswerCheckpointStore(run.context)
+        input_hash = digest(["answer-batch", self.settings.llm_model, data])
+        saved = store.load(source, input_hash)
+        if saved is not None:
+            try:
+                return self._accept(run, data, saved["result"], saved["metadata"])
+            except (AppError, KeyError, TypeError):
+                pass  # A checkpoint that no longer validates is regenerated, never trusted.
+        result = await self._generate(run, data)
+        store.save(
+            source,
+            input_hash,
+            self.settings.llm_model,
+            {
+                "result": result.model_dump(mode="json"),
+                "metadata": run.metadata[-1].model_dump(mode="json"),
+            },
+        )
         return result
 
     def _history(self, history, run):
@@ -435,7 +471,9 @@ class AnswerService:
         for source in run.sources:
             selected = [n for n in nodes if n["video_id"] == source.video_id]
             for group in self._groups("summarize_batch", request, selected):
-                result = await self._generate(run, payload("summarize_batch", request, group))
+                result = await self._generate_checkpointed(
+                    run, source, payload("summarize_batch", request, group)
+                )
                 run.processed.update(cid for n in group for cid in n["citation_ids"])
                 summaries.extend(self._nodes(run, result))
                 if result.status == "insufficient_evidence":
