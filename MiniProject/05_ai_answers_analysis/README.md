@@ -71,7 +71,7 @@ of `AnswerSettings` is a separate standalone API, not the full runtime configura
 | `ANSWER_READ_PAGE_SIZE` | 100 | Whole-video enumeration page size |
 | `ANSWER_MAX_CHUNKS` | 5000 | Evidence memory/processing limit |
 | `ANSWER_MAX_MODEL_CALLS` | 64 | Maximum generation requests per answer/analysis |
-| `ANSWER_BATCH_CONCURRENCY` | 3 | Independent analysis batches sent to the model at once (1-8) |
+| `ANSWER_BATCH_CONCURRENCY` | 3 | Independent analysis batches sent to the model at once (1-8); capped by `GEMINI_MAX_CONCURRENT` and `GEMINI_USER_CONCURRENT` in the full runtime |
 | `ANSWER_MAX_HISTORY_MESSAGES` | 12 | Maximum recent history entries |
 | `ANSWER_MAX_HISTORY_BYTES` | 4000 | Serialized UTF-8 history budget |
 | `ENABLE_STREAMING` | false | True rejected; only validated final results are supported |

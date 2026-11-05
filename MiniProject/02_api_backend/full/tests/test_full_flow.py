@@ -195,6 +195,10 @@ async def full(tmp_path, monkeypatch, request):
         database_url=f"sqlite:///{(tmp_path / 'app.db').as_posix()}",
         chroma_persist_dir=str(tmp_path / "chroma"),
         gemini_api_key="test-only-not-a-real-key",
+        # Broker limits at or above the batch default, so the exported
+        # ANSWER_BATCH_CONCURRENCY=3 is not capped by 05 and its passthrough stays checked.
+        gemini_max_concurrent=3,
+        gemini_user_concurrent=3,
         job_retry_base_seconds=0,
         job_lease_seconds=120,
         transcript_languages="en,th",
