@@ -88,6 +88,43 @@ async def test_five_real_documents_local_http_worker_never_dispatches_provider(
     assert not env.model.payloads
 
 
+async def test_plain_language_questions_find_related_transcript_lines(integrated, monkeypatch):
+    env = integrated
+    await seed(env)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Related lookup attempted provider/client admission")
+
+    monkeypatch.setattr(env.answers, "_answer_provider", forbidden)
+    monkeypatch.setattr(QuotaBroker, "call", forbidden)
+    cases = [
+        ("semantic search คืออะไร", ["cWVse_LuFO0"], "semantic"),
+        ("vector database ใช้ทำอะไร", ["cWVse_LuFO0"], "database"),
+        # The speaker says "แคก" for RAG; the English question still finds it.
+        ("ถ้าไม่มี rag จะเป็นยังไง", ["cWVse_LuFO0"], "ไม่มีแคก"),
+        ("custom gpt สร้างยังไง", ["f0SQzjp3QzM"], "customize"),
+    ]
+    for question, videos, expected in cases:
+        result = await ask(env, question, videos)
+        assert result["status"] == "answered", (question, result)
+        assert result["answer"].startswith("ไม่พบประโยคที่ตรงคำถามทุกคำ")
+        assert expected in result["answer"].casefold(), (question, result["answer"])
+        assert result["provider_metadata"]["provider"] == "local-document"
+        assert result["citations"] and all(
+            c["kind"] == "document_transcript" and c["video_id"] in videos
+            for c in result["citations"]
+        )
+    for question, videos in (
+        ("สูตรขนมครก", ["cWVse_LuFO0"]),
+        ("สูตรขนมครก", ["NZImGB4O-X4"]),
+        ("เพลงนี้เศร้าไหม", ["B-zaXo-skGo"]),
+        ("embedding คืออะไร", ["cWVse_LuFO0"]),
+    ):
+        result = await ask(env, question, videos)
+        assert result["status"] == "insufficient_evidence" and not result["citations"], question
+    assert not env.model.payloads
+
+
 async def test_opted_in_ai_uses_same_document_evidence_instead_of_old_captions(integrated):
     env = integrated
     await seed(env)
