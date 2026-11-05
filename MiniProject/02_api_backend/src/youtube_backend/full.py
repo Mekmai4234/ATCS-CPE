@@ -39,6 +39,7 @@ class FullSettings(Settings):
     answer_read_page_size: int = 100
     answer_max_chunks: int = 5000
     answer_max_model_calls: int = 64
+    answer_batch_concurrency: int = 3
     answer_max_history_messages: int = 12
     answer_max_history_bytes: int = 4000
 
