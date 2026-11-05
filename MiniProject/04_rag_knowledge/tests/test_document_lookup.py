@@ -3,7 +3,7 @@ import socket
 import pytest
 from youtube_backend.document_store import publish
 
-from youtube_rag.document_lookup import lookup
+from youtube_rag.document_lookup import lookup, related_terms
 
 
 @pytest.mark.asyncio
@@ -45,3 +45,13 @@ async def test_inverted_lookup_requires_full_phrase_and_keeps_unknown_end(env, m
     assert not lookup(queried.ctx, [source], ["ค้นข้อที่ไม่มี"])["items"]
     assert not lookup(queried.ctx, [source], [], window=(30, 40))["items"]
     assert lookup(queried.ctx, [source], [], window=(15, 21))["items"][0]["start_seconds"] == 10
+
+
+def test_related_terms_drop_question_words_but_keep_inner_syllables():
+    terms = related_terms("Vector Database ใช้ทำอะไรครับ")
+    assert terms[0] == ("exact", frozenset({"vector", "เวกเตอร์"}))
+    assert terms[1] == ("exact", frozenset({"database", "ดาต้าเบส"}))
+    assert terms[2][0] == "grams" and "ใช้" in terms[2][1]
+    # "คะ" and "ไหม" are particles only at a word end.
+    assert ("grams", frozenset({"คะแ", "ะแน", "แนน"})) in related_terms("คะแนนเท่าไหร่คะ")
+    assert related_terms("อะไรครับ") == []
